@@ -6,3 +6,10 @@ __pycache__/
 data/raw/
 artifacts/
 
+# Large reproducible CalculiX high-frequency solver intermediates.
+web/assets/simulation/calculix-highfreq/*.eig
+web/assets/simulation/calculix-highfreq/*.frd
+web/assets/simulation/calculix-highfreq/*.12d
+web/assets/simulation/calculix-highfreq/*.cvg
+web/assets/simulation/calculix-highfreq/*.sta
+web/assets/simulation/calculix-highfreq/spooles.out

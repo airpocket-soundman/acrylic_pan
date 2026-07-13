@@ -23,7 +23,7 @@
 
 - MCU: ML63Q2557、48 MHz、Flash 256 KB、RAM 16 KB
 - センサ: KX134-1211、Z軸、符号付き16 bit
-- 初期設定: ±8 g、ODR 6.4 kHz、High Performance、LPF ODR/2
+- 初期設定: ±8 g、ODR 25.6 kHz（最大）、High Performance、LPF ODR/2
 - USB: FT2232H Channel B / UARTF1、115200 bps、8-N-1、フロー制御なし
 - センサ位置: `(200,100) mm`
 
@@ -104,13 +104,13 @@ BOOT -> SELF_TEST -> IDLE -> ARMED -> CAPTURING -> QUEUED -> TRANSMITTING
 
 ### 3.3 通常EVENTモード
 
-- リングバッファ: Z軸1024点、160 ms、int16
+- リングバッファ: Z軸2048点、80 ms、int16
 - トリガ: `abs(z[n]-z[n-1])` を基本とするjerkしきい値
-- 保存: 512点、前32点（5 ms）+ 後480点（75 ms）
-- trigger index: 32
+- 保存: 1,280点、前128点（5 ms）+ 後1,152点（45 ms）
+- trigger index: 128
 - 再トリガ抑止: 初期150 ms、PCから変更可能
 - 1 Hz程度の単打収録に使用
-- 1イベント約1 KB、UART送信約90 ms
+- 1イベント約2.5 KB、UART送信は1 Hz程度の教師収録に限定
 
 トリガ時刻は仮位置である。PCは保存波形内の最大jerkを再探索し、整列済み位置を
 manifestへ別フィールドで保存する。
@@ -120,7 +120,8 @@ manifestへ別フィールドで保存する。
 同時打撃と100 ms連打を収録する。
 
 - 明示的なPCコマンドでARM
-- Z軸2048点、320 msを1ブロックとして取得
+- 25.6 kHzで取得しながらアンチエイリアスLPFと4分周を実行
+- 保存はZ軸6.4 kHz・2048点、320 msの1ブロック
 - 先頭に40 ms以上の静止区間を含める
 - ブロック内の全ピークを保存し、ボード側では1打へ分割しない
 - 取得完了後にUART送信
@@ -142,7 +143,7 @@ PCのarea ID、座標、note、session IDはボード処理に使用しない。
 
 ### 3.6 受入条件
 
-- 6.4 kHzのサンプル数誤差0、連続10分でoverrun 0
+- 25.6 kHzのサンプル数誤差0、連続10分でoverrun 0
 - 1 Hz × 100イベントでsequence欠落0、CRCエラー0
 - 前32点が全イベントに存在
 - ±8 g飽和を確実にflag
@@ -160,10 +161,12 @@ PCのarea ID、座標、note、session IDはボード処理に使用しない。
 ### 4.2 初期モデル
 
 - 教師あり、3層FFNN、隠れ層1層
-- 入力128: Z軸符号付き時間波形20 ms
+- 取得: Z軸 25.6 kHz、50 ms、1,280点
+- 連続フィルタ: HPF 100 Hzを初期候補とし、約5 kHz LPF後に2分周
+- 入力32～64: 12.8 kHz・640点のFFT帯域強度（Hann窓、1,024点へゼロパディング）
 - 隠れ64: Hard Sigmoid
 - 出力8: AREA_0..AREA_7の独立スコア
-- 合計200ノード、最終AI RAMはSolist-AI Sim表示で確認
+- 入力64時は合計136ノード、最終AI RAMはSolist-AI Sim表示で確認
 - 演算精度: bfloat16
 - 単打教師: one-hot
 - 同時2点教師: multi-hot
@@ -173,13 +176,13 @@ PCのarea ID、座標、note、session IDはボード処理に使用しない。
 ### 4.3 イベント処理
 
 ```text
-Z連続取得 -> jerkトリガ -> 前16～32点を含む128点 -> DC除去
--> 打撃開始再整列 -> スケール処理 -> bfloat16 -> Solist-AI
+Z 25.6 kHz連続取得 -> 連続HPF -> jerkトリガ -> 前128点（5 ms）を含む1,280点
+-> 打撃開始再整列 -> LPF -> 2分周 -> 640点 -> Hann窓 -> 1024点FFT -> 帯域圧縮 -> 正規化 -> Solist-AI
 -> 8スコア -> 単打/同時2点判定 -> RESULT送信
 ```
 
-- 打撃開始から20 msで入力窓を確定
-- 打撃開始から40 ms以内に再アーム
+- 入力窓は前5 ms＋後45 msの合50 ms
+- 打撃開始から60 ms以内に再アーム
 - 100 ms以上離れた打撃を別イベントとして処理
 - 前打の残響を含む学習データで2打目を評価
 - 同時打撃は最大2エリアを返す
@@ -201,7 +204,7 @@ Z連続取得 -> jerkトリガ -> 前16～32点を含む128点 -> DC除去
 - `GET_MODEL_INFO`
 - `SET_THRESHOLDS`
 - `INFERENCE_RESULT`
-- `DEBUG_SNAPSHOT`: 明示要求時だけ128点波形を付加
+- `DEBUG_SNAPSHOT`: 明示要求時だけ1,280点生波形、640点分周後波形、圧縮特徴を付加
 - `INFERENCE_STATS`: hit/unknown/ambiguous/latency/overrun統計
 
 `INFERENCE_RESULT`にはsequence、timestamp、8 raw scores、検出数、area IDs、
@@ -214,7 +217,7 @@ Z連続取得 -> jerkトリガ -> 前16～32点を含む128点 -> DC除去
 - 同時2点は完全一致率とlabel F1を報告
 - 100 ms連打の2打目欠落率1%未満を目標
 - 打撃開始からRESULT送信開始まで50 ms未満
-- 再アーム40 ms以内
+- 再アーム60 ms以内
 - 1時間連続動作でoverrun、hard fault、watchdog reset 0
 - model CRC不一致時は推論を開始しない
 
@@ -248,4 +251,3 @@ models/
 
 2つのファームで共通モジュールの同じcommitを使用し、センサ波形の差がファーム差に
 起因しないようにする。
-

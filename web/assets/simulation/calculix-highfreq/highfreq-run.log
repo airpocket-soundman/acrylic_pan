@@ -1,0 +1,908 @@
+
+************************************************************
+
+CalculiX Version 2.20, Copyright(C) 1998-2022 Guido Dhondt
+CalculiX comes with ABSOLUTELY NO WARRANTY. This is free
+software, and you are welcome to redistribute it under
+certain conditions, see gpl.htm
+
+************************************************************
+
+You are using an executable made on Sun Jul 31 18:08:37 CEST 2022
+
+  The numbers below are estimated upper bounds
+
+  number of:
+
+   nodes:         9285
+   elements:         1600
+   one-dimensional elements:            0
+   two-dimensional elements:            0
+   integration points per element:            8
+   degrees of freedom per node:            3
+   layers per element:            1
+
+   distributed facial loads:            0
+   distributed volumetric loads:            0
+   concentrated loads:            0
+   single point constraints:          963
+   multiple point constraints:            1
+   terms in all multiple point constraints:            1
+   tie constraints:            0
+   dependent nodes tied by cyclic constraints:            0
+   dependent nodes in pre-tension constraints:            0
+
+   sets:           12
+   terms in all sets:         3539
+
+   materials:            1
+   constants per material and temperature:            2
+   temperature points per material:            1
+   plastic data points per material:            0
+
+   orientations:            0
+   amplitudes:            1
+   data points in all amplitudes:            1
+   print requests:            1
+   transformations:            0
+   property cards:            0
+
+
+ STEP            1
+
+ Frequency analysis was selected
+
+ Decascading the MPC's
+
+ Determining the structure of the matrix:
+ Using up to 1 cpu(s) for setting up the structure of the matrix.
+ number of equations
+ 26892
+ number of nonzero lower triangular matrix elements
+ 1796004
+
+ Using up to 1 cpu(s) for setting up the structure of the matrix.
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the symmetric stiffness/mass contributions.
+
+ Factoring the system of equations using the symmetric spooles solver
+ Using up to 1 cpu(s) for spooles.
+
+ Calculating the eigenvalues and the eigenmodes
+
+U^T*M*U=1.000000 for eigenmode 1
+U^T*M*U=1.000000 for eigenmode 2
+U^T*M*U=1.000000 for eigenmode 3
+U^T*M*U=1.000000 for eigenmode 4
+U^T*M*U=1.000000 for eigenmode 5
+U^T*M*U=1.000000 for eigenmode 6
+U^T*M*U=1.000000 for eigenmode 7
+U^T*M*U=1.000000 for eigenmode 8
+U^T*M*U=1.000000 for eigenmode 9
+U^T*M*U=1.000000 for eigenmode 10
+U^T*M*U=1.000000 for eigenmode 11
+U^T*M*U=1.000000 for eigenmode 12
+U^T*M*U=1.000000 for eigenmode 13
+U^T*M*U=1.000000 for eigenmode 14
+U^T*M*U=1.000000 for eigenmode 15
+U^T*M*U=1.000000 for eigenmode 16
+U^T*M*U=1.000000 for eigenmode 17
+U^T*M*U=1.000000 for eigenmode 18
+U^T*M*U=1.000000 for eigenmode 19
+U^T*M*U=1.000000 for eigenmode 20
+U^T*M*U=1.000000 for eigenmode 21
+U^T*M*U=1.000000 for eigenmode 22
+U^T*M*U=1.000000 for eigenmode 23
+U^T*M*U=1.000000 for eigenmode 24
+U^T*M*U=1.000000 for eigenmode 25
+U^T*M*U=1.000000 for eigenmode 26
+U^T*M*U=1.000000 for eigenmode 27
+U^T*M*U=1.000000 for eigenmode 28
+U^T*M*U=1.000000 for eigenmode 29
+U^T*M*U=1.000000 for eigenmode 30
+U^T*M*U=1.000000 for eigenmode 31
+U^T*M*U=1.000000 for eigenmode 32
+U^T*M*U=1.000000 for eigenmode 33
+U^T*M*U=1.000000 for eigenmode 34
+U^T*M*U=1.000000 for eigenmode 35
+U^T*M*U=1.000000 for eigenmode 36
+U^T*M*U=1.000000 for eigenmode 37
+U^T*M*U=1.000000 for eigenmode 38
+U^T*M*U=1.000000 for eigenmode 39
+U^T*M*U=1.000000 for eigenmode 40
+U^T*M*U=1.000000 for eigenmode 41
+U^T*M*U=1.000000 for eigenmode 42
+U^T*M*U=1.000000 for eigenmode 43
+U^T*M*U=1.000000 for eigenmode 44
+U^T*M*U=1.000000 for eigenmode 45
+U^T*M*U=1.000000 for eigenmode 46
+U^T*M*U=1.000000 for eigenmode 47
+U^T*M*U=1.000000 for eigenmode 48
+U^T*M*U=1.000000 for eigenmode 49
+U^T*M*U=1.000000 for eigenmode 50
+U^T*M*U=1.000000 for eigenmode 51
+U^T*M*U=1.000000 for eigenmode 52
+U^T*M*U=1.000000 for eigenmode 53
+U^T*M*U=1.000000 for eigenmode 54
+U^T*M*U=1.000000 for eigenmode 55
+U^T*M*U=1.000000 for eigenmode 56
+U^T*M*U=1.000000 for eigenmode 57
+U^T*M*U=1.000000 for eigenmode 58
+U^T*M*U=1.000000 for eigenmode 59
+U^T*M*U=1.000000 for eigenmode 60
+U^T*M*U=1.000000 for eigenmode 61
+U^T*M*U=1.000000 for eigenmode 62
+U^T*M*U=1.000000 for eigenmode 63
+U^T*M*U=1.000000 for eigenmode 64
+U^T*M*U=1.000000 for eigenmode 65
+U^T*M*U=1.000000 for eigenmode 66
+U^T*M*U=1.000000 for eigenmode 67
+U^T*M*U=1.000000 for eigenmode 68
+U^T*M*U=1.000000 for eigenmode 69
+U^T*M*U=1.000000 for eigenmode 70
+U^T*M*U=1.000000 for eigenmode 71
+U^T*M*U=1.000000 for eigenmode 72
+U^T*M*U=1.000000 for eigenmode 73
+U^T*M*U=1.000000 for eigenmode 74
+U^T*M*U=1.000000 for eigenmode 75
+U^T*M*U=1.000000 for eigenmode 76
+U^T*M*U=1.000000 for eigenmode 77
+U^T*M*U=1.000000 for eigenmode 78
+U^T*M*U=1.000000 for eigenmode 79
+U^T*M*U=1.000000 for eigenmode 80
+U^T*M*U=1.000000 for eigenmode 81
+U^T*M*U=1.000000 for eigenmode 82
+U^T*M*U=1.000000 for eigenmode 83
+U^T*M*U=1.000000 for eigenmode 84
+U^T*M*U=1.000000 for eigenmode 85
+U^T*M*U=1.000000 for eigenmode 86
+U^T*M*U=1.000000 for eigenmode 87
+U^T*M*U=1.000000 for eigenmode 88
+U^T*M*U=1.000000 for eigenmode 89
+U^T*M*U=1.000000 for eigenmode 90
+U^T*M*U=1.000000 for eigenmode 91
+U^T*M*U=1.000000 for eigenmode 92
+U^T*M*U=1.000000 for eigenmode 93
+U^T*M*U=1.000000 for eigenmode 94
+U^T*M*U=1.000000 for eigenmode 95
+U^T*M*U=1.000000 for eigenmode 96
+U^T*M*U=1.000000 for eigenmode 97
+U^T*M*U=1.000000 for eigenmode 98
+U^T*M*U=1.000000 for eigenmode 99
+U^T*M*U=1.000000 for eigenmode 100
+U^T*M*U=1.000000 for eigenmode 101
+U^T*M*U=1.000000 for eigenmode 102
+U^T*M*U=1.000000 for eigenmode 103
+U^T*M*U=1.000000 for eigenmode 104
+U^T*M*U=1.000000 for eigenmode 105
+U^T*M*U=1.000000 for eigenmode 106
+U^T*M*U=1.000000 for eigenmode 107
+U^T*M*U=1.000000 for eigenmode 108
+U^T*M*U=1.000000 for eigenmode 109
+U^T*M*U=1.000000 for eigenmode 110
+U^T*M*U=1.000000 for eigenmode 111
+U^T*M*U=1.000000 for eigenmode 112
+U^T*M*U=1.000000 for eigenmode 113
+U^T*M*U=1.000000 for eigenmode 114
+U^T*M*U=1.000000 for eigenmode 115
+U^T*M*U=1.000000 for eigenmode 116
+U^T*M*U=1.000000 for eigenmode 117
+U^T*M*U=1.000000 for eigenmode 118
+U^T*M*U=1.000000 for eigenmode 119
+U^T*M*U=1.000000 for eigenmode 120
+U^T*M*U=1.000000 for eigenmode 121
+U^T*M*U=1.000000 for eigenmode 122
+U^T*M*U=1.000000 for eigenmode 123
+U^T*M*U=1.000000 for eigenmode 124
+U^T*M*U=1.000000 for eigenmode 125
+U^T*M*U=1.000000 for eigenmode 126
+U^T*M*U=1.000000 for eigenmode 127
+U^T*M*U=1.000000 for eigenmode 128
+U^T*M*U=1.000000 for eigenmode 129
+U^T*M*U=1.000000 for eigenmode 130
+U^T*M*U=1.000000 for eigenmode 131
+U^T*M*U=1.000000 for eigenmode 132
+U^T*M*U=1.000000 for eigenmode 133
+U^T*M*U=1.000000 for eigenmode 134
+U^T*M*U=1.000000 for eigenmode 135
+U^T*M*U=1.000000 for eigenmode 136
+U^T*M*U=1.000000 for eigenmode 137
+U^T*M*U=1.000000 for eigenmode 138
+U^T*M*U=1.000000 for eigenmode 139
+U^T*M*U=1.000000 for eigenmode 140
+U^T*M*U=1.000000 for eigenmode 141
+U^T*M*U=1.000000 for eigenmode 142
+U^T*M*U=1.000000 for eigenmode 143
+U^T*M*U=1.000000 for eigenmode 144
+U^T*M*U=1.000000 for eigenmode 145
+U^T*M*U=1.000000 for eigenmode 146
+U^T*M*U=1.000000 for eigenmode 147
+U^T*M*U=1.000000 for eigenmode 148
+U^T*M*U=1.000000 for eigenmode 149
+U^T*M*U=1.000000 for eigenmode 150
+U^T*M*U=1.000000 for eigenmode 151
+U^T*M*U=1.000000 for eigenmode 152
+U^T*M*U=1.000000 for eigenmode 153
+U^T*M*U=1.000000 for eigenmode 154
+U^T*M*U=1.000000 for eigenmode 155
+U^T*M*U=1.000000 for eigenmode 156
+U^T*M*U=1.000000 for eigenmode 157
+U^T*M*U=1.000000 for eigenmode 158
+U^T*M*U=1.000000 for eigenmode 159
+U^T*M*U=1.000000 for eigenmode 160
+U^T*M*U=1.000000 for eigenmode 161
+U^T*M*U=1.000000 for eigenmode 162
+U^T*M*U=1.000000 for eigenmode 163
+U^T*M*U=1.000000 for eigenmode 164
+U^T*M*U=1.000000 for eigenmode 165
+U^T*M*U=1.000000 for eigenmode 166
+U^T*M*U=1.000000 for eigenmode 167
+U^T*M*U=1.000000 for eigenmode 168
+U^T*M*U=1.000000 for eigenmode 169
+U^T*M*U=1.000000 for eigenmode 170
+U^T*M*U=1.000000 for eigenmode 171
+U^T*M*U=1.000000 for eigenmode 172
+U^T*M*U=1.000000 for eigenmode 173
+U^T*M*U=1.000000 for eigenmode 174
+U^T*M*U=1.000000 for eigenmode 175
+U^T*M*U=1.000000 for eigenmode 176
+U^T*M*U=1.000000 for eigenmode 177
+U^T*M*U=1.000000 for eigenmode 178
+U^T*M*U=1.000000 for eigenmode 179
+U^T*M*U=1.000000 for eigenmode 180
+U^T*M*U=1.000000 for eigenmode 181
+U^T*M*U=1.000000 for eigenmode 182
+U^T*M*U=1.000000 for eigenmode 183
+U^T*M*U=1.000000 for eigenmode 184
+U^T*M*U=1.000000 for eigenmode 185
+U^T*M*U=1.000000 for eigenmode 186
+U^T*M*U=1.000000 for eigenmode 187
+U^T*M*U=1.000000 for eigenmode 188
+U^T*M*U=1.000000 for eigenmode 189
+U^T*M*U=1.000000 for eigenmode 190
+U^T*M*U=1.000000 for eigenmode 191
+U^T*M*U=1.000000 for eigenmode 192
+U^T*M*U=1.000000 for eigenmode 193
+U^T*M*U=1.000000 for eigenmode 194
+U^T*M*U=1.000000 for eigenmode 195
+U^T*M*U=1.000000 for eigenmode 196
+U^T*M*U=1.000000 for eigenmode 197
+U^T*M*U=1.000000 for eigenmode 198
+U^T*M*U=1.000000 for eigenmode 199
+U^T*M*U=1.000000 for eigenmode 200
+U^T*M*U=1.000000 for eigenmode 201
+U^T*M*U=1.000000 for eigenmode 202
+U^T*M*U=1.000000 for eigenmode 203
+U^T*M*U=1.000000 for eigenmode 204
+U^T*M*U=1.000000 for eigenmode 205
+U^T*M*U=1.000000 for eigenmode 206
+U^T*M*U=1.000000 for eigenmode 207
+U^T*M*U=1.000000 for eigenmode 208
+U^T*M*U=1.000000 for eigenmode 209
+U^T*M*U=1.000000 for eigenmode 210
+U^T*M*U=1.000000 for eigenmode 211
+U^T*M*U=1.000000 for eigenmode 212
+U^T*M*U=1.000000 for eigenmode 213
+U^T*M*U=1.000000 for eigenmode 214
+U^T*M*U=1.000000 for eigenmode 215
+U^T*M*U=1.000000 for eigenmode 216
+U^T*M*U=1.000000 for eigenmode 217
+U^T*M*U=1.000000 for eigenmode 218
+U^T*M*U=1.000000 for eigenmode 219
+U^T*M*U=1.000000 for eigenmode 220
+U^T*M*U=1.000000 for eigenmode 221
+U^T*M*U=1.000000 for eigenmode 222
+U^T*M*U=1.000000 for eigenmode 223
+U^T*M*U=1.000000 for eigenmode 224
+U^T*M*U=1.000000 for eigenmode 225
+U^T*M*U=1.000000 for eigenmode 226
+U^T*M*U=1.000000 for eigenmode 227
+U^T*M*U=1.000000 for eigenmode 228
+U^T*M*U=1.000000 for eigenmode 229
+U^T*M*U=1.000000 for eigenmode 230
+U^T*M*U=1.000000 for eigenmode 231
+U^T*M*U=1.000000 for eigenmode 232
+U^T*M*U=1.000000 for eigenmode 233
+U^T*M*U=1.000000 for eigenmode 234
+U^T*M*U=1.000000 for eigenmode 235
+U^T*M*U=1.000000 for eigenmode 236
+U^T*M*U=1.000000 for eigenmode 237
+U^T*M*U=1.000000 for eigenmode 238
+U^T*M*U=1.000000 for eigenmode 239
+U^T*M*U=1.000000 for eigenmode 240
+U^T*M*U=1.000000 for eigenmode 241
+U^T*M*U=1.000000 for eigenmode 242
+U^T*M*U=1.000000 for eigenmode 243
+U^T*M*U=1.000000 for eigenmode 244
+U^T*M*U=1.000000 for eigenmode 245
+U^T*M*U=1.000000 for eigenmode 246
+U^T*M*U=1.000000 for eigenmode 247
+U^T*M*U=1.000000 for eigenmode 248
+U^T*M*U=1.000000 for eigenmode 249
+U^T*M*U=1.000000 for eigenmode 250
+U^T*M*U=1.000000 for eigenmode 251
+U^T*M*U=1.000000 for eigenmode 252
+U^T*M*U=1.000000 for eigenmode 253
+U^T*M*U=1.000000 for eigenmode 254
+U^T*M*U=1.000000 for eigenmode 255
+U^T*M*U=1.000000 for eigenmode 256
+U^T*M*U=1.000000 for eigenmode 257
+U^T*M*U=1.000000 for eigenmode 258
+U^T*M*U=1.000000 for eigenmode 259
+U^T*M*U=1.000000 for eigenmode 260
+U^T*M*U=1.000000 for eigenmode 261
+U^T*M*U=1.000000 for eigenmode 262
+U^T*M*U=1.000000 for eigenmode 263
+U^T*M*U=1.000000 for eigenmode 264
+U^T*M*U=1.000000 for eigenmode 265
+U^T*M*U=1.000000 for eigenmode 266
+U^T*M*U=1.000000 for eigenmode 267
+U^T*M*U=1.000000 for eigenmode 268
+U^T*M*U=1.000000 for eigenmode 269
+U^T*M*U=1.000000 for eigenmode 270
+U^T*M*U=1.000000 for eigenmode 271
+U^T*M*U=1.000000 for eigenmode 272
+U^T*M*U=1.000000 for eigenmode 273
+U^T*M*U=1.000000 for eigenmode 274
+U^T*M*U=1.000000 for eigenmode 275
+U^T*M*U=1.000000 for eigenmode 276
+U^T*M*U=1.000000 for eigenmode 277
+U^T*M*U=1.000000 for eigenmode 278
+U^T*M*U=1.000000 for eigenmode 279
+U^T*M*U=1.000000 for eigenmode 280
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+ Using up to 1 cpu(s) for the stress calculation.
+
+
+ Job finished
+
+________________________________________
+
+Total CalculiX Time: 124.325418
+________________________________________

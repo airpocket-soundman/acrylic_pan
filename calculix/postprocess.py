@@ -154,9 +154,14 @@ def save_hit_perspective_animation(path,nodes,modes,metadata,duration=.06,frames
 
 
 def main():
-    parser=argparse.ArgumentParser(); parser.add_argument("--output",type=Path,required=True); parser.add_argument("--reference",type=Path,required=True)
+    parser=argparse.ArgumentParser(); parser.add_argument("--output",type=Path,required=True); parser.add_argument("--reference",type=Path,required=True); parser.add_argument("--long-videos-only",action="store_true")
     args=parser.parse_args(); meta=json.loads((args.output/"model-metadata.json").read_text()); nodes={int(k):v for k,v in json.loads((args.output/"mesh-nodes.json").read_text()).items()}
     frequencies=frequencies_from_dat(args.output/"acrylic_pan.dat"); modes=modes_from_frd(args.output/"acrylic_pan.frd")
+    if args.long_videos_only:
+        save_hit_animation(args.output/"calculix-eight-hits-long.mp4",nodes,modes,meta,duration=.32,frames=240)
+        save_hit_perspective_animation(args.output/"calculix-eight-hits-perspective-long.mp4",nodes,modes,meta,duration=.32,frames=240)
+        print(json.dumps({"duration_ms":320,"frames":240,"frequencies_hz":frequencies[:3]}))
+        return
     for index,(frequency,mode) in enumerate(modes[:8],1): save_mode(args.output/f"calculix-mode-{index}.svg",nodes,mode,index,frequency)
     signals=[]; time_ref=None
     for note in NOTES:
@@ -181,6 +186,8 @@ def main():
     save_comparison(args.output/"frequency-comparison.svg",frequencies,old2d,old3d)
     save_hit_animation(args.output/"calculix-eight-hits.mp4",nodes,modes,meta)
     save_hit_perspective_animation(args.output/"calculix-eight-hits-perspective.mp4",nodes,modes,meta)
+    save_hit_animation(args.output/"calculix-eight-hits-long.mp4",nodes,modes,meta,duration=.32,frames=240)
+    save_hit_perspective_animation(args.output/"calculix-eight-hits-perspective-long.mp4",nodes,modes,meta,duration=.32,frames=240)
     result={**meta,"frequencies_hz":frequencies,"outputs":{"modes":min(8,len(modes)),"dynamic_samples":len(time_ref),"frequency_resolution_hz":round(float(fft_f[1]-fft_f[0]),6)}}
     (args.output/"calculix-results.json").write_text(json.dumps(result,ensure_ascii=False,indent=2),encoding="utf-8")
     print(json.dumps({"frequencies_hz":frequencies[:12],"samples":len(time_ref)}))

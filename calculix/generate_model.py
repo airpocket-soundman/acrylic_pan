@@ -24,7 +24,8 @@ def chunks(values, count=16):
         yield values[start:start + count]
 
 
-def build_mesh():
+def build_mesh(x_grid=None,y_grid=None,z_grid=None):
+    x_grid=X_GRID if x_grid is None else x_grid; y_grid=Y_GRID if y_grid is None else y_grid; z_grid=Z_GRID if z_grid is None else z_grid
     nodes = {}
     coordinates = {}
     elements = []
@@ -37,9 +38,9 @@ def build_mesh():
             coordinates[number] = key
         return nodes[key]
 
-    for z0, z1 in zip(Z_GRID[:-1], Z_GRID[1:]):
-        for y0, y1 in zip(Y_GRID[:-1], Y_GRID[1:]):
-            for x0, x1 in zip(X_GRID[:-1], X_GRID[1:]):
+    for z0, z1 in zip(z_grid[:-1], z_grid[1:]):
+        for y0, y1 in zip(y_grid[:-1], y_grid[1:]):
+            for x0, x1 in zip(x_grid[:-1], x_grid[1:]):
                 xm, ym, zm = (x0+x1)/2, (y0+y1)/2, (z0+z1)/2
                 connectivity = [
                     node(x0,y0,z0), node(x1,y0,z0), node(x1,y1,z0), node(x0,y1,z0),

@@ -113,7 +113,7 @@ CVATのコンテナ、compose、ネットワーク、イメージ、ボリュー
 
 生成物には、CalculiX入力デッキ`.inp`、固有値・質量・剛性を格納する`.eig`、モード形状`.frd`、数値結果`.dat`、各ジョブの実行ログ、SVG、JSON、JavaScriptを含む。
 
-`calculix-eight-hits.mp4`は直上ビュー、`calculix-eight-hits-perspective.mp4`は変形を立体的に読むための斜めパースビューである。どちらもCalculiXがFRDへ出力した30個の質量正規化モードから、8打点の60 ms過渡表面変位を再構成する。24 fps、1280 × 650、H.264/yuv420p、5秒のスローモーションである。8打点は共通振幅スケールを使い、パースのZ方向は正規化最大変位を±18 mmとして意図的に強調する。この高さは実寸変形ではない。中央センサの時間波形は別途CalculiXの`*MODAL DYNAMIC`結果と照合している。
+`calculix-eight-hits-long.mp4`は直上ビュー、`calculix-eight-hits-perspective-long.mp4`は変形を立体的に読むための斜めパースビューである。どちらもCalculiXがFRDへ出力した30個の質量正規化モードから、8打点の320 ms過渡表面変位を再構成する。24 fps、1280 × 650、H.264/yuv420p、10秒のスローモーションである。この時間範囲には第1モード（8.934847 Hz、周期111.9 ms）が約2.9周期含まれる。8打点は共通振幅スケールを使い、パースのZ方向は正規化最大変位を±18 mmとして意図的に強調する。この高さは実寸変形ではない。中央センサの時間波形は別途CalculiXの`*MODAL DYNAMIC`結果と照合している。従来の60 ms・5秒版である`calculix-eight-hits.mp4`と`calculix-eight-hits-perspective.mp4`も比較用に保持する。
 
 ## 残る検証
 
