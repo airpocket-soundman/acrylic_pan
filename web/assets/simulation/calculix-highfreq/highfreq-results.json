@@ -410,5 +410,157 @@
       "mean_cosine_distance": 0.2672992736279566
     }
   ],
+  "e4_baseline_18_band_scores": [
+    {
+      "highpass_hz": 0,
+      "features": 18,
+      "band_range_hz": [
+        100.0,
+        5000.0
+      ],
+      "level_and_shape": {
+        "minimum_rms_log10_distance": 0.1113228233601197,
+        "mean_rms_log10_distance": 0.18488510083266155,
+        "closest_pair": [
+          "C4",
+          "C5"
+        ]
+      },
+      "shape_only": {
+        "minimum_rms_log10_distance": 0.10686335083277217,
+        "mean_rms_log10_distance": 0.1842711426709926,
+        "closest_pair": [
+          "C4",
+          "C5"
+        ]
+      },
+      "baseline_translation_distance_error": 0.0
+    },
+    {
+      "highpass_hz": 100,
+      "features": 18,
+      "band_range_hz": [
+        100.0,
+        5000.0
+      ],
+      "level_and_shape": {
+        "minimum_rms_log10_distance": 0.11115623921352073,
+        "mean_rms_log10_distance": 0.1845514912599883,
+        "closest_pair": [
+          "C4",
+          "C5"
+        ]
+      },
+      "shape_only": {
+        "minimum_rms_log10_distance": 0.10660391737958724,
+        "mean_rms_log10_distance": 0.18388214184091664,
+        "closest_pair": [
+          "C4",
+          "C5"
+        ]
+      },
+      "baseline_translation_distance_error": 0.0
+    },
+    {
+      "highpass_hz": 250,
+      "features": 18,
+      "band_range_hz": [
+        250.0,
+        5000.0
+      ],
+      "level_and_shape": {
+        "minimum_rms_log10_distance": 0.0846087466523234,
+        "mean_rms_log10_distance": 0.1711398456046938,
+        "closest_pair": [
+          "C5",
+          "D5"
+        ]
+      },
+      "shape_only": {
+        "minimum_rms_log10_distance": 0.0823416597703271,
+        "mean_rms_log10_distance": 0.17064789462903876,
+        "closest_pair": [
+          "C5",
+          "D5"
+        ]
+      },
+      "baseline_translation_distance_error": 0.0
+    },
+    {
+      "highpass_hz": 500,
+      "features": 18,
+      "band_range_hz": [
+        500.0,
+        5000.0
+      ],
+      "level_and_shape": {
+        "minimum_rms_log10_distance": 0.11537929443920365,
+        "mean_rms_log10_distance": 0.18682714349000848,
+        "closest_pair": [
+          "A4",
+          "C5"
+        ]
+      },
+      "shape_only": {
+        "minimum_rms_log10_distance": 0.10754202201328987,
+        "mean_rms_log10_distance": 0.18764088062595521,
+        "closest_pair": [
+          "A4",
+          "C5"
+        ]
+      },
+      "baseline_translation_distance_error": 0.0
+    },
+    {
+      "highpass_hz": 750,
+      "features": 18,
+      "band_range_hz": [
+        750.0,
+        5000.0
+      ],
+      "level_and_shape": {
+        "minimum_rms_log10_distance": 0.14435058894168318,
+        "mean_rms_log10_distance": 0.20019420731263304,
+        "closest_pair": [
+          "C5",
+          "D5"
+        ]
+      },
+      "shape_only": {
+        "minimum_rms_log10_distance": 0.1391798924407085,
+        "mean_rms_log10_distance": 0.2012280068225792,
+        "closest_pair": [
+          "A4",
+          "C5"
+        ]
+      },
+      "baseline_translation_distance_error": 0.0
+    },
+    {
+      "highpass_hz": 1000,
+      "features": 18,
+      "band_range_hz": [
+        1000.0,
+        5000.0
+      ],
+      "level_and_shape": {
+        "minimum_rms_log10_distance": 0.15008299675585735,
+        "mean_rms_log10_distance": 0.21316674807600264,
+        "closest_pair": [
+          "A4",
+          "C5"
+        ]
+      },
+      "shape_only": {
+        "minimum_rms_log10_distance": 0.1400479459999582,
+        "mean_rms_log10_distance": 0.21175863396256916,
+        "closest_pair": [
+          "A4",
+          "C5"
+        ]
+      },
+      "baseline_translation_distance_error": 0.0
+    }
+  ],
   "true_fft_resolution_hz": 20.0
 }
