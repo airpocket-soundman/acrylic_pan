@@ -1,0 +1,4 @@
+web/assets/simulation
+__pycache__
+*.pyc
+.git

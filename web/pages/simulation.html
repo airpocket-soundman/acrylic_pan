@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="ja">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>振動モード解析</title><link rel="stylesheet" href="../css/page.css"></head>
+<body>
+<div class="eyebrow">04B / 3-D solid FEM</div>
+<div class="pill-row"><a class="pill" href="simulation-plate.html">2D板モデル</a><span class="pill active">独自3D FEM</span><a class="pill" href="simulation-calculix.html">CalculiX基準解析</a></div>
+<h1>板モデルと3次元ソリッドFEMで<br>打撃位置による振動差を比較する</h1>
+<p class="lead">400 × 200 × 2 mmのPMMA板を、100 × 20 mmの領域で挟み込み固定します。センサは中央の1個だけです。既存のKirchhoff板モデルに加え、板厚方向を2層に分けたHEX8ソリッドモデルをDockerで解析しました。</p>
+<div class="status warn"><strong>結果の位置づけ</strong>現段階は設計比較用です。3Dモデルも完全積分一次要素によるせん断ロッキング、完全固定の理想化、センサ・接着層質量の省略を含むため、固有振動数の絶対値は実測FRFで校正します。</div>
+
+<h2>3次元ワーク・メッシュモデル</h2>
+<figure class="wide-figure"><img src="../assets/simulation/solid3d/solid3d-mesh.svg" alt="32×16×2要素の3次元ソリッドメッシュ。固定領域と中央センサを表示"><figcaption>32 × 16 × 2 = 1,024 HEX8要素。オレンジは板厚全体を拘束する x=200–300、y=0–20 mm領域、緑の菱形は中央センサです。</figcaption></figure>
+<table class="spec"><tr><th>要素・自由度</th><td>HEX8、1,683節点、5,049自由度</td><td>3並進自由度/節点</td></tr><tr><th>要素寸法</th><td>12.5 × 12.5 × 1.0 mm</td><td>板厚方向2要素</td></tr><tr><th>材料</th><td>E=3.2 GPa、ν=0.35、ρ=1,180 kg/m³</td><td>等方・線形PMMA</td></tr><tr><th>境界条件</th><td>固定領域54節点のXYZ変位を拘束</td><td>板厚全体を固定</td></tr><tr><th>固有値解法</th><td>SciPy <code>eigsh</code></td><td>shift-invert、σ=0</td></tr></table>
+
+<h2>3次元固有モードの変形静止画</h2><p>形状を見やすくするためZ変位を強調しています。色は正負方向の正規化Z変位で、実変位量ではありません。</p>
+<div class="mode-grid"><figure><img src="../assets/simulation/solid3d/solid3d-mode-1.svg" alt="3次元FEMの第1固有モード"><figcaption>Mode 1 — 18.36 Hz</figcaption></figure><figure><img src="../assets/simulation/solid3d/solid3d-mode-2.svg" alt="3次元FEMの第2固有モード"><figcaption>Mode 2 — 40.64 Hz</figcaption></figure><figure><img src="../assets/simulation/solid3d/solid3d-mode-3.svg" alt="3次元FEMの第3固有モード"><figcaption>Mode 3 — 53.15 Hz</figcaption></figure><figure><img src="../assets/simulation/solid3d/solid3d-mode-4.svg" alt="3次元FEMの第4固有モード"><figcaption>Mode 4 — 96.75 Hz</figcaption></figure><figure><img src="../assets/simulation/solid3d/solid3d-mode-5.svg" alt="3次元FEMの第5固有モード"><figcaption>Mode 5 — 166.04 Hz</figcaption></figure><figure><img src="../assets/simulation/solid3d/solid3d-mode-6.svg" alt="3次元FEMの第6固有モード"><figcaption>Mode 6 — 236.24 Hz</figcaption></figure></div>
+
+<h2>8打点の代表変形静止画</h2><figure class="wide-figure"><img src="../assets/simulation/solid3d/solid3d-eight-hit-stills.svg" alt="8打点ごとに最大応答付近を抽出した変形分布"><figcaption>各打点について空間RMSが最大となる時刻を抽出。全8図で同じ振幅スケールを使用しています。星が打点、菱形が中央センサです。</figcaption></figure>
+
+<h2>8打点の過渡応答動画</h2><div class="video-frame"><video controls muted loop preload="metadata" poster="../assets/simulation/solid3d/solid3d-eight-hit-stills.svg"><source src="../assets/simulation/solid3d/solid3d-eight-hits.mp4" type="video/mp4">このブラウザはMP4動画に対応していません。</video></div><p class="note">60 msの物理時間を5秒のスローモーションとして表示しています。16固有モード、モード減衰比1.2%、Z方向単位力積の重ね合わせです。</p>
+
+<h2>中央測定点の時間波形とFFT</h2><p>中央センサ1個のZ加速度を6.4 kHz・2,048点で計算しています。打点を切り替えると、3DソリッドFEMの時間応答と卓越周波数を共通スケールで比較できます。計算と正規化の詳細は <a href="../../docs/sensor-response.md" target="_blank">中央センサ時間波形・FFT仕様</a> に記録しています。</p><div class="pill-row" id="sensor-hit-buttons"></div><div class="sensor-readout" id="sensor-readout"></div><div class="sensor-charts"><figure class="sensor-chart"><svg id="waveform-chart" role="img" aria-label="中央センサの時間波形"></svg><figcaption>単位Z方向力積に対する320 msの正規化加速度応答</figcaption></figure><figure class="sensor-chart"><svg id="fft-chart" role="img" aria-label="中央センサ波形のFFT"></svg><figcaption>Hann窓、周波数分解能3.125 Hz、表示範囲0–1,200 Hz</figcaption></figure></div>
+
+<h2>既存の板モデルとの比較</h2><div class="grid two"><div class="card"><h3>Kirchhoff板モデル</h3><p>81 × 41節点の薄板差分モデル。計算が軽く、固定位置や打点配置の設計探索に向きます。先頭4モードは15.04、25.81、43.26、57.48 Hzです。</p></div><div class="card"><h3>3Dソリッドモデル</h3><p>板厚内応力と3方向変位を持ちます。メッシュ・質量・固定体積を直接表せます。先頭4モードは18.36、40.64、53.15、96.75 Hzです。</p></div></div>
+
+<h2>Dockerの分離と再現</h2><table class="spec"><tr><th>専用イメージ</th><td><code>acrylic-pan-solid-fem:local</code></td><td>CVATイメージを使用しない</td></tr><tr><th>一時コンテナ</th><td><code>acrylic-pan-solid-fem-run</code></td><td>終了時に自動削除</td></tr><tr><th>ネットワーク</th><td><code>--network none</code></td><td>CVATネットワークから分離</td></tr><tr><th>書込み範囲</th><td><code>web/assets/simulation</code>のみ</td><td>本プロジェクト内だけをbind mount</td></tr></table><pre class="formula"><code>.\run-solid-fem.ps1</code></pre><p class="note">ビルド条件、固定バージョン、手動再現コマンド、制約は <a href="../../docs/solid-fem.md" target="_blank">3次元ソリッドFEM解析仕様</a> に記録しています。既存板モデルの詳細は <a href="../../docs/simulation-method.md" target="_blank">振動シミュレーション手法</a> を参照してください。</p>
+
+<h2>使用ソフトウェア</h2><table class="spec"><tr><th>コンテナ</th><td>Docker Desktop / Engine 28.0.4</td><td>Linux/amd64、ネットワーク無効</td></tr><tr><th>ランタイム</th><td>Python 3.12.13</td><td>専用実装 <code>sim/solid_fem.py</code></td></tr><tr><th>数値計算</th><td>NumPy 2.2.6 / SciPy 1.15.3</td><td>疎行列・ARPACK <code>eigsh</code>・FFT</td></tr><tr><th>可視化</th><td>Matplotlib 3.10.3</td><td>SVG・動画フレーム</td></tr><tr><th>動画</th><td>FFmpeg 7.1.5</td><td>H.264 / yuv420p</td></tr></table><p class="note">ソフトウェア、モデル、材料、メッシュ、打撃、FFT、Dockerの全条件は <a href="../../docs/simulation-environment.md" target="_blank">シミュレーション使用ソフト・実行条件</a> に集約しています。</p>
+
+<h2>次に行う精度確認</h2><ol class="source-list"><li>面内64 × 32 × 板厚2要素へ細分化し、固有振動数とMACのメッシュ収束を確認する。</li><li>二次六面体または選択低減積分要素と比較し、せん断ロッキングの影響を定量化する。</li><li>中央のセンサ基板と接着層を質量・剛性として加える。</li><li>実測FRFからヤング率、減衰、クランプ剛性を同定する。</li></ol>
+<script src="../assets/simulation/solid3d/sensor-response-3d.js"></script><script src="../js/sensor-charts.js"></script></body></html>

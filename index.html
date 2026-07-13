@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Acrylic Pan — ROHM Edge Hack Challenge向け振動位置推定楽器の設計資料">
+  <title>Acrylic Pan · Engineering Notes</title>
+  <link rel="stylesheet" href="web/css/shell.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#overview" data-page="overview" aria-label="Acrylic Pan トップ">
+      <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+      <span><strong>ACRYLIC PAN</strong><small>ROHM EDGE HACK CHALLENGE</small></span>
+    </a>
+    <nav class="topnav" aria-label="トップメニュー">
+      <a href="#overview" data-page="overview">概要</a>
+      <a href="#mechanics" data-page="mechanics">構造設計</a>
+      <a href="#simulation-calculix" data-page="simulation-calculix">解析</a>
+      <a href="#ai" data-page="ai">Solist AI</a>
+      <a href="#firmware" data-page="firmware">Firmware</a>
+      <a href="#experiment" data-page="experiment">実験</a>
+    </nav>
+    <span class="project-state"><i aria-hidden="true"></i> DESIGN PHASE</span>
+    <button class="menu-button" type="button" aria-label="目次を開く" aria-expanded="false">☰</button>
+  </header>
+
+  <div class="app-layout">
+    <aside class="sidebar" aria-label="目次">
+      <div class="sidebar-label">CONTENTS</div>
+      <nav>
+        <a href="#overview" data-page="overview"><span>01</span><b>プロジェクト概要</b><small>目的・体験・構成</small></a>
+        <a href="#hardware" data-page="hardware"><span>02</span><b>ハードウェア</b><small>ボード・センサ仕様</small></a>
+        <a href="#mechanics" data-page="mechanics"><span>03</span><b>パネル構造</b><small>非対称固定・座標系</small></a>
+        <a href="#simulation-plate" data-page="simulation-plate"><span>04A</span><b>2D板モデル</b><small>固有モード・8打点応答</small></a>
+        <a href="#simulation" data-page="simulation"><span>04B</span><b>3DソリッドFEM</b><small>メッシュ・変形・動画</small></a>
+        <a href="#simulation-calculix" data-page="simulation-calculix"><span>04C</span><b>CalculiX基準解析</b><small>C3D20R・非一様メッシュ</small></a>
+        <a href="#ai" data-page="ai"><span>05</span><b>Solist AIモデル</b><small>1隠れ層・出力設計</small></a>
+        <a href="#firmware" data-page="firmware"><span>06</span><b>ファームウェア仕様</b><small>採取用・推論用</small></a>
+        <a href="#experiment" data-page="experiment"><span>07</span><b>学習・評価計画</b><small>収録・合格基準</small></a>
+        <a href="#references" data-page="references"><span>08</span><b>資料・再現方法</b><small>出典・Docker</small></a>
+      </nav>
+      <div class="sidebar-foot">
+        <span>Panel</span><strong>400 × 200 × 2 mm</strong>
+        <span>Sensor</span><strong>KX134-1211 × 1</strong>
+      </div>
+    </aside>
+
+    <main class="content">
+      <iframe id="content-frame" src="web/pages/overview.html" title="Acrylic Pan設計資料" loading="eager"></iframe>
+    </main>
+  </div>
+  <script src="web/js/shell.js"></script>
+</body>
+</html>

@@ -1,0 +1,302 @@
+Release Note
+LAPIS Development Tools LEXIDE-Ω V2.2.0 リリースノート
+LAPIS Development Tools LEXIDE-Ωは弊社オリジナル 8 ビット RISC プロセッサ nX-U8/100 コア，16 ビット RISC プロセッサ nXU16/100 コアを搭載したマイクロコントローラ，および Arm® Cortex®-M0+/M3/M33 コアを搭載したマイクロコントローラ用アプリケーションプロ グラム開発環境です。
+本バージョンでは以下の内容を更新しました。 LEXIDE-Ω(Arm) ・ FreeRTOS™向けタスク表示機能を追加しました ・ Arm コア向けリアルタイム RAM モニタ機能（LEXIDE Scope）の使い勝手を改善しました ・ Arm コア向けシミュレータの機能を拡張しました ・ Arm コア向けオリジナルデバッグアダプタ LxEASE™ および LxEASE Isolator に正式対応しました ・ セキュアデバッグアクセス認証機能に対応しました ・ 制限事項を一部解除しました
+LEXIDE-Ω(U16) ・ 機種情報ファイルを一部更新しました。
+改版内容の詳細についてはツールインストール後，[スタートメニュー] > [LAPIS LEXIDE Tools] > [LAPIS Development Tools LEXIDEOmega について]および[機種情報ファイルについて]をご覧ください。
+本書では LAPIS Development Tools LEXIDE-Ω V2.2.0（以下，本リリースと呼びます）について説明します。 1． 動作環境 2． 対応 LSI 3． インストール方法 4． アンインストール方法 5． 注意事項(ご使用前に必ずお読みください) 6． 著作権について
+
+* 「Arm®」および 「Cortex®」は，Arm Limited（またはその子会社または関連会社）の米国およびその他の国における登録商標です。 * 「FreeRTOS™」は，Amazon Technologies, Inc. の米国およびその他の国における商標または登録商標です。 * 「LxEASE™」は，ローム株式会社の商標または登録商標です。
+
+© 2026 ROHM Co., Ltd.
+
+1/11
+
+ReleaseNote_LEXIDE_V2_2_0_j 2026.3
+
+LAPIS Development Tools LEXIDE-Ω V2.2.0 リリースノート
+
+Release Note
+
+1. 動作環境
+Windows® 10 64bit(x64) および Windows 11 64bit(x64)上で動作します。 管理者権限のあるアカウントでログオンしてください
+・ CPU︓ デュアルコア以上の x86 互換 CPU ・ ハードディスク容量︓C ドライブに 4 GByte 以上の空き容量 ・ メモリ容量︓8 GByte 以上
+各種 Windows OS は，Windows update を実施して最新の状態にした上でインストールしてください。 仮想環境へのインストールは，LEXIDE-Ωが正常に動作しない可能性がありますので，行わないでください。 インストール先，プロジェクトファイル・ソースファイル保存先は，ローカルドライブを指定してください。ネットワークドライブ上のパスを指定すると，正常 に動作しません。
+
+* 「Windows®」 は、Microsoft Corporation の米国およびその他の国における登録商標です。
+
+© 2026 ROHM Co., Ltd.
+
+2/11
+
+ReleaseNote_LEXIDE_V2_2_0_j
+2026.3
+
+LAPIS Development Tools LEXIDE-Ω V2.2.0 リリースノート
+
+Release Note
+
+2. 対応 LSI
+以下の LSI 用機種情報ファイルをインストールできます。ここにない LSI 用の機種情報ファイルについては弊社営業までお問い合わせいただく，弊 社サポートサイトからダウンロードしてください。
+■ nX-U8/100 コアおよび nX-U16/100 コア搭載マイクロコントローラ
+ML610Q101/Q102, ML610Q111/Q112, ML610Q172/Q173/Q174/Q178 ML610Q304/Q305/Q306, ML610Q317/Q318/Q327/Q328/Q329/Q338/Q339 ML610Q340/Q346/Q347, ML610Q355/Q356/Q359/Q360, ML610Q380/Q385 ML610401/402/403/404/405/406/Q407/Q408/Q409, ML610Q411/Q412/Q413/Q415/Q418/Q418C/Q419/Q419C ML610Q421/Q422/Q426/Q426C/Q428/Q429, ML610Q431/Q432/Q435/Q436/Q438/Q439, ML610Q461/Q462/Q463 ML610Q471/Q472/Q473 (*1) ML610Q474/Q475/Q476/Q477/Q478/Q479, ML610Q482/Q484/Q486/Q488 ML610Q772, ML610Q793/Q794G (*2) ML620Q131/Q132/Q133/Q134/Q135/Q136, ML620Q131B/Q132B/Q133B/Q134B/Q135B/Q136B ML620Q151A/Q152A/Q153A/Q154A/Q155A/Q156A ML620Q151B/Q152B/Q153B/Q154B/Q155B/Q156B/Q157B/Q158B/Q159B ML620Q416/Q418 ML620Q503/Q503H/Q504/Q504H (*3) ML62Q1223A/Q1224A/Q1225A/Q1233A/Q1234A/Q1235A/Q1245A/Q1246A/Q1247A/Q1265A/Q1266A/Q1267A ML62Q1223E/Q1224E/Q1225E/Q1233E/Q1234E/Q1235E/Q1245E/Q1246E/Q1247E/Q1265E/Q1266E/Q1267E (*4) ML62Q1323/Q1324/Q1325/Q1333/Q1334/Q1335 ML62Q1345/Q1346/Q1347, ML62Q1365/Q1366/Q1367 ML62Q1430/Q1431/Q1432/Q1440/Q1441/Q1442/Q1450/Q1451/Q1452 ML62Q1530/Q1531/Q1532/Q1533/Q1534/Q1540/Q1541/Q1542/Q1543/Q1544/Q1550/Q1551/Q1552/Q1553/Q1554 ML62Q1555/Q1556/Q1557 ML62Q1543C/Q1544C/Q1553C/Q1554C/Q1563C/Q1564C ML62Q1563/Q1564/Q1565/Q1566/Q1567, ML62Q1573/Q1574/Q1575/Q1576/Q1577 ML62Q1600/Q1601/Q1602/Q1610/Q1611/Q1612/Q1620/Q1621/Q1622 ML62Q1700/Q1701/Q1702/Q1703/Q1704, ML62Q1710/Q1711/Q1712/Q1713/Q1714 ML62Q1720/Q1721/Q1722/Q1723/Q1724/Q1725/Q1726/Q1727/Q1728/Q1729 (*5) ML62Q1733/Q1734/Q1735/Q1736/Q1737/Q1738/Q1739, ML62Q1743/Q1744/Q1745/Q1746/Q1747/Q1748/Q1749 ML62Q1713C/Q1714C/Q1723C/Q1724C/Q1733C/Q1734C ML62Q1713E/Q1714E/Q1723E/Q1724E/Q1733E/Q1734E ML62Q1725D/Q1726D/Q1727D, ML62Q1733D/Q1734D/Q1735D/Q1736D/Q1737D ML62Q1743D/Q1744D/Q1745D/Q1746D/Q1747D ML62Q1858/Q1859/Q1868/Q1869/Q1878/Q1879 (*5) ML62Q2502/Q2504/Q2522/Q2524/Q2532/Q2534 ML62Q2724/Q2725/Q2726/Q2727/Q2734/Q2735/Q2736/Q2737/Q2744/Q2745/Q2746/Q2747 ML62Q2702/Q2703/Q2712/Q2713/Q2722/Q2723 ML62Q2033/Q2033R/Q2035/Q2035R/Q2043/Q2043R/Q2045/Q2045R
+*1︓ML610Q471/Q472/Q473 はオンチップデバッグ機能を搭載していません。ソフトウェア開発に関しては ML610Q471/Q472/Q473 のユ ーザーズマニュアルを参照してください。また，MWU16 を使用する場合，EASE1000 V2 は接続できません。uEASE をお使いください。 *2︓ML610Q794G 用のプログラム開発では機種名に ML610793 を選択してお使いください。 *3 ︓ ML620Q503/Q503H 用 の プ ロ グ ラ ム 開 発 で は 機 種 名 に ML620503F ， ML620Q504/Q504H 用 の プ ロ グ ラ ム 開 発 で は ML620504F を選択してお使いください。 *4︓ML62Q12xxE 用のプログラム開発では機種名に ML6212xx（E なし）を選択してお使いください。 *5︓本リリースに含まれる ML62Q1729/Q1739/Q1749, ML62Q1859/Q1869/Q1879 用機種情報ファイルと MWU16 V1.12 以前と 組み合わせると”Save Memory”機能が正しく動作しません。必ず MWU16 V1.13 以上と組み合わせてお使いください。
+
+© 2026 ROHM Co., Ltd.
+
+3/11
+
+ReleaseNote_LEXIDE_V2_2_0_j
+2026.3
+
+LAPIS Development Tools LEXIDE-Ω V2.2.0 リリースノート
+
+Release Note
+
+■ Arm Cortex-M0+/M33 コア搭載マイクロコントローラ(*6)
+ML630Q466, ML630Q448 ML63Q8000 グループ ML63Q2500 グループ ML800100/200 シリーズ
+*6︓Arm 向け機種情報ファイルは，本リリースには含まれていません。Arm 向け機種情報ファイルについては，弊社営業へお問い合わせいただく か，弊社サポートサイトからダウンロードしてください。
+
+© 2026 ROHM Co., Ltd.
+
+4/11
+
+ReleaseNote_LEXIDE_V2_2_0_j
+2026.3
+
+LAPIS Development Tools LEXIDE-Ω V2.2.0 リリースノート
+
+Release Note
+
+3. インストール方法
+■ LEXIDE-Ωのインストール手順
+以下の手順に従ってインストールします。インストールする際は，管理者(Administrator)権限を持つアカウントでログオンしてください。
+1. LAPIS Development Tools LEXIDE-Ωの旧版がインストールされている場合は，本リリースをインストールする前に旧版をアンインストー ルします。[スタートメニュー] > [設定] > [アプリ]から以下のプログラムを順番に削除してください。インストールフォルダにファイルを追加コピーし ている場合などは，すべてのファイルが削除されない場合があります。その場合は，インストールフォルダを手動で削除してください。
+(1) LAPIS Development Tools LEXIDE-Ω V2.0.0 Patch : LEXIDE-Ω V2.0.0 向けパッチ (無い場合は削除不要) (2) LAPIS Development Tools LEXIDE-Ω Setup : LEXIDE-Ω 開発環境セットアップ (*1)
+*1: 一部の環境では、稀にアンインストールが失敗する場合があります。その場合は，以下の関連ソフトを個別にアンインストールした後、 最後に Setup をアンインストールしてください。 ・ LAPIS Development Tools LEXIDE-Ω Build Tools Ver.<日付:該当バージョン> ・ LAPIS Development Tools LEXIDE-Ω Driver ・ LAPIS Development Tools LEXIDE-Ω GUI Tools ・ LAPIS Development Tools LEXIDE-Ω MWU16 Multiple Flash Writer ・ LAPIS Development Tools LEXIDE-Ω U8/U16 Device Information Files
+
+2. LAPIS Development Tools LEXIDE-Ωをインストールします。以下のインストーラを実行してください。 以降は，セットアッププログラムの指示に従ってインストール作業を行ってください。
+
+インストーラ LexideInstaller_20260317.exe
+
+インストールするツール LEXIDE-Ω開発環境 GUI ソフトウェア LEXIDE-Ω開発環境ビルドソフトウェア Ver.20260317 MWU16 フラッシュマルチライタ 汎用 LSI 用機種情報ファイル 各エミュレータ用 USB デバイスドライバ
+
+インストール時のご注意
+・ インストールフォルダのパスに使用できる文字は，半角英数字および以下の記号です。
+&'()+,.@[]_`{}~$-=
+・ Windows の最大パス長 260 文字の制限があるため，インストールフォルダのパス長は最大 15 文字程度を推奨します。
+・ LEXIDE-Ωのデフォルトインストール先は，C:\LAPIS\LEXIDE です。
+・ C:\Program Files\U8Dev にインストールした FWuEASE， MWuEASE は，C:\LAPIS\LEXIDE にインストールした機種情報ファ イルを参照できないため起動できません。FWuEASE， MWuEASE は[スタートメニュー] > [設定] > [アプリ]からアンインストールし， FWuEASE と MWuEASE を統合した機能を持つ MWU16 をご使用ください。
+・ LEXIDE-Ωは U8/U16 Development Tools と同時にインストールすることができます。同時にインストールする場合は，必ず「LEXIDEΩと U8/U16 Development Tools の同時使用について」を参照してください。
+・ U8/U16 Development Tools からアップグレードインストールする場合は，必ず U8/U16 Development Tools をアンインストールして から，LEXIDE-Ωをインストールしてください。LEXIDE-Ωのインストーラでは U8/U16 Development Tools はアンインストールされませ ん。
+
+© 2026 ROHM Co., Ltd.
+
+5/11
+
+ReleaseNote_LEXIDE_V2_2_0_j
+2026.3
+
+LAPIS Development Tools LEXIDE-Ω V2.2.0 リリースノート
+
+Release Note
+
+■ EASE1000/EASE1000 V2 ファームウェアのアップデート方法
+EASE1000/EASE1000 V2 用ファームウェアを Ver.2.20 にアップデートしてください。アップデート用ファイルについては，弊社サポートサイトより 取得してください。
+EASE1000/EASE1000 V2 ファームウェアのアップデート方法については，ファームウェアアップデータのユーザーズマニュアルを参照してください。
+・ ユーザーズマニュアル [スタートメニュー] > [LAPIS LEXIDE Software Tools ドキュメント] > [ファームウェアアップデータ for LAPIS ICE ユーザーズマニュア ル]
+・ ファームウェアアップデータ本体 [スタートメニュー] > [LAPIS LEXIDE Tools] > [Firmware Updater for LAPIS ICE (GUI)]
+
+© 2026 ROHM Co., Ltd.
+
+6/11
+
+ReleaseNote_LEXIDE_V2_2_0_j
+2026.3
+
+LAPIS Development Tools LEXIDE-Ω V2.2.0 リリースノート
+
+Release Note
+
+4. アンインストール方法
+アンインストールは，[スタートメニュー] > [設定] > [アプリ]から以下のプログラムを削除してください。 ・ LAPIS Development Tools LEXIDE-Ω Setup ︓LEXIDE-Ω 開発環境セットアップ
+インストールフォルダにファイルを追加コピーしている場合などは，上記アンインストールだけではすべてのファイルが削除されない場合があります。その 場合は，インストールフォルダを手動で削除してください。 一部の環境では、アンインストールが失敗する場合があります。その場合は，以下の関連ソフトを個別にアンインストールした後、最後に Setup をアンインストールしてください。
+・ LAPIS Development Tools LEXIDE-Ω Build Tools Ver.20260317 ・ LAPIS Development Tools LEXIDE-Ω Driver ・ LAPIS Development Tools LEXIDE-Ω GUI Tools ・ LAPIS Development Tools LEXIDE-Ω MWU16 Multiple Flash Writer ・ LAPIS Development Tools LEXIDE-Ω U8/U16 Device Information Files
+
+© 2026 ROHM Co., Ltd.
+
+7/11
+
+ReleaseNote_LEXIDE_V2_2_0_j
+2026.3
+
+LAPIS Development Tools LEXIDE-Ω V2.2.0 リリースノート
+
+Release Note
+
+5. 注意事項
+■ 共通
+ログオン時のアカウント名について 「&」を含むアカウント名でログオンしている場合，正常にプログラムのビルドができない場合があります。この文字を含まないアカウント名でログインし てビルドを行ってください。
+
+ファイル名およびパス名について 日本語文字や空白文字を含むファイル名やパス名を指定しないでください。これらの文字を含む場合，正常にビルドできません。
+
+Windows のテキストのサイズについて
+Windows のテキストのサイズを 100%から変更している場合，LEXIDE-Ω開発環境ソフトウェアの表示がおかしくなることがあります。そのような 場合はテキストのサイズを 100%に戻してお使いください。
+
+機種情報ファイル改版におけるビルド結果の影響について
+LSI の仕様変更に伴い機種情報ファイルが改版される場合があります。機種情報ファイルの改版はビルド結果に影響する場合があります。LSI の 仕様変更に合わせて十分に評価してください。
+
+■ Arm 向け
+LEXIDE-Ω v1.1.1 以前をご使用のユーザの方へ
+本リリースでは，LEXIDE-Ω V1.1.1 以前にインストールした機種情報ファイルをそのまま利用することができません。以前にインストールした機種 情報ファイルをご利用になる際は，本リリースを利用して再度インストールする必要があります。 以下に，LEXIDE-Ω V1.1.1 以前にインストールした機種情報ファイル(.pack)の格納場所を示します。
+・ C:\Users\＜サインインユーザー名＞\AppData\Roaming\CMSIS-Packs\.cache\ 本格納場所から使用する機種情報ファイル(.pack)を「LEXIDE-Ω Arm コア搭載マイコン向けユーザーズマニュアル」に従い，再インストールして ご利用ください。
+
+© 2026 ROHM Co., Ltd.
+
+8/11
+
+ReleaseNote_LEXIDE_V2_2_0_j
+2026.3
+
+LAPIS Development Tools LEXIDE-Ω V2.2.0 リリースノート
+
+Release Note
+
+■ U16 向け
+
+On Chip Emulator のタイプごとの接続可能 LSI について
+
+On Chip Emulator のタイプにより，接続可能な LSI が異なります。
+
+EASE1000 V2 EASE1000
+
+ML610Q100 ✔ ✔
+
+ML610Q000 ML610Q300/Q400/Q700 ✔ -
+
+ML620Q000
+✔ ✔
+
+ML62Q1000 ML62Q2000
+✔ ✔
+✔︓接続可能
+
+・ EASE1000/EASE1000 V2 と，ML610Q000 または ML620Q000 を接続して使用する場合，必ず R1.16.0（2018 年 1 月リ リース）以降のリリースに含まれる機種情報ファイルをご使用ください。
+・ EASE1000/EASE1000 V2 で DTU8 の最新の機能を使用するには，EASE1000 ファームウェア Ver.2.01 以上が必要です。 アップデート方法については，「EASE1000/EASE1000 V2 ファームウェアのアップデート方法」を参照してください。
+
+U8/U16 機種情報ファイルについて
+LEXIDE-Ω開発環境に含まれる U8/U16 機種情報ファイルは，C スタートアップファイル以外は変更しないでください。C スタートアップファイルを変 更する場合は，別フォルダにコピーしたファイルを変更してください。
+
+インターバルウォッチウィンドウの廃止について
+DTU8 V6.30 でウォッチウィンドウへインターバル機能を追加しました。それに伴い，インターバルウォッチウィンドウを廃止しました。V6.30 より前の DTU8 でインターバルウォッチウィンドウをお使いの場合は，登録アイテムを一旦ウォッチアイテムリストファイル（*.wi）に保存し，保存したファイル を最新バージョンの DTU8 のウォッチウィンドウに読み込んでください。
+
+ROM コードエントリ用のファイルフォーマットについて
+ROM コードエントリ用の ROM コードデータは，Intel HEX フォーマットで出力してください。ただし，ML62Q1000 シリーズの ROM コードデータお よびセグメント 16 から 31 にあるデータ・フラッシュ領域を含んだ ROM コードデータの場合は，モトローラ S フォーマットで出力してください。
+
+LEXIDE-Ωと U8/U16 Development Tools の同時使用について
+
+◇U8/U16 Development Tools を使用する場合
+
+LEXIDE-Ω のインストーラにより IDEU8 が参照するシステムパスが LEXIDE-Ω のインストールフォルダに変わるため，ビルドエラーとなることや，ビ ルド結果が変わってしまう場合があります。このような場合は，IDEU8 でファイルメニューから[環境設定] > [システムパス] を選び，表示される 「システムパス」ダイアログでフォルダ設定を変更してください。
+
+■例︓U8/U16 Development Tools R1.16.2 インストール時のシステムパス設定（デフォルトの場合）
+
+・CCU8 のパス ・MACU8 のパス ・DTU8 のパス ・DCL ファイルのパス ・システムインクルードパス ・システムライブラリパス
+
+C:\Program Files (x86)\U8Dev\Bin C:\Program Files (x86)\U8Dev\Bin C:\Program Files (x86)\U8Dev\Bin C:\Program Files (x86)\U8Dev\Dcl C:\Program Files (x86)\U8Dev\Inc C:\Program Files (x86)\U8Dev\Lib
+
+© 2026 ROHM Co., Ltd.
+
+9/11
+
+ReleaseNote_LEXIDE_V2_2_0_j
+2026.3
+
+LAPIS Development Tools LEXIDE-Ω V2.2.0 リリースノート
+
+■例︓U8/U16 Development Tools R2.4.2 インストール時のシステムパス設定（デフォルトの場合）
+
+（※V2_04_02 は使用するビルドツールのバージョンに合わせて変更してください。）
+
+・CCU8 のパス ・MACU8 のパス ・DTU8 のパス ・DCL ファイルのパス ・システムインクルードパス ・システムライブラリパス
+
+C:\U8Dev\BuildTools\V2_04_02\Bin C:\U8Dev\BuildTools\V2_04_02\Bin C:\U8Dev\Bin C:\U8Dev\Dcl C:\U8Dev\BuildTools\V2_04_02\Inc\;C:\U8Dev\Inc\ (*1) C:\U8Dev\BuildTools\V2_04_02\Lib
+
+Release Note
+
+*1︓ビルドツールのバージョンによっては，ヘッダファイルが Inc\U16 フォルダ内に格納されている場合があります。インストール先のフォルダ構 成を確認し，ファイルが存在する階層（...\Inc\ または ...\Inc\U16\）を適切に設定してください。
+◇LEXIDE-U16 を使用する場合 LEXIDE-U16 で作成したプロジェクトを LEXIDE-Ω で開くと LEXIDE-Ω 用にコンバートされ LEXIDE-U16 で使用できなくなります。LEXIDEΩ用から LEXIDE-U16 用へのコンバートはできません。必ずバックアップを取ったうえで LEXIDE-Ω をご使用ください。また，コンバートする際に LEXIDE-Ωが再起動します。
+
+© 2026 ROHM Co., Ltd.
+
+10/11
+
+ReleaseNote_LEXIDE_V2_2_0_j
+2026.3
+
+LAPIS Development Tools LEXIDE-Ω V2.2.0 リリースノート
+
+Release Note
+
+6. 著作権について
+
+LEXIDE-Ωは Eclipse™，GDB，OpenOCD，OpenCSD， QEMU™， libwdi ライブラリ等のオープンソースソフトウェアを利用していま す。これらは Eclipse Public License Version 2.0(EPL)，GNU General Public License（GPL）， GNU Lesser General Public License（LGPL）により保護されています。
+
+LEXIDE ビルドツールは LLVM を利用しています。LLVM は University of Illinois at Urbana-Champaign が著作権を有します。
+
+LEXIDE ビルドツールが提供する標準ライブラリは，Newlib 及び Picolibc を利用しています。Newlib は RedHat 社の Jeff Johnston 氏， Tom Fitzsimmons 氏が管理するオープンソースの組み込み用 C ライブラリです。Picolibc は Keith Packard 氏が管理するオープンソースの組 み込み用 C ライブラリです。
+
+ライセンスに関しては，以下のフォルダのファイルに記述されていますので，ご使用前にご覧ください。
+
+・ "(インストールフォルダ)\eclipse\"
+
+（Eclipse ライセンスファイル）
+
+・ "(インストールフォルダ)\Licenses\LEXIDE\BuildTools\(バージョンフォルダ)" （LLVM，Newlib，Picolibc ライセンスファイル）
+
+・ "(インストールフォルダ)\Licenses\LEXIDE\gdb"
+
+（GDB ライセンスファイル）
+
+・ "(インストールフォルダ)\Licenses\LEXIDE\libwdi"
+
+（libwdi ライセンスファイル）
+
+・ "(インストールフォルダ)\Licenses\LEXIDE\LEXIDEScope"
+
+（LEXIDE Scope ライセンスファイル）
+
+・ "(インストールフォルダ)\Licenses\LEXIDE\opencsd"
+
+（OpenCSD ライセンスファイル）
+
+・ "(インストールフォルダ)\Licenses\LEXIDE\openocd-0.11.0"
+
+（OpenOCD ライセンスファイル）
+
+・ "(インストールフォルダ)\Licenses\LEXIDE\openocd-0.12.0"
+
+（OpenOCD ライセンスファイル）
+
+・ "(インストールフォルダ)\Licenses\LEXIDE\pyOCD"
+
+（pyOCD ライセンスファイル）
+
+・ "(インストールフォルダ)\Licenses\LEXIDE\qemu"
+
+（QEMU ライセンスファイル）
+
+・ "(インストールフォルダ)\Licenses\LEXIDE\zadig"
+
+（zadig ライセンスファイル）
+
+* 「Eclipse™」は，Eclipse Foundation, Inc.の米国およびその他の国における商標または登録商標です。 * 「QEMU™」は，Fabrice Bellard 氏の米国およびその他の国における商標または登録商標です。
+
+© 2026 ROHM Co., Ltd.
+
+11/11
+
+ReleaseNote_LEXIDE_V2_2_0_j
+2026.3
+
+

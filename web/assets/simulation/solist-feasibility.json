@@ -1,0 +1,68 @@
+{
+  "status": "synthetic feasibility only",
+  "input_nodes": 18,
+  "output_nodes": 8,
+  "activation": "hard sigmoid",
+  "seeds": 10,
+  "train_samples": 640,
+  "test_samples": 320,
+  "cases": [
+    {
+      "hidden_nodes": 8,
+      "node_total": 34,
+      "accuracy_mean": 0.9159,
+      "accuracy_min": 0.8375,
+      "accuracy_max": 0.9875
+    },
+    {
+      "hidden_nodes": 16,
+      "node_total": 42,
+      "accuracy_mean": 0.9944,
+      "accuracy_min": 0.9875,
+      "accuracy_max": 1.0
+    },
+    {
+      "hidden_nodes": 32,
+      "node_total": 58,
+      "accuracy_mean": 0.9997,
+      "accuracy_min": 0.9969,
+      "accuracy_max": 1.0
+    },
+    {
+      "hidden_nodes": 64,
+      "node_total": 90,
+      "accuracy_mean": 1.0,
+      "accuracy_min": 1.0,
+      "accuracy_max": 1.0
+    }
+  ],
+  "simultaneous_hits": {
+    "classes": "8 singles + 28 two-hit combinations",
+    "target": "8-output multi-hot",
+    "train_samples": 1800,
+    "test_samples": 900,
+    "cases": [
+      {
+        "hidden_nodes": 32,
+        "node_total": 58,
+        "exact_set_accuracy_mean": 0.8691,
+        "exact_set_accuracy_min": 0.8567,
+        "label_f1_mean": 0.957
+      },
+      {
+        "hidden_nodes": 64,
+        "node_total": 90,
+        "exact_set_accuracy_mean": 0.8884,
+        "exact_set_accuracy_min": 0.8811,
+        "label_f1_mean": 0.9632
+      },
+      {
+        "hidden_nodes": 128,
+        "node_total": 154,
+        "exact_set_accuracy_mean": 0.8871,
+        "exact_set_accuracy_min": 0.8811,
+        "label_f1_mean": 0.9628
+      }
+    ]
+  }
+}

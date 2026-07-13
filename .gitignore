@@ -1,0 +1,8 @@
+__pycache__/
+*.py[cod]
+.venv/
+
+# Raw captures and generated models can become large.
+data/raw/
+artifacts/
+
