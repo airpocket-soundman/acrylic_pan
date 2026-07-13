@@ -8,6 +8,17 @@
 <p class="lead">従来結果を残したまま、実績あるCalculiX CrunchiX 2.20で再解析しました。曲げに不利な一次HEX8を避け、二次20節点・低減積分のC3D20Rを使用しています。</p>
 <div class="status"><strong>基準解析として採用</strong>固有値、モード形状、8打点のモード動解析はCalculiXが計算します。Pythonは入力生成、SVG化、中央変位からの加速度換算、FFTだけを担当します。</div>
 
+<h2>2026年7月14日 全解析再実行結果</h2>
+<table class="spec">
+  <tr><th>2D薄板モデル</th><td>18モード、先頭8モード 15.04～153.39 Hz</td><td>8打点RMS・波形・FFT生成成功</td></tr>
+  <tr><th>独自3D FEM</th><td>16モード、先頭8モード 18.362～307.045 Hz</td><td>静止画・動画・波形・FFT生成成功</td></tr>
+  <tr><th>Solist-AI予備評価</th><td>1隠れ層16ノード、平均99.44%</td><td>合成データでの単一点8分類</td></tr>
+  <tr><th>CalculiX標準</th><td>30モード、8.934847～540.2219 Hz</td><td>8打点・2,048点応答と動画4本を生成</td></tr>
+  <tr><th>CalculiX高周波</th><td>274モード、最大5,992.405 Hz</td><td>25.6 kHz・50 ms・1,280点応答を生成</td></tr>
+</table>
+<div class="status"><strong>高周波側の再計算値</strong>HPF候補0～1,000 Hzを比較し、最小コサイン距離は1,000 Hzで0.1886と僅かに最大でした。FFTの真の周波数分解能は20 Hzです。これは理想化モデルによる予備値で、最終カットオフは実測で決めます。</div>
+<div class="status warn"><strong>CalculiX 2.20の実行警告</strong><code>*MODAL DYNAMIC, DIRECT</code>と<code>*MODAL DAMPING, MODAL=DIRECT</code>の追加パラメータは未認識として警告されましたが、全ジョブは<code>Job finished</code>で終了し、固有モードからの動的応答合成と出力生成は完了しています。警告原文は各run logに保存しています。</div>
+
 <h2>局所細分化した非一様メッシュ</h2>
 <figure class="wide-figure"><img src="../assets/simulation/calculix/calculix-graded-mesh.svg" alt="固定領域とセンサ周辺を局所細分化したCalculiXメッシュ"><figcaption>560 C3D20R要素、3,357節点。固定領域の境界、中央センサ、8打点付近へ節点を配置し、その他は粗くしています。</figcaption></figure>
 <div class="grid two"><div class="card"><h3>細分化領域</h3><p>固定領域はY方向5 mm、x=200/300 mm付近は10～15 mm、中央センサ付近は10～15 mm間隔です。板厚方向は1 mm × 2要素です。</p></div><div class="card"><h3>粗い領域</h3><p>応力・曲率変化が比較的小さい外側は25 mmまで広げ、均一格子より少ない560要素で二次要素を使えるようにしました。</p></div></div>
