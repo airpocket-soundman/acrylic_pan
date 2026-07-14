@@ -13,3 +13,6 @@ web/assets/simulation/calculix-highfreq/*.12d
 web/assets/simulation/calculix-highfreq/*.cvg
 web/assets/simulation/calculix-highfreq/*.sta
 web/assets/simulation/calculix-highfreq/spooles.out
+
+# Local Solist-AI vendor software and documentation.
+solist-ai/
