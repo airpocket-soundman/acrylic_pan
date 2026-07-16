@@ -33,31 +33,115 @@ from pc.acrylic_pan_monitor.signal_processing import prepare_plot_data
 
 
 STATIC_DIR = Path(__file__).with_name("static")
+PANEL_WIDTH_MM = 400.0
+PANEL_HEIGHT_MM = 200.0
+AREA_WIDTH_MM = PANEL_WIDTH_MM / 4
+AREA_HEIGHT_MM = PANEL_HEIGHT_MM / 2
+
+POSITION_PATTERNS: dict[str, tuple[tuple[str, float, float], ...]] = {
+    "center": (("center", 0.0, 0.0),),
+    "five": (
+        ("center", 0.0, 0.0),
+        ("left", -25.0, 0.0),
+        ("right", 25.0, 0.0),
+        ("up", 0.0, -25.0),
+        ("down", 0.0, 25.0),
+    ),
+    "nine": (
+        ("center", 0.0, 0.0),
+        ("left", -25.0, 0.0),
+        ("right", 25.0, 0.0),
+        ("up", 0.0, -25.0),
+        ("down", 0.0, 25.0),
+        ("up_left", -25.0, -25.0),
+        ("up_right", 25.0, -25.0),
+        ("down_left", -25.0, 25.0),
+        ("down_right", 25.0, 25.0),
+    ),
+}
+
+
+@dataclass(frozen=True)
+class CollectionTarget:
+    class_id: int
+    point_id: int
+    point_name: str
+    x_mm: float
+    y_mm: float
+    offset_x_mm: float
+    offset_y_mm: float
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "class_id": self.class_id,
+            "point_id": self.point_id,
+            "point_name": self.point_name,
+            "x_mm": self.x_mm,
+            "y_mm": self.y_mm,
+            "offset": {"x_mm": self.offset_x_mm, "y_mm": self.offset_y_mm},
+        }
+
+
+def build_collection_targets(pattern: str) -> tuple[CollectionTarget, ...]:
+    try:
+        positions = POSITION_PATTERNS[pattern]
+    except KeyError as error:
+        raise ValueError("position_pattern must be center, five, or nine") from error
+    targets: list[CollectionTarget] = []
+    for class_id in range(8):
+        column, row = class_id % 4, class_id // 4
+        center_x = (column + 0.5) * AREA_WIDTH_MM
+        center_y = (row + 0.5) * AREA_HEIGHT_MM
+        for point_id, (name, offset_x, offset_y) in enumerate(positions):
+            targets.append(CollectionTarget(
+                class_id, point_id, name,
+                center_x + offset_x, center_y + offset_y,
+                offset_x, offset_y,
+            ))
+    return tuple(targets)
 
 
 @dataclass
 class CollectionState:
-    """Progress for fixed-order, eight-area guided acquisition."""
+    """Progress for fixed-order, eight-area and intra-area targets."""
 
     active: bool = False
     finished: bool = False
     repetitions: int = 0
     completed_samples: int = 0
     per_class_counts: list[int] = field(default_factory=lambda: [0] * 8)
+    position_pattern: str = "center"
+    targets: tuple[CollectionTarget, ...] = field(
+        default_factory=lambda: build_collection_targets("center")
+    )
+    target_counts: list[int] = field(default_factory=lambda: [0] * 8)
     order: tuple[int, ...] = tuple(range(8))
 
     @property
     def total_samples(self) -> int:
-        return len(self.order) * self.repetitions
+        return len(self.targets) * self.repetitions
+
+    @property
+    def current_target_index(self) -> int | None:
+        if not self.active or self.completed_samples >= self.total_samples:
+            return None
+        return self.completed_samples // self.repetitions
+
+    @property
+    def current_target(self) -> CollectionTarget | None:
+        index = self.current_target_index
+        return self.targets[index] if index is not None else None
 
     @property
     def current_class_id(self) -> int | None:
-        if not self.active or self.completed_samples >= self.total_samples:
-            return None
-        return self.order[self.completed_samples // self.repetitions]
+        target = self.current_target
+        return target.class_id if target is not None else None
 
     def as_dict(self) -> dict[str, Any]:
-        current = self.current_class_id
+        target_index = self.current_target_index
+        target = self.current_target
+        current = target.class_id if target is not None else None
+        current_count = self.target_counts[target_index] if target_index is not None else None
         return {
             "active": self.active,
             "finished": self.finished,
@@ -65,8 +149,27 @@ class CollectionState:
             "completed_samples": self.completed_samples,
             "total_samples": self.total_samples,
             "current_class_id": current,
-            "current_repetition": self.per_class_counts[current] + 1 if current is not None else None,
+            "current_point_id": target.point_id if target is not None else None,
+            "current_point_name": target.point_name if target is not None else None,
+            "current_x_mm": target.x_mm if target is not None else None,
+            "current_y_mm": target.y_mm if target is not None else None,
+            "current_offset": (
+                {"x_mm": target.offset_x_mm, "y_mm": target.offset_y_mm}
+                if target is not None else None
+            ),
+            "current_target": target.as_dict() if target is not None else None,
+            "current_target_index": target_index,
+            "current_repetition": current_count + 1 if current_count is not None else None,
             "per_class_counts": list(self.per_class_counts),
+            "per_position_counts": [
+                {**item.as_dict(), "count": self.target_counts[index]}
+                for index, item in enumerate(self.targets)
+            ],
+            "position_pattern": self.position_pattern,
+            "points_per_class": len(POSITION_PATTERNS[self.position_pattern]),
+            "samples_per_class": len(POSITION_PATTERNS[self.position_pattern]) * self.repetitions,
+            "panel": {"width_mm": PANEL_WIDTH_MM, "height_mm": PANEL_HEIGHT_MM},
+            "targets": [item.as_dict() for item in self.targets],
             "order": list(self.order),
         }
 
@@ -153,25 +256,40 @@ class AcquisitionController:
         return dict(self.last_control)
 
     def start_collection(
-        self, repetitions: int, output_root: str | Path | None = None
+        self,
+        repetitions: int,
+        output_root: str | Path | None = None,
+        position_pattern: str = "center",
     ) -> dict[str, Any]:
         if not 1 <= repetitions <= 1000:
             raise ValueError("repetitions must be between 1 and 1000")
         if not self.link.connected:
             raise OSError("serial port is not connected")
+        targets = build_collection_targets(position_pattern)
         with self._lock:
             if self.collection.active:
                 raise ValueError("collection is already active")
             self.new_session(output_root, class_id=None, metadata={
-                "mode": "guided_8area_collection",
+                "mode": "guided_8area_points",
                 "collection_plan": {
                     "area_count": 8,
                     "repetitions": repetitions,
+                    "position_pattern": position_pattern,
+                    "points_per_class": len(POSITION_PATTERNS[position_pattern]),
+                    "point_count": len(POSITION_PATTERNS[position_pattern]),
+                    "panel": {"width_mm": PANEL_WIDTH_MM, "height_mm": PANEL_HEIGHT_MM},
                     "order": list(range(8)),
-                    "total_samples": 8 * repetitions,
+                    "targets": [target.as_dict() for target in targets],
+                    "total_samples": len(targets) * repetitions,
                 },
             })
-            self.collection = CollectionState(active=True, repetitions=repetitions)
+            self.collection = CollectionState(
+                active=True,
+                repetitions=repetitions,
+                position_pattern=position_pattern,
+                targets=targets,
+                target_counts=[0] * len(targets),
+            )
         try:
             self.send_command("start")
         except Exception:
@@ -288,25 +406,37 @@ class AcquisitionController:
                 try:
                     self._ensure_session()
                     assert self.recorder is not None
-                    collection_class = (
-                        self.collection.current_class_id
+                    collection_target = (
+                        self.collection.current_target
                         if self.collection.active and source == "serial"
                         else None
                     )
+                    collection_target_index = self.collection.current_target_index
+                    collection_class = (
+                        collection_target.class_id if collection_target is not None else None
+                    )
                     label = collection_class if collection_class is not None else self.class_id
                     annotations: dict[str, Any] = {"source": source}
-                    if collection_class is not None:
+                    if collection_target is not None and collection_target_index is not None:
                         annotations.update({
                             "collection": True,
                             "collection_index": self.collection.completed_samples,
-                            "target_class_id": collection_class,
-                            "target_area": collection_class + 1,
-                            "repetition": self.collection.per_class_counts[collection_class] + 1,
+                            "target_class_id": collection_target.class_id,
+                            "target_area": collection_target.class_id + 1,
+                            "target_point_id": collection_target.point_id,
+                            "target_point_name": collection_target.point_name,
+                            "target_x_mm": collection_target.x_mm,
+                            "target_y_mm": collection_target.y_mm,
+                            "offset_x_mm": collection_target.offset_x_mm,
+                            "offset_y_mm": collection_target.offset_y_mm,
+                            "position_pattern": self.collection.position_pattern,
+                            "repetition": self.collection.target_counts[collection_target_index] + 1,
                         })
                     self.recorder.record_event(event, class_id=label, annotations=annotations)
                     self.stats.events_saved += 1
-                    if collection_class is not None:
+                    if collection_class is not None and collection_target_index is not None:
                         self.collection.per_class_counts[collection_class] += 1
+                        self.collection.target_counts[collection_target_index] += 1
                         self.collection.completed_samples += 1
                         if self.collection.completed_samples >= self.collection.total_samples:
                             self.collection.active = False
@@ -423,7 +553,9 @@ class ApiHandler(BaseHTTPRequestHandler):
                 return self._json(self.controller.send_ai_selftest(int(body.get("case_id", 0))))
             if path == "/api/collection/start":
                 return self._json(self.controller.start_collection(
-                    int(body.get("repetitions", 10)), body.get("output_root")
+                    int(body.get("repetitions", 10)),
+                    body.get("output_root"),
+                    str(body.get("position_pattern", "center")),
                 ))
             if path == "/api/collection/stop":
                 return self._json(self.controller.stop_collection())
@@ -456,6 +588,7 @@ class ApiHandler(BaseHTTPRequestHandler):
             "/": "index.html",
             "/index.html": "index.html",
             "/collector.html": "collector.html",
+            "/collector.css": "collector.css",
             "/app.js": "app.js",
             "/style.css": "style.css",
         }

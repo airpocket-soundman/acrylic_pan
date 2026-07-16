@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="ja">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Acrylic Pan Vibration Monitor</title><link rel="stylesheet" href="/style.css"></head>
+<title>Acrylic Pan Vibration Monitor</title><link rel="stylesheet" href="/style.css"><link rel="stylesheet" href="/collector.css"></head>
 <body><main>
   <header><div><h1>Acrylic Pan Vibration Monitor</h1><p>振動データの記録・FFT表示・8エリアガイド採取</p></div><span id="connection" class="badge">未接続</span></header>
   <section class="controls card">
@@ -16,8 +16,9 @@
   <section id="stats" class="stats"></section><div id="controlStatus">「測定トリガー」を押すと、Z軸振動を512点取得します。</div><div id="error" class="error"></div>
   <section class="card collection-panel">
     <div class="collection-toolbar">
-      <div><h2>8エリア ガイド付きデータ採取</h2><p>光っているエリアを叩いてください。受信後、自動的に次の測定を待ち受けます。</p></div>
-      <label>各エリアの回数 <input id="collectionRepetitions" type="number" min="1" max="1000" value="10"></label>
+      <div><h2>8エリア ガイド付きデータ採取</h2><p>マーカー位置を叩いてください。受信後、自動的に次の測定を待ち受けます。</p></div>
+      <label>位置パターン <select id="collectionPattern"><option value="center">中心 1点</option><option value="five" selected>中心＋上下左右 5点</option><option value="nine">3×3 9点</option></select></label>
+      <label>各位置の回数 <input id="collectionRepetitions" type="number" min="1" max="1000" value="10"></label>
       <button id="collectionStart" class="primary">採取開始</button>
       <button id="collectionStop">採取停止</button>
     </div>
@@ -31,6 +32,12 @@
       <div class="collection-cell" data-area="5"><b>エリア6</b><span>0 / 0</span></div>
       <div class="collection-cell" data-area="6"><b>エリア7</b><span>0 / 0</span></div>
       <div class="collection-cell" data-area="7"><b>エリア8</b><span>0 / 0</span></div>
+      <div id="collectionMarker" class="collection-marker" hidden><span></span></div>
+    </div>
+    <div class="panel-axis"><span>← 400 mm →</span><span>高さ 200 mm</span></div>
+    <div class="position-progress-wrap">
+      <h3>ラベル・打点別の採取件数</h3>
+      <div id="positionProgress" class="position-progress" aria-live="polite"></div>
     </div>
   </section>
   <section class="card plot"><h2>振動波形</h2><canvas id="wave" width="1100" height="280"></canvas></section>

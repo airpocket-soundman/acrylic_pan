@@ -1,0 +1,57 @@
+.collection-grid {
+  position: relative;
+  overflow: hidden;
+  gap: 0;
+  border: 2px solid #7c8b97;
+  border-radius: 8px;
+}
+
+.collection-grid .collection-cell { border-radius: 0; }
+
+.collection-marker {
+  position: absolute;
+  z-index: 4;
+  width: 30px;
+  height: 30px;
+  border: 4px solid #b51f15;
+  border-radius: 50%;
+  background: #fff7;
+  box-shadow: 0 0 0 7px #ffcf33aa, 0 2px 8px #0005;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.collection-marker::before,
+.collection-marker::after {
+  content: "";
+  position: absolute;
+  background: #b51f15;
+}
+
+.collection-marker::before { left: 11px; top: -10px; width: 2px; height: 42px; }
+.collection-marker::after { left: -10px; top: 11px; width: 42px; height: 2px; }
+.collection-marker span {
+  position: absolute;
+  left: 35px;
+  top: -11px;
+  width: max-content;
+  padding: 3px 6px;
+  border-radius: 4px;
+  color: #fff;
+  background: #8e1b13;
+  font-size: 12px;
+}
+.collection-marker.right-edge span { left: auto; right: 35px; }
+
+.panel-axis { display: flex; justify-content: space-between; color: #526474; font-size: 13px; margin-top: 5px; }
+.position-progress-wrap { margin-top: 1rem; }
+.position-progress-wrap h3 { margin: .2rem 0 .6rem; }
+.position-progress { overflow-x: auto; border: 1px solid #dbe3ee; border-radius: 10px; background: #fff; }
+.position-row { display: grid; grid-template-columns: minmax(76px, 1.1fr) repeat(var(--point-count, 5), minmax(68px, 1fr)) minmax(76px, 1fr); min-width: 620px; align-items: center; border-top: 1px solid #e8edf4; }
+.position-row:first-child { border-top: 0; }
+.position-row > * { padding: .45rem .55rem; text-align: center; }
+.position-header { background: #f1f5f9; color: #334155; position: sticky; top: 0; }
+.position-count { border-radius: 6px; }
+.position-count.active { background: #fff0b8; color: #7c4a00; outline: 2px solid #f59e0b; font-weight: 700; }
+.position-count.complete { background: #dcfce7; color: #166534; }
+.position-count.active.complete { background: #fde68a; color: #713f12; }

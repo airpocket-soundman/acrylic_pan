@@ -23,6 +23,9 @@ int main(int argc, char **argv)
     uint8_t command_packet[64];
     size_t command_size;
     FILE *output;
+    ApanCapture threshold_capture;
+    ApanCaptureConfig production_threshold = { 2000U, 800U };
+    int16_t gravity_history[128];
 
     CHECK(argc == 2);
     for (i = 0U; i < 512U; i++)
@@ -91,5 +94,24 @@ int main(int argc, char **argv)
     CHECK(command.message_type == APAN_MESSAGE_CAPTURE);
     CHECK(command.sequence == 77U);
     CHECK(command.payload_size == 0U);
+
+    /* Static Z gravity satisfies the level gate, so the jerk threshold must
+       reject a 1999-LSB adjacent difference and accept the 2000-LSB boundary. */
+    for (i = 0U; i < 128U; i++)
+    {
+        gravity_history[i] = 4000;
+    }
+    ApanCaptureInit(&threshold_capture, &production_threshold);
+    ApanCaptureFeed(&threshold_capture, gravity_history, 128U);
+    gravity_history[0] = 5999;
+    ApanCaptureFeed(&threshold_capture, gravity_history, 1U);
+    CHECK(!threshold_capture.collecting);
+    gravity_history[0] = 4000;
+    ApanCaptureFeed(&threshold_capture, gravity_history, 1U);
+    CHECK(!threshold_capture.collecting);
+    gravity_history[0] = 6000;
+    ApanCaptureFeed(&threshold_capture, gravity_history, 1U);
+    CHECK(threshold_capture.collecting);
+    CHECK(threshold_capture.event.trigger_index == APAN_PRETRIGGER_SAMPLES);
     return 0;
 }

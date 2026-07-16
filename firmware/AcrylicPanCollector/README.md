@@ -30,7 +30,9 @@ The completed COM3 qualification result is documented in
 - trigger sample plus 383 later samples, giving 512 samples (20 ms) total
 - sensor is stopped only after the complete event exists
 - APAN version 1 `EVENT_DATA`, CRC32 and COBS framing at 115,200 bit/s
-- default raw-count thresholds: jerk 1200, absolute level 800
+- default raw-count thresholds: jerk 2000, absolute level 800.  The jerk
+  threshold includes margin above the 1351-LSB maximum adjacent difference
+  measured during a ten-event stationary-board false-trigger investigation.
 
 UART1 accepts newline-terminated ASCII commands at 115200 8-N-1:
 

@@ -71,10 +71,14 @@ function drawAiResult(result) {
 function drawCollection(collection) {
   if (!collection) return;
   const summary = $('collectionSummary');
+  const pointLabels = {
+    center: '中心', left: '左', right: '右', up: '上', down: '下',
+    up_left: '左上', up_right: '右上', down_left: '左下', down_right: '右下'
+  };
   if (collection.active) {
-    summary.textContent = `エリア${collection.current_class_id + 1}を叩いてください ` +
-      `（このエリア ${collection.current_repetition}/${collection.repetitions}、全体 ` +
-      `${collection.completed_samples}/${collection.total_samples}）`;
+    summary.textContent = `エリア${collection.current_class_id + 1}の${pointLabels[collection.current_point_name] || collection.current_point_name}` +
+      `（x=${collection.current_x_mm} mm, y=${collection.current_y_mm} mm）を叩いてください ` +
+      `（この位置 ${collection.current_repetition}/${collection.repetitions}、全体 ${collection.completed_samples}/${collection.total_samples}）`;
   } else if (collection.finished) {
     summary.textContent = `採取完了：${collection.completed_samples}/${collection.total_samples}件を保存しました。`;
   } else {
@@ -85,13 +89,46 @@ function drawCollection(collection) {
   document.querySelectorAll('.collection-cell').forEach(cell => {
     const area = Number(cell.dataset.area);
     const count = collection.per_class_counts[area] || 0;
-    cell.querySelector('span').textContent = `${count} / ${collection.repetitions}`;
+    cell.querySelector('span').textContent = `${count} / ${collection.samples_per_class}`;
     cell.classList.toggle('active', collection.active && area === collection.current_class_id);
-    cell.classList.toggle('complete', collection.repetitions > 0 && count >= collection.repetitions);
+    cell.classList.toggle('complete', collection.samples_per_class > 0 && count >= collection.samples_per_class);
   });
+  const positionProgress = $('positionProgress');
+  if (positionProgress) {
+    const positions = collection.per_position_counts || [];
+    const points = positions.filter(item => item.class_id === 0);
+    const byKey = new Map(positions.map(item => [`${item.class_id}:${item.point_id}`, item]));
+    positionProgress.style.setProperty('--point-count', Math.max(points.length, 1));
+    if (points.length === 0) {
+      positionProgress.textContent = '採取を開始すると、位置ごとの件数を表示します。';
+    } else {
+      const header = `<div class="position-row position-header"><b>ラベル</b>${points.map(point =>
+        `<b>${pointLabels[point.point_name] || point.point_name}</b>`).join('')}<b>合計</b></div>`;
+      const rows = Array.from({length: 8}, (_, classId) => {
+        const cells = points.map(point => {
+          const item = byKey.get(`${classId}:${point.point_id}`);
+          const count = item ? item.count : 0;
+          const active = collection.active && classId === collection.current_class_id && point.point_id === collection.current_point_id;
+          const complete = collection.repetitions > 0 && count >= collection.repetitions;
+          return `<span class="position-count${active ? ' active' : ''}${complete ? ' complete' : ''}">${count}/${collection.repetitions}</span>`;
+        }).join('');
+        return `<div class="position-row"><b>エリア${classId + 1}</b>${cells}<b>${collection.per_class_counts[classId] || 0}/${collection.samples_per_class}</b></div>`;
+      }).join('');
+      positionProgress.innerHTML = header + rows;
+    }
+  }
+  const marker = $('collectionMarker');
+  marker.hidden = !collection.active;
+  if (collection.active) {
+    marker.style.left = `${collection.current_x_mm / collection.panel.width_mm * 100}%`;
+    marker.style.top = `${collection.current_y_mm / collection.panel.height_mm * 100}%`;
+    marker.classList.toggle('right-edge', collection.current_x_mm > collection.panel.width_mm * 0.75);
+    marker.querySelector('span').textContent = `エリア${collection.current_class_id + 1} ${pointLabels[collection.current_point_name] || collection.current_point_name}`;
+  }
   $('collectionStart').disabled = collection.active;
   $('collectionStop').disabled = !collection.active;
   $('collectionRepetitions').disabled = collection.active;
+  $('collectionPattern').disabled = collection.active;
 }
 
 function plot(canvas, x, y, color, xlabel, ylabel, marker) {
@@ -150,7 +187,11 @@ if ($('aiRunAll')) $('aiRunAll').onclick = async () => {
 if ($('collectionStart')) $('collectionStart').onclick = async () => {
   try {
     const repetitions = Number($('collectionRepetitions').value);
-    await api('/api/collection/start', {repetitions, output_root: $('output').value});
+    await api('/api/collection/start', {
+      repetitions,
+      output_root: $('output').value,
+      position_pattern: $('collectionPattern').value
+    });
     await status();
   } catch (error) { $('error').textContent = error.message; }
 };

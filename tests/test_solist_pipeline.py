@@ -16,6 +16,7 @@ from sim.solist_dataset import (
     one_hot,
     split_dataset,
     split_dataset_by_session,
+    validate_guided_collection,
 )
 from sim.solist_elm import SolistELM, accuracy
 from pc.acrylic_pan_monitor.recorder import Recorder, make_demo_event
@@ -32,6 +33,39 @@ from sim.dummy_model_pipeline import (
 
 
 class SolistPipelineTests(unittest.TestCase):
+    def test_guided_collection_validates_five_and_nine_points(self):
+        point_names = ("center", "left", "right", "up", "down",
+                       "up_left", "up_right", "down_left", "down_right")
+        offsets = ((0, 0), (-10, 0), (10, 0), (0, -10), (0, 10),
+                   (-10, -10), (10, -10), (-10, 10), (10, 10))
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            for point_count in (5, 9):
+                recorder = Recorder(root)
+                recorder.begin_session({"mode": "guided_8area_points", "point_count": point_count})
+                sequence = 1
+                for class_id in range(8):
+                    center_x = 50.0 + 100.0 * (class_id % 4)
+                    center_y = 50.0 + 100.0 * (class_id // 4)
+                    for point_id in range(point_count):
+                        dx, dy = offsets[point_id]
+                        for repetition in (1, 2):
+                            recorder.record_event(make_demo_event(sequence), class_id=class_id, annotations={
+                                "target_class_id": class_id,
+                                "target_point_id": point_id,
+                                "target_point_name": point_names[point_id],
+                                "target_x_mm": center_x + dx,
+                                "target_y_mm": center_y + dy,
+                                "offset_x_mm": dx,
+                                "offset_y_mm": dy,
+                                "repetition": repetition,
+                            })
+                            sequence += 1
+                recorder.close()
+            summaries = validate_guided_collection(root, repetitions=2)
+            self.assertEqual(sorted(summary.point_count for summary in summaries), [5, 9])
+            self.assertEqual(sorted(summary.event_count for summary in summaries), [80, 144])
+
     def test_eight_class_recorder_sessions_split_without_leakage(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

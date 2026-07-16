@@ -13,7 +13,10 @@
 #include "apan_capture.h"
 #include "apan_protocol.h"
 
-#define DEFAULT_JERK_THRESHOLD  (1200U)
+/* Ten no-impact captures on the target board observed adjacent Z differences
+   up to 1351 LSB (99.99 percentile about 1298 LSB).  Keep margin above that
+   static-noise envelope while retaining sensitivity to a real acrylic hit. */
+#define DEFAULT_JERK_THRESHOLD  (2000U)
 #define DEFAULT_LEVEL_THRESHOLD (800U)
 
 static AI_CONTEXT sensor_context[2];

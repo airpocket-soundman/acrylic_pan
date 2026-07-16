@@ -49,6 +49,14 @@ class SessionDataset:
     event_paths: tuple[Path, ...]
 
 
+@dataclass(frozen=True)
+class GuidedRunSummary:
+    session_id: str
+    point_count: int
+    repetitions: int
+    event_count: int
+
+
 def extract_fft_features(samples: np.ndarray, feature_count: int = DEFAULT_FEATURE_COUNT) -> np.ndarray:
     """Return log-magnitude FFT features, excluding the DC bin."""
     waveform = np.asarray(samples, dtype=np.float64)
@@ -176,6 +184,95 @@ def load_recorded_sessions(
     return SessionDataset(
         np.stack(features), label_array, np.asarray(session_ids), tuple(event_paths)
     )
+
+
+def validate_guided_collection(
+    source: Path,
+    *,
+    class_count: int = DEFAULT_CLASS_COUNT,
+    point_count: int | None = None,
+    repetitions: int | None = None,
+) -> tuple[GuidedRunSummary, ...]:
+    """Validate complete 8-class x 5/9-point guided acquisition runs."""
+    if point_count is not None and point_count not in (5, 9):
+        raise ValueError("point_count must be 5 or 9")
+    source = Path(source)
+    session_dirs = [source] if (source / "session.json").is_file() else sorted(
+        path.parent for path in source.rglob("session.json")
+    )
+    if not session_dirs:
+        raise FileNotFoundError(f"no Recorder sessions under {source}")
+    summaries: list[GuidedRunSummary] = []
+    required = (
+        "target_class_id", "target_point_id", "target_point_name",
+        "target_x_mm", "target_y_mm", "offset_x_mm", "offset_y_mm", "repetition",
+    )
+    for session_dir in session_dirs:
+        metadata = json.loads((session_dir / "session.json").read_text(encoding="utf-8"))
+        session_id = str(metadata.get("session_id", ""))
+        rows = [json.loads(line) for line in
+                (session_dir / "manifest.jsonl").read_text(encoding="utf-8").splitlines() if line]
+        entries: dict[tuple[int, int, int], tuple[str, float, float, float, float]] = {}
+        point_definitions: dict[int, tuple[str, float, float]] = {}
+        class_centers: dict[int, tuple[float, float]] = {}
+        for row in rows:
+            annotations = row.get("annotations")
+            if not isinstance(annotations, dict) or any(name not in annotations for name in required):
+                raise ValueError(f"{session_dir}: guided event is missing position annotations")
+            target_class = annotations["target_class_id"]
+            target_point = annotations["target_point_id"]
+            repetition = annotations["repetition"]
+            if any(isinstance(value, bool) or not isinstance(value, int)
+                   for value in (target_class, target_point, repetition)):
+                raise ValueError(f"{session_dir}: class, point and repetition must be integers")
+            if not 0 <= target_class < class_count or row.get("class_id") != target_class:
+                raise ValueError(f"{session_dir}: target_class_id does not match class_id")
+            if target_point < 0 or repetition < 1:
+                raise ValueError(f"{session_dir}: invalid point or repetition")
+            name = annotations["target_point_name"]
+            if not isinstance(name, str) or not name.strip():
+                raise ValueError(f"{session_dir}: target_point_name must be non-empty")
+            try:
+                x, y, dx, dy = (float(annotations[key]) for key in
+                                ("target_x_mm", "target_y_mm", "offset_x_mm", "offset_y_mm"))
+            except (TypeError, ValueError) as error:
+                raise ValueError(f"{session_dir}: position values must be numeric") from error
+            if not np.isfinite((x, y, dx, dy)).all():
+                raise ValueError(f"{session_dir}: position values must be finite")
+            key = (target_class, target_point, repetition)
+            if key in entries:
+                raise ValueError(f"{session_dir}: duplicate class/point/repetition")
+            entries[key] = (name, x, y, dx, dy)
+            definition = (name, dx, dy)
+            if target_point in point_definitions and point_definitions[target_point] != definition:
+                raise ValueError(f"{session_dir}: point definition changes within run")
+            point_definitions[target_point] = definition
+            center = (x - dx, y - dy)
+            old_center = class_centers.setdefault(target_class, center)
+            if not np.allclose(center, old_center, rtol=0, atol=1e-6):
+                raise ValueError(f"{session_dir}: inconsistent area center coordinates")
+
+        inferred_points = len(point_definitions)
+        expected_points = point_count or inferred_points
+        if expected_points not in (5, 9) or set(point_definitions) != set(range(expected_points)):
+            raise ValueError(f"{session_dir}: point IDs must completely cover 0..{expected_points - 1}")
+        expected_repetitions = repetitions or max((key[2] for key in entries), default=0)
+        if expected_repetitions < 1:
+            raise ValueError(f"{session_dir}: no guided events")
+        expected_keys = {
+            (class_id, point_id, repeat)
+            for class_id in range(class_count)
+            for point_id in range(expected_points)
+            for repeat in range(1, expected_repetitions + 1)
+        }
+        if set(entries) != expected_keys:
+            missing = len(expected_keys - set(entries))
+            extra = len(set(entries) - expected_keys)
+            raise ValueError(f"{session_dir}: incomplete guided run (missing={missing}, extra={extra})")
+        summaries.append(GuidedRunSummary(
+            session_id, expected_points, expected_repetitions, len(entries)
+        ))
+    return tuple(summaries)
 
 
 def split_dataset_by_session(
