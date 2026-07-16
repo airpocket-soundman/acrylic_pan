@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Solist AI Simulator環境</title>
+  <link rel="stylesheet" href="../css/page.css">
+</head>
+<body>
+  <div class="eyebrow">08 / Solist AI Simulator</div>
+  <h1>512点の打撃波形を、<br>8エリア識別モデルへ変換する。</h1>
+  <p class="lead">IchiPing_solist_AIで確立した公式Simulatorの使い方を、acrylic_panの振動位置推定へ移植します。収録した波形をそのまま学習器へ渡すのではなく、同じ前処理で固定長の特徴量へ変換し、8出力のone-hot教師データで学習します。</p>
+
+  <div class="status"><strong>このPCで確認済みの実行環境</strong>公式 Solist-AI Sim 教師あり学習版 <b>SLV1.00.04</b> がインストールされています。実行ファイルは次の場所です。</div>
+  <pre class="formula"><code>C:\Program Files\ROHM\SolistAI_Sim_SLV10004sp\application\SolistAI_Sim_SLV10004.exe</code></pre>
+  <p class="note">管理者権限は通常不要です。学習データとモデル成果物はProgram Files配下ではなく、このリポジトリの作業ディレクトリへ保存します。</p>
+
+  <h2>acrylic_pan用の入出力</h2>
+  <div class="flow">
+    <div><span class="tag">CAPTURE</span><h3>512点のZ軸波形</h3><p>25.6 kHz、20 ms。リングバッファからプリトリガ128点＋ポストトリガ384点を切り出します。</p></div>
+    <span>→</span>
+    <div><span class="tag">FEATURES</span><h3>128 FFT特徴</h3><p>DC除去とHann窓の後、DCを除く先頭128ビンのlog振幅を計算し、学習データだけから求めた平均・標準偏差で正規化します。</p></div>
+    <span>→</span>
+    <div><span class="tag">OUTPUT</span><h3>8クラススコア</h3><p>各エリアをone-hotの8値で学習。実機では8スコアの最大値をCPU側で選び、クラス番号へ変換します。</p></div>
+  </div>
+
+  <table class="spec">
+    <tr><th>元データ</th><td><strong>512 samples</strong></td><td>1打撃を1サンプルとして扱う</td></tr>
+    <tr><th>初期入力</th><td><strong>128 features</strong></td><td>DCを除くFFT bin 1～128のlog振幅（50～6,400 Hz）</td></tr>
+    <tr><th>教師出力</th><td><strong>8 values</strong></td><td>area 0～7に対応するone-hotベクトル</td></tr>
+    <tr><th>隠れノード</th><td><strong>32 / 64から比較</strong></td><td>精度、AI RAM、処理時間を見て決定</td></tr>
+    <tr><th>出力判定</th><td><strong>CPU argmax</strong></td><td>最大スコアと2位との差も信頼度として利用</td></tr>
+  </table>
+
+  <div class="status warn"><strong>前処理はPCとマイコンで完全に揃える</strong>FFTの窓、帯域境界、logの定義、正規化定数が1つでも違うとSimulator精度を実機で再現できません。仕様をversion付きで保存し、同じテストベクトルをPCとファームの両方へ通して照合します。</div>
+
+  <h2>Simulatorへ渡すCSV</h2>
+  <p>1行が1打撃です。Simulatorが読み込むCSVには識別用文字列や日時を混ぜず、数値だけを並べます。収録メタデータは別ファイルで保持し、CSV生成時に結合します。</p>
+  <pre class="formula"><code>input_0,input_1,...,input_127,target_0,...,target_7
+-0.184,0.927,...,0.311,1,0,0,0,0,0,0,0
+ 0.442,-0.105,...,1.028,0,1,0,0,0,0,0,0</code></pre>
+  <table class="spec">
+    <tr><th>入力データ</th><td>First column = <strong>1</strong></td><td>Rows at one chunk = 1、Columns at one chunk = 128</td></tr>
+    <tr><th>期待値</th><td>First column = <strong>129</strong></td><td>Rows = 1、Columns = 8</td></tr>
+    <tr><th>チャンク数</th><td>Automatic</td><td>Check後に入力128／出力8ノードになることを確認</td></tr>
+    <tr><th>ヘッダ</th><td>1行目に列名</td><td>Simulatorは先頭ヘッダを読み飛ばす前提。読込み結果も必ず確認</td></tr>
+    <tr><th>分割</th><td>収録セッション単位</td><td>同じ日の連続打撃をtrainとtestへランダム混在させない</td></tr>
+    <tr><th>サイズ制約</th><td>（データ行数＋ヘッダ）× 136列 ≤ 1,000,000</td><td>安全側で最大7,351データ行。生成コードが超過を拒否</td></tr>
+  </table>
+
+  <h2>初期AI設定</h2>
+  <div class="grid two">
+    <div class="card"><span class="tag">ACTIVATION</span><h3>Hard sigmoid</h3><p>Solist AIのELM系1隠れ層で使用する非線形写像。PC側の比較コードも同じ定義にします。</p></div>
+    <div class="card"><span class="tag">LOSS</span><h3>MSE</h3><p>8クラスのone-hot教師値と8出力スコアの二乗誤差を最小化します。</p></div>
+    <div class="card"><span class="tag">PRECISION</span><h3>double → bfloat16</h3><p>最初はdoubleで構成とSeedを探索し、候補を決めてからbfloat16を有効にして実機相当精度を確認します。</p></div>
+    <div class="card"><span class="tag">RANDOM SEED</span><h3>Seed 1を基準</h3><p>IchiPingの再現設定を初期値にし、1～10を同じtestデータで比較。採用Seedはモデルversionへ固定記録します。</p></div>
+  </div>
+  <table class="spec">
+    <tr><th>Activation</th><td><strong>Hard sigmoid</strong></td><td>候補モデル間で固定</td></tr>
+    <tr><th>Loss</th><td><strong>MSE</strong></td><td>8出力one-hot分類</td></tr>
+    <tr><th>Forgetting</th><td><strong>1.0</strong></td><td>初期のバッチ学習基準</td></tr>
+    <tr><th>Seed</th><td><strong>1（基準）</strong></td><td>1～10比較後、採用値を固定</td></tr>
+    <tr><th>scaleGamma / leakRate</th><td><strong>0 / 0</strong></td><td>ESNの再帰結合を使用しない</td></tr>
+    <tr><th>Bfloat16</th><td><strong>探索時OFF、最終確認ON</strong></td><td>精度差、AI RAM、1 chunk処理時間を記録</td></tr>
+    <tr><th>Normalize</th><td><strong>OFF</strong></td><td>CSV生成側で正規化済みとする</td></tr>
+  </table>
+
+  <h2>作業フロー</h2>
+  <div class="timeline">
+    <div class="n">01</div><div><h3>実測データを収録</h3><p>8エリアを同数、打撃強度と日・固定し直しを変えて収録します。生の512点波形とラベル、capture tokenを失わず保存します。</p></div>
+    <div class="n">02</div><div><h3>特徴量CSVを生成</h3><p>波形品質を検査し、128 FFT特徴へ変換。trainで正規化定数を作り、validation/testにも同じ定数を適用します。</p></div>
+    <div class="n">03</div><div><h3>doubleで候補を探索</h3><p>隠れ32／64／128、Seed 1～10を比較します。総合精度だけでなく8×8混同行列と最悪クラス精度を確認します。</p></div>
+    <div class="n">04</div><div><h3>bfloat16で再評価</h3><p>有力候補を実機精度へ切り替え、精度低下、AI RAM、処理時間を記録します。別セッションtestで8エリア90%以上、デモ目標95%以上を合否基準にします。</p></div>
+    <div class="n">05</div><div><h3>モデルを保存してファームへ組込み</h3><p>採用モデルをSimulatorから保存し、model1.hを推論ファームへ取り込みます。CPU側でargmax、最低スコア、1位と2位のmarginを判定します。</p></div>
+    <div class="n">06</div><div><h3>PCと実機の出力を照合</h3><p>保存済み波形を使い、PC前処理、Simulator、実機の8スコアを比較。差が許容範囲内であることをリリース条件にします。</p></div>
+  </div>
+
+  <h2>保存するモデル成果物</h2>
+  <table class="spec">
+    <tr><th>model1.h</th><td>ファーム組込み用</td><td>重みとモデル定義。採用ファームのソースと同じversionで管理</td></tr>
+    <tr><th>model1.xlsx</th><td>Simulator再ロード用</td><td>設定・係数を再現し、後から評価をやり直すため保存</td></tr>
+    <tr><th>model1.mat</th><td>数値解析用</td><td>Simulatorが出力した元データとして保持</td></tr>
+    <tr><th>train / test CSV</th><td>学習再現用</td><td>生成スクリプト、元データmanifest、split一覧も一緒に保存</td></tr>
+    <tr><th>feature_scaler.npz</th><td>前処理仕様</td><td>128特徴の学習データ平均と標準偏差を記録</td></tr>
+    <tr><th>metrics.json / confusion.csv</th><td>採用根拠</td><td>Seed、隠れ数、精度モード、クラス別精度、AI RAM、処理時間を記録</td></tr>
+  </table>
+  <div class="status"><strong>推奨ディレクトリ</strong><code>models/area8/&lt;model-version&gt;/</code> に上記一式をまとめます。ファイル名だけでなくmanifest内にも収録データversion、特徴量version、Seed、Simulator SLV1.00.04を記録します。</div>
+
+  <h2>XY座標＋強度へ進む条件</h2>
+  <p>まず8クラスモデルを基準性能として完成させます。座標回帰へ進む場合も同じ128特徴を入口にできますが、教師値を8 one-hotから正規化した <code>x, y, strength</code> の3列へ変更し、クラス分類とは別モデルとして評価します。8エリアの中心以外を含む十分な座標データが集まるまでは、クラス出力からエリア中心座標へ変換する方式を採用します。</p>
+
+  <p class="note">このページの設定はIchiPing_solist_AIで使用した公式Sim運用を基準に、acrylic_panの8打点・512点振動波形向けへ改変した初期仕様です。帯域境界、隠れノード数、Seedは実測データで最終決定します。</p>
+</body>
+</html>

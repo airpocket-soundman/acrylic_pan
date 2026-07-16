@@ -1,0 +1,113 @@
+import csv
+from pathlib import Path
+import tempfile
+import unittest
+
+import numpy as np
+
+from sim.solist_dataset import (
+    FeatureScaler,
+    export_solist_csv,
+    extract_fft_features,
+    load_npz_events,
+    make_synthetic_events,
+    one_hot,
+    split_dataset,
+)
+from sim.solist_elm import SolistELM, accuracy
+from sim.dummy_model_pipeline import (
+    CLASS_COUNT,
+    HIDDEN_COUNT,
+    INPUT_COUNT,
+    from_bfloat16_bits,
+    generate,
+    make_dataset,
+    to_bfloat16_bits,
+    train_model,
+)
+
+
+class SolistPipelineTests(unittest.TestCase):
+    def test_dummy_model_is_deterministic_and_separable(self):
+        features, labels = make_dataset(samples_per_class=8)
+        alpha, beta = train_model(features, labels)
+        self.assertEqual(alpha.shape, (INPUT_COUNT, HIDDEN_COUNT))
+        self.assertEqual(beta.shape, (HIDDEN_COUNT, CLASS_COUNT))
+        self.assertTrue(np.array_equal(alpha, train_model(features, labels)[0]))
+        self.assertAlmostEqual(float(np.max(np.abs(alpha))), 0.20520325, places=6)
+
+    def test_bfloat16_round_trip(self):
+        values = np.array([-1.25, 0.0, 0.1, 42.5], dtype=np.float32)
+        actual = from_bfloat16_bits(to_bfloat16_bits(values))
+        np.testing.assert_allclose(actual, values, rtol=4e-3, atol=1e-4)
+
+    def test_dummy_export_has_eight_correct_golden_cases(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            result = generate(root / "data", root / "model.h")
+            self.assertEqual(len(result["cases"]), CLASS_COUNT)
+            self.assertEqual([case["board_case_id"] for case in result["cases"]], list(range(8)))
+            self.assertTrue(all(case["expected_class"] == case["predicted_class"]
+                                for case in result["cases"]))
+            self.assertTrue((root / "model.h").exists())
+
+    def test_fft_feature_shape_and_peak(self):
+        sample_rate = 25_600
+        time = np.arange(512) / sample_rate
+        features = extract_fft_features(np.sin(2 * np.pi * 1_000 * time), 128)
+        self.assertEqual(features.shape, (128,))
+        self.assertAlmostEqual((np.argmax(features) + 1) * sample_rate / 512, 1_000, delta=50)
+
+    def test_synthetic_eight_class_elm(self):
+        features, labels = make_synthetic_events(samples_per_class=12, seed=7)
+        train_x, train_y, test_x, test_y = split_dataset(features, labels, 0.25, 8)
+        scaler = FeatureScaler.fit(train_x)
+        model = SolistELM(n_hidden=64, seed=3).fit(scaler.transform(train_x), train_y)
+        self.assertGreaterEqual(accuracy(test_y, model.predict(scaler.transform(test_x))), 0.90)
+
+    def test_fit_targets_supports_coordinate_regression(self):
+        rng = np.random.default_rng(1)
+        features = rng.normal(size=(80, 5))
+        targets = np.column_stack((features[:, 0] * 0.2, features[:, 1] * -0.1, features[:, 2] * 0.3))
+        model = SolistELM(n_hidden=40, activation_name="linear", ridge=1e-6, seed=2)
+        actual = model.fit_targets(features, targets).decision(features)
+        self.assertEqual(actual.shape, (80, 3))
+        self.assertLess(np.mean((actual - targets) ** 2), 1e-6)
+
+    def test_npz_loader_requires_and_reads_label(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            samples = np.arange(512, dtype=np.int16)
+            np.savez(root / "event.npz", samples=samples, class_id=np.uint8(3))
+            features, labels = load_npz_events(root)
+            self.assertEqual(features.shape, (1, 128))
+            self.assertEqual(labels.tolist(), [3])
+            np.savez(root / "unlabelled.npz", samples=samples)
+            with self.assertRaisesRegex(ValueError, "missing class_id"):
+                load_npz_events(root)
+
+    def test_csv_layout_and_one_hot(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            output = Path(temporary) / "dataset.csv"
+            features = np.arange(12, dtype=float).reshape(3, 4)
+            rows = export_solist_csv(output, features, one_hot(np.array([0, 2, 7])))
+            with output.open(encoding="utf-8", newline="") as stream:
+                content = list(csv.reader(stream))
+            self.assertEqual(rows, 3)
+            self.assertEqual(len(content), 4)
+            self.assertEqual(len(content[0]), 12)
+            self.assertEqual(content[2][-8:], ["0.0", "0.0", "1.0", "0.0", "0.0", "0.0", "0.0", "0.0"])
+
+    def test_csv_cell_limit_rejects_or_truncates(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            output = Path(temporary) / "limited.csv"
+            features = np.ones((10, 3))
+            targets = np.ones((10, 2))
+            with self.assertRaisesRegex(ValueError, "limit"):
+                export_solist_csv(output, features, targets, max_cells=40)
+            rows = export_solist_csv(output, features, targets, max_cells=40, limit_rows=True)
+            self.assertEqual(rows, 7)
+
+
+if __name__ == "__main__":
+    unittest.main()

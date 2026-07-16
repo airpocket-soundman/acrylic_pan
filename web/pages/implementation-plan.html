@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>実装計画</title>
+  <link rel="stylesheet" href="../css/page.css">
+</head>
+<body>
+  <div class="eyebrow">07 / Implementation roadmap</div>
+  <h1>波形を確実に取るところから、<br>8クラス・XY推定へ育てる。</h1>
+  <p class="lead">最初の合格点は、衝撃の立ち上がりを欠落させずに1イベント分の振動波形を取得し、PCで時間波形とFFTを確認できることです。その同じ通信・収録基盤へ、ラベリング、学習、推論、演奏表示を順番に追加します。</p>
+
+  <div class="status"><strong>現在のマイルストーン — M1</strong>PCモニタの通信プロトコル、波形・FFT表示と保存処理を実装中。次にML63Q2557/KX134側のリングバッファ、衝撃検出、UART転送を接続します。</div>
+
+  <h2>実装する順番</h2>
+  <div class="timeline">
+    <div class="n">M0</div><div><h3>共通仕様と自動テスト</h3><p>サンプリング条件、COBS + CRC32通信、イベント形式、sequence番号を固定します。PC上の疑似イベントで分割受信、CRC異常、FFTピークをテストします。</p></div>
+    <div class="n">M1</div><div><h3>衝撃検知・波形・FFTモニタ</h3><p>マイコンはKX134のZ軸を常時取得し、jerkしきい値で打撃を検知。プリトリガを含む512点をPCへ送り、PCは時間波形とFFTを表示してNPZへ自動保存します。</p></div>
+    <div class="n">M2</div><div><h3>教師データ収録とラベリング</h3><p>PC画面に次に叩く8エリアを表示し、受信した波形へarea ID、座標、打撃順、品質フラグを付与。取り直しと収録数の均等化も行います。</p></div>
+    <div class="n">M3</div><div><h3>特徴量評価とSolist AI用データ生成</h3><p>生波形、FFT、帯域エネルギーなどを比較し、実測データを学習・検証・テストへ打撃単位で分割。正規化定数も学習データだけから決めます。</p></div>
+    <div class="n">M4</div><div><h3>8クラス推論</h3><p>Solist AI Simulatorで8出力スコアのモデルを生成してファームへ組み込みます。モデルは8スコアを返し、CPU側で最大値としきい値からクラスを決定します。</p></div>
+    <div class="n">M5</div><div><h3>演奏モード</h3><p>推論結果をPCへ送り、対応音階を再生。アクリル板上の打点エリア、スコア、強度、レイテンシをリアルタイム表示します。</p></div>
+    <div class="n">M6</div><div><h3>XY座標＋強度への拡張</h3><p>実測量と精度を確認後、出力をx、y、strengthの3値回帰、または8クラス＋座標補正へ拡張します。8クラス方式を基準性能として残します。</p></div>
+    <div class="n">M7</div><div><h3>耐久・再現性・リリース</h3><p>連打、弱打、強打、温度・固定条件の変化、長時間通信を評価。モデル・ファーム・収録条件へversionを付け、再現できる一式にまとめます。</p></div>
+  </div>
+
+  <h2>M1のバッファ設計</h2>
+  <div class="flow">
+    <div><span class="tag">CONTINUOUS</span><h3>リングへ常時記録</h3><p>25.6 kHzでZ軸を連続取得。書込み位置は循環し、最新の過去波形を常に保持します。</p></div>
+    <span>→</span>
+    <div><span class="tag">TRIGGER</span><h3>衝撃を検出</h3><p>サンプル間の差分（jerk）がしきい値を超えた位置をtrigger indexとします。</p></div>
+    <span>→</span>
+    <div><span class="tag">POST CAPTURE</span><h3>後半を待って確定</h3><p>過去128点をコピーし、以後384点を追記。512点が揃ってから送信します。</p></div>
+  </div>
+  <table class="spec">
+    <tr><th>イベント長</th><td><strong>512 samples / 20 ms</strong></td><td>Solist AIサンプルの入力長と一致</td></tr>
+    <tr><th>プリトリガ</th><td><strong>128 samples / 5 ms</strong></td><td>衝撃の立ち上がり前とDC基準を確保</td></tr>
+    <tr><th>ポストトリガ</th><td><strong>384 samples / 15 ms</strong></td><td>主要な減衰振動を取得</td></tr>
+    <tr><th>サンプルレート</th><td><strong>25,600 samples/s</strong></td><td>KX134の既存サンプル設定を使用</td></tr>
+    <tr><th>欠落対策</th><td>リング＋イベント領域</td><td>検知後に取得を始める方式ではないため先頭を失わない</td></tr>
+    <tr><th>検出境界</th><td>前ブロック末尾も保持</td><td>DMA/コールバック境界を跨ぐ差分も正しく判定</td></tr>
+  </table>
+  <div class="status warn"><strong>UART送信待ちの扱い</strong>512点イベントはヘッダ込みで約1.1 kBとなり、115200 bpsでは送信に約95 msかかります。初版は1イベントを確定して送信し、送信完了後に再アームします。したがって最初の打撃の先頭は欠落しませんが、約100 ms以内の連打対応にはイベント領域の2面化または高ボーレート化が必要です。</div>
+
+  <h2>M1の合格条件</h2>
+  <ul class="checklist">
+    <li>静止時に誤トリガせず、しきい値をPCから調整できる</li>
+    <li>全イベントでtrigger indexが128となり、その前に128点の実測波形が存在する</li>
+    <li>1 Hzで100回叩き、sequence欠落・CRCエラー・overrunが0</li>
+    <li>PCで時間波形と周波数スペクトルが同時表示される</li>
+    <li>受信イベントがtimestamp、sample rate、trigger index付きで自動保存される</li>
+    <li>疑似データで通信フレームとFFTの自動テストが通る</li>
+  </ul>
+
+  <h2>コマンドラインでのビルドと書込み</h2>
+  <table class="spec">
+    <tr><th>ビルド</th><td><span class="badge">確認済み</span></td><td>LEXIDE付属のmakeとLLVMツールチェーンでDebug/makefileを実行可能。出力はELFとHEXです。</td></tr>
+    <tr><th>書込み</th><td><span class="badge">ツール確定待ち</span></td><td>付属資料ではDAPLink + KeilまたはJ-Link + J-Flashを使用。どちらもCLI自動化できますが、このPCでは書込み用CLI本体をまだ検出できていません。</td></tr>
+    <tr><th>今後のスクリプト</th><td>build-firmware.ps1</td><td>環境変数とmakeを固定し、クリーン／増分ビルドを再現可能にします。</td></tr>
+    <tr><th>今後のスクリプト</th><td>flash-firmware.ps1</td><td>実際に接続するDAPLink/J-LinkとCLIの場所を確認後、HEX書込みと結果確認を自動化します。</td></tr>
+  </table>
+  <pre class="formula"><code># ビルド方式（プロジェクト生成後にスクリプト化）
+cd firmware/AcrylicPanCollector/Debug
+C:/LAPIS/LEXIDE/Utilities/Bin/make.exe all -j</code></pre>
+
+  <h2>現在作成済みのPC側部品</h2>
+  <div class="grid two">
+    <div class="card"><span class="tag">PROTOCOL</span><h3>APAN通信</h3><p>COBS、CRC32、sequence、EVENT_DATA、コマンド応答を実装しています。</p></div>
+    <div class="card"><span class="tag">MONITOR</span><h3>波形＋FFT GUI</h3><p>COM接続、時間波形、FFT、イベント情報、NPZ自動保存、デモ入力を実装しています。</p></div>
+    <div class="card"><span class="tag">SOLIST DATA</span><h3>8クラスCSV生成</h3><p>512点波形を128 FFT特徴へ変換し、学習データだけで標準化してone-hot教師値付きCSVを出力します。</p></div>
+    <div class="card"><span class="tag">REFERENCE ELM</span><h3>互換モデル検査</h3><p>固定alpha・学習betaの純NumPy ELMで、公式Simulator投入前の次元、精度、将来のXY＋強度回帰を検査します。</p></div>
+  </div>
+  <p class="note">数値は初期値です。実機波形を見ながらtrigger threshold、プリトリガ長、再アーム時間を変更できるようにします。</p>
+</body>
+</html>

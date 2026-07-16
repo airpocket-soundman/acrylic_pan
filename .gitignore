@@ -1,6 +1,8 @@
 __pycache__/
 *.py[cod]
 .venv/
+tmp/
+.local/
 
 # Raw captures and generated models can become large.
 data/raw/
