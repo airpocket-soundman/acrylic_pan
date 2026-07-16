@@ -39,6 +39,11 @@ Machine-readable results are in `../data/dummy_model/board_comparison.json`.
 - response `AI_RESULT` (`0x21`), payload: little-endian `<BBH8f`
 - response fields: case number, argmax class, reserved zero, eight raw scores
 
+The PC AI demo also loads the exact 128-element normalized input for the
+returned case from `golden_outputs.json`. It displays that synthetic input as
+a waveform and shows its DC-removed, Hann-windowed FFT. The graph is explicitly
+labelled as normalized dummy-model input, not a physical accelerometer waveform.
+
 ## Applications retained
 
 - AI demo: `scripts/run-ai-demo.ps1`, page `/`

@@ -35,8 +35,8 @@
     <div id="aiSummary" class="ai-summary">実機推論結果を待っています。</div>
     <div id="aiOutputs" class="ai-outputs"></div>
   </section>
-  <section class="card plot"><h2>振動波形</h2><canvas id="wave" width="1100" height="280"></canvas></section>
-  <section class="card plot"><h2>FFTスペクトル（DC除去・Hann窓）</h2><canvas id="fft" width="1100" height="280"></canvas></section>
-  <footer id="eventInfo">イベントを待っています。</footer>
+  <section class="card plot"><h2>ダミー入力波形（正規化値）</h2><canvas id="wave" width="1100" height="280"></canvas></section>
+  <section class="card plot"><h2>ダミー入力FFT（DC除去・Hann窓）</h2><canvas id="fft" width="1100" height="280"></canvas></section>
+  <footer id="eventInfo">AI推論を開始すると、そのテストで使用した128点の正規化合成データを表示します（実センサ波形ではありません）。</footer>
 </main><script src="/app.js"></script></body>
 </html>

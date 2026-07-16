@@ -1,4 +1,5 @@
 import json
+import math
 from pathlib import Path
 import struct
 import tempfile
@@ -60,6 +61,8 @@ class WebApiTests(unittest.TestCase):
             page = response.read().decode("utf-8")
         self.assertIn("Acrylic Pan AI Demo", page)
         self.assertIn("AI推論を開始", page)
+        self.assertIn("ダミー入力波形（正規化値）", page)
+        self.assertIn("実センサ波形ではありません", page)
         with urlopen(self.base + "/collector.html", timeout=2) as response:
             collector_page = response.read().decode("utf-8")
         self.assertIn("Acrylic Pan Vibration Monitor", collector_page)
@@ -111,9 +114,14 @@ class WebApiTests(unittest.TestCase):
 
         golden_path = Path(self.temporary.name) / "golden.json"
         outputs = [0.0, 0.1, 0.8, 0.2, 0.0, -0.1, 0.1, 0.0]
+        model_input = [
+            0.25 + math.sin(2.0 * math.pi * 5 * index / 128)
+            for index in range(128)
+        ]
         golden_path.write_text(json.dumps({"cases": [{
             "board_case_id": 2,
             "case_id": "class2_sample0",
+            "input": model_input,
             "outputs": outputs,
             "predicted_class": 2,
         }]}), encoding="utf-8")
@@ -128,6 +136,18 @@ class WebApiTests(unittest.TestCase):
             time.sleep(0.01)
         self.assertIsNotNone(self.controller.latest_ai)
         self.assertTrue(self.controller.latest_ai["comparison"]["passed"])
+        plot = self.controller.latest_ai["input_plot"]
+        self.assertEqual(plot["source"], "dummy_model_input")
+        self.assertEqual(plot["case_id"], 2)
+        self.assertEqual(plot["sample_rate_hz"], 25_600)
+        self.assertEqual(plot["sample_units"], "normalized_model_input")
+        self.assertFalse(plot["is_physical_sensor_data"])
+        self.assertEqual(plot["samples"], model_input)
+        self.assertEqual(len(plot["time_ms"]), 128)
+        self.assertEqual(len(plot["frequency_hz"]), 65)
+        self.assertEqual(len(plot["magnitude_db"]), 65)
+        peak_index = max(range(1, 65), key=lambda index: plot["magnitude_db"][index])
+        self.assertAlmostEqual(plot["frequency_hz"][peak_index], 1000.0)
 
     def test_guided_collection_labels_all_areas_and_rearms(self):
         packets = []

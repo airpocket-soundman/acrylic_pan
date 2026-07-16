@@ -66,6 +66,7 @@ function drawAiResult(result) {
     return `<div class="ai-output"><b>class ${index}</b><span>${value.toFixed(6)}</span>` +
       (expected === null ? '' : `<small>PC ${expected.toFixed(6)}<br>差 ${error.toFixed(6)}</small>`) + '</div>';
   }).join('');
+  if (result.input_plot) drawDummyInput(result.input_plot);
 }
 
 function drawCollection(collection) {
@@ -131,7 +132,7 @@ function drawCollection(collection) {
   $('collectionPattern').disabled = collection.active;
 }
 
-function plot(canvas, x, y, color, xlabel, ylabel, marker) {
+function plot(canvas, x, y, color, xlabel, ylabel, marker, yDecimals = 0) {
   const context = $(canvas).getContext('2d');
   const element = $(canvas), width = element.width, height = element.height;
   const pad = {l: 66, r: 18, t: 16, b: 42};
@@ -143,7 +144,7 @@ function plot(canvas, x, y, color, xlabel, ylabel, marker) {
   for (let i = 0; i <= 4; i++) {
     const py = pad.t + (height - pad.t - pad.b) * i / 4;
     context.beginPath(); context.moveTo(pad.l, py); context.lineTo(width - pad.r, py); context.stroke();
-    context.fillText((ymax - range * i / 4).toFixed(0), 5, py + 4);
+    context.fillText((ymax - range * i / 4).toFixed(yDecimals), 5, py + 4);
   }
   const px = value => pad.l + (value - xmin) / (xmax - xmin || 1) * (width - pad.l - pad.r);
   const py = value => pad.t + (ymax - value) / range * (height - pad.t - pad.b);
@@ -158,6 +159,14 @@ function plot(canvas, x, y, color, xlabel, ylabel, marker) {
   context.save(); context.translate(15, height / 2 + 25); context.rotate(-Math.PI / 2); context.fillText(ylabel, 0, 0); context.restore();
   context.fillText(xmin.toFixed(1), pad.l - 10, height - pad.b + 18);
   context.fillText(xmax.toFixed(1), width - pad.r - 36, height - pad.b + 18);
+}
+
+function drawDummyInput(input) {
+  plot('wave', input.time_ms, input.samples, '#1777c8', '時間 [ms]', '正規化入力値', undefined, 2);
+  plot('fft', input.frequency_hz, input.magnitude_db, '#dd7b16', '周波数 [Hz]', '振幅 [dB]');
+  $('eventInfo').textContent = `ダミーモデル入力 / テスト ${input.case_id} / ` +
+    `${input.samples.length}点 / ${input.sample_rate_hz.toLocaleString()} Hz / ` +
+    `正規化された合成データ（実センサ波形ではありません）`;
 }
 
 function drawEvent(event) {

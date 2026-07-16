@@ -14,6 +14,8 @@ import webbrowser
 from typing import Any
 from urllib.parse import urlparse
 
+import numpy as np
+
 from pc.acrylic_pan_monitor.ai_validation import (
     DEFAULT_GOLDEN_PATH,
     compare_ai_result,
@@ -37,6 +39,7 @@ PANEL_WIDTH_MM = 400.0
 PANEL_HEIGHT_MM = 200.0
 AREA_WIDTH_MM = PANEL_WIDTH_MM / 4
 AREA_HEIGHT_MM = PANEL_HEIGHT_MM / 2
+DUMMY_MODEL_SAMPLE_RATE_HZ = 25_600
 
 POSITION_PATTERNS: dict[str, tuple[tuple[str, float, float], ...]] = {
     "center": (("center", 0.0, 0.0),),
@@ -59,6 +62,38 @@ POSITION_PATTERNS: dict[str, tuple[tuple[str, float, float], ...]] = {
         ("down_right", 25.0, 25.0),
     ),
 }
+
+
+def prepare_dummy_input_plot(
+    golden_case: dict[str, Any], board_case_id: int
+) -> dict[str, Any]:
+    """Build plot data from normalized dummy-model input, not sensor ADC data."""
+    samples = np.asarray(golden_case["input"], dtype=np.float64)
+    if samples.ndim != 1 or len(samples) != 128:
+        raise ValueError("dummy model input must contain exactly 128 samples")
+    centered = samples - samples.mean()
+    window = np.hanning(len(samples))
+    spectrum = np.fft.rfft(centered * window)
+    coherent_gain = max(window.sum() / 2.0, 1.0)
+    magnitude = np.abs(spectrum) / coherent_gain
+    magnitude_db = 20.0 * np.log10(np.maximum(magnitude, 1e-9))
+    return {
+        "time_ms": (
+            np.arange(len(samples), dtype=np.float64)
+            * 1000.0
+            / DUMMY_MODEL_SAMPLE_RATE_HZ
+        ).tolist(),
+        "samples": samples.tolist(),
+        "frequency_hz": np.fft.rfftfreq(
+            len(samples), 1.0 / DUMMY_MODEL_SAMPLE_RATE_HZ
+        ).tolist(),
+        "magnitude_db": magnitude_db.tolist(),
+        "sample_rate_hz": DUMMY_MODEL_SAMPLE_RATE_HZ,
+        "source": "dummy_model_input",
+        "case_id": board_case_id,
+        "sample_units": "normalized_model_input",
+        "is_physical_sensor_data": False,
+    }
 
 
 @dataclass(frozen=True)
@@ -496,6 +531,10 @@ class AcquisitionController:
                         golden = load_golden_case(self.golden_path, result.case_id)
                         if golden is not None:
                             payload["comparison"] = compare_ai_result(result, golden)
+                            if "input" in golden:
+                                payload["input_plot"] = prepare_dummy_input_plot(
+                                    golden, result.case_id
+                                )
                     with self._lock:
                         self.latest_ai = payload
                         self.last_control = {
