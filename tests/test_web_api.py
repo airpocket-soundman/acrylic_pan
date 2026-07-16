@@ -10,6 +10,7 @@ from urllib.request import Request, urlopen
 
 from pc.acrylic_pan_web.server import AcquisitionController, create_server
 from pc.acrylic_pan_monitor.protocol import Frame, MessageType, decode_frame
+from pc.acrylic_pan_monitor.recorder import make_demo_event
 
 
 class WebApiTests(unittest.TestCase):
@@ -47,6 +48,7 @@ class WebApiTests(unittest.TestCase):
         self.assertEqual(status_code, 200)
         self.assertFalse(status["connected"])
         self.assertIn("decoder_errors", status["stats"])
+        self.assertFalse(status["collection"]["active"])
         _, ports = self.get_json("/api/ports")
         self.assertIsInstance(ports["ports"], list)
         with urlopen(self.base + "/", timeout=2) as response:
@@ -56,6 +58,8 @@ class WebApiTests(unittest.TestCase):
         with urlopen(self.base + "/collector.html", timeout=2) as response:
             collector_page = response.read().decode("utf-8")
         self.assertIn("Acrylic Pan Vibration Monitor", collector_page)
+        self.assertIn("8エリア ガイド付きデータ採取", collector_page)
+        self.assertIn("採取開始", collector_page)
         self.assertNotIn("AI推論を開始", collector_page)
         self.assertIn("FFT", page)
 
@@ -114,6 +118,52 @@ class WebApiTests(unittest.TestCase):
             time.sleep(0.01)
         self.assertIsNotNone(self.controller.latest_ai)
         self.assertTrue(self.controller.latest_ai["comparison"]["passed"])
+
+    def test_guided_collection_labels_all_areas_and_rearms(self):
+        packets = []
+        self.controller.link.send = packets.append
+        with patch.object(type(self.controller.link), "connected", new_callable=PropertyMock, return_value=True):
+            started = self.controller.start_collection(2, self.temporary.name)
+            self.assertTrue(started["active"])
+            for sequence in range(1, 17):
+                self.controller._process_event(make_demo_event(sequence), "serial", True)
+
+        collection = self.controller.collection_status()
+        self.assertFalse(collection["active"])
+        self.assertTrue(collection["finished"])
+        self.assertEqual(collection["completed_samples"], 16)
+        self.assertEqual(collection["per_class_counts"], [2] * 8)
+        self.assertEqual(len(packets), 16)  # initial START plus one re-arm except after final event
+        self.assertTrue(all(decode_frame(packet).message_type == MessageType.START for packet in packets))
+
+        assert self.controller.recorder is not None
+        assert self.controller.recorder.session_dir is not None
+        session_dir = self.controller.recorder.session_dir
+        session = json.loads((session_dir / "session.json").read_text(encoding="utf-8"))
+        plan = session["user_metadata"]["collection_plan"]
+        self.assertEqual(plan["repetitions"], 2)
+        self.assertEqual(plan["order"], list(range(8)))
+        records = [json.loads(line) for line in
+                   (session_dir / "manifest.jsonl").read_text(encoding="utf-8").splitlines()]
+        self.assertEqual([record["class_id"] for record in records],
+                         [area for area in range(8) for _ in range(2)])
+        self.assertEqual(records[0]["annotations"]["target_area"], 1)
+        self.assertEqual(records[-1]["annotations"]["target_area"], 8)
+
+    def test_collection_api_and_stop(self):
+        packets = []
+        self.controller.link.send = packets.append
+        with patch.object(type(self.controller.link), "connected", new_callable=PropertyMock, return_value=True):
+            status_code, started = self.post_json("/api/collection/start", {
+                "repetitions": 3,
+                "output_root": self.temporary.name,
+            })
+            self.assertEqual(status_code, 200)
+            self.assertEqual(started["current_class_id"], 0)
+            _, stopped = self.post_json("/api/collection/stop", {})
+        self.assertFalse(stopped["active"])
+        self.assertEqual(decode_frame(packets[0]).message_type, MessageType.START)
+        self.assertEqual(decode_frame(packets[-1]).message_type, MessageType.STOP)
 
 
 if __name__ == "__main__":

@@ -35,6 +35,7 @@ async function status() {
       stat('欠落', stats.missing_sequences) + stat('CRC等', stats.decoder_errors) +
       stat('重複', stats.duplicate_sequences) + stat('順序逆転', stats.out_of_order_sequences) +
       stat('保存失敗', stats.save_errors);
+    if ($('collectionGrid')) drawCollection(data.collection);
     if ($('aiSummary') && data.latest_ai && data.latest_ai.sequence !== lastAiSequence) {
       lastAiSequence = data.latest_ai.sequence;
       drawAiResult(data.latest_ai);
@@ -65,6 +66,32 @@ function drawAiResult(result) {
     return `<div class="ai-output"><b>class ${index}</b><span>${value.toFixed(6)}</span>` +
       (expected === null ? '' : `<small>PC ${expected.toFixed(6)}<br>差 ${error.toFixed(6)}</small>`) + '</div>';
   }).join('');
+}
+
+function drawCollection(collection) {
+  if (!collection) return;
+  const summary = $('collectionSummary');
+  if (collection.active) {
+    summary.textContent = `エリア${collection.current_class_id + 1}を叩いてください ` +
+      `（このエリア ${collection.current_repetition}/${collection.repetitions}、全体 ` +
+      `${collection.completed_samples}/${collection.total_samples}）`;
+  } else if (collection.finished) {
+    summary.textContent = `採取完了：${collection.completed_samples}/${collection.total_samples}件を保存しました。`;
+  } else {
+    summary.textContent = collection.total_samples ?
+      `採取停止：${collection.completed_samples}/${collection.total_samples}件` :
+      '採取を開始するとエリア1から順に案内します。';
+  }
+  document.querySelectorAll('.collection-cell').forEach(cell => {
+    const area = Number(cell.dataset.area);
+    const count = collection.per_class_counts[area] || 0;
+    cell.querySelector('span').textContent = `${count} / ${collection.repetitions}`;
+    cell.classList.toggle('active', collection.active && area === collection.current_class_id);
+    cell.classList.toggle('complete', collection.repetitions > 0 && count >= collection.repetitions);
+  });
+  $('collectionStart').disabled = collection.active;
+  $('collectionStop').disabled = !collection.active;
+  $('collectionRepetitions').disabled = collection.active;
 }
 
 function plot(canvas, x, y, color, xlabel, ylabel, marker) {
@@ -119,6 +146,17 @@ if ($('aiRunAll')) $('aiRunAll').onclick = async () => {
       await new Promise(resolve => setTimeout(resolve, 180));
     }
   } catch (error) { $('error').textContent = error.message; }
+};
+if ($('collectionStart')) $('collectionStart').onclick = async () => {
+  try {
+    const repetitions = Number($('collectionRepetitions').value);
+    await api('/api/collection/start', {repetitions, output_root: $('output').value});
+    await status();
+  } catch (error) { $('error').textContent = error.message; }
+};
+if ($('collectionStop')) $('collectionStop').onclick = async () => {
+  try { await api('/api/collection/stop', {}); await status(); }
+  catch (error) { $('error').textContent = error.message; }
 };
 $('refresh').onclick = ports;
 $('connect').onclick = async () => { try { await api('/api/connect', {port: $('port').value}); await status(); } catch (error) { $('error').textContent = error.message; } };

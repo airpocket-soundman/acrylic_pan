@@ -7,14 +7,18 @@ import numpy as np
 
 from sim.solist_dataset import (
     FeatureScaler,
+    SessionDataset,
     export_solist_csv,
     extract_fft_features,
+    load_recorded_sessions,
     load_npz_events,
     make_synthetic_events,
     one_hot,
     split_dataset,
+    split_dataset_by_session,
 )
 from sim.solist_elm import SolistELM, accuracy
+from pc.acrylic_pan_monitor.recorder import Recorder, make_demo_event
 from sim.dummy_model_pipeline import (
     CLASS_COUNT,
     HIDDEN_COUNT,
@@ -28,6 +32,43 @@ from sim.dummy_model_pipeline import (
 
 
 class SolistPipelineTests(unittest.TestCase):
+    def test_eight_class_recorder_sessions_split_without_leakage(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            # Each independent run contains all eight classes. Runs, not
+            # individual events, are the train/test grouping boundary.
+            for repeat in range(2):
+                recorder = Recorder(root)
+                recorder.begin_session({"fixture": f"complete-run-{repeat}"})
+                for label in range(8):
+                    recorder.record_event(make_demo_event(label * 10 + repeat, seed=label * 2 + repeat),
+                                          class_id=label, annotations={"source": "synthetic-test"})
+                recorder.close()
+            dataset = load_recorded_sessions(root, require_all_classes=True)
+            train_x, train_y, test_x, test_y = split_dataset_by_session(dataset, 0.5, 11)
+            self.assertEqual(train_x.shape, (8, 128))
+            self.assertEqual(test_x.shape, (8, 128))
+            self.assertEqual(set(train_y.tolist()), set(range(8)))
+            self.assertEqual(set(test_y.tolist()), set(range(8)))
+
+    def test_recorded_session_loader_rejects_unlabelled_capture(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            recorder = Recorder(temporary)
+            recorder.begin_session()
+            recorder.record_event(make_demo_event())
+            with self.assertRaisesRegex(ValueError, "class_id"):
+                load_recorded_sessions(Path(temporary))
+
+    def test_session_split_rejects_incomplete_class_set(self):
+        dataset = SessionDataset(
+            np.zeros((4, 128), dtype=np.float32),
+            np.asarray([0, 1, 0, 1]),
+            np.asarray(["run-a", "run-a", "run-b", "run-b"]),
+            tuple(Path(f"event-{index}.npz") for index in range(4)),
+        )
+        with self.assertRaisesRegex(ValueError, "every class"):
+            split_dataset_by_session(dataset, 0.5, 1)
+
     def test_dummy_model_is_deterministic_and_separable(self):
         features, labels = make_dataset(samples_per_class=8)
         alpha, beta = train_model(features, labels)

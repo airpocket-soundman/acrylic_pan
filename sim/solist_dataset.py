@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import csv
 from dataclasses import dataclass
+import json
 from pathlib import Path
 import re
 
@@ -36,6 +37,16 @@ class FeatureScaler:
 
     def transform(self, features: np.ndarray) -> np.ndarray:
         return ((features - self.mean) / self.scale).astype(np.float32)
+
+
+@dataclass(frozen=True)
+class SessionDataset:
+    """Labelled events with acquisition-session groups kept for safe splitting."""
+
+    features: np.ndarray
+    labels: np.ndarray
+    session_ids: np.ndarray
+    event_paths: tuple[Path, ...]
 
 
 def extract_fft_features(samples: np.ndarray, feature_count: int = DEFAULT_FEATURE_COUNT) -> np.ndarray:
@@ -94,6 +105,113 @@ def load_npz_events(
             features.append(extract_fft_features(event["samples"], feature_count))
             labels.append(label)
     return np.stack(features), np.asarray(labels, dtype=np.int64)
+
+
+def load_recorded_sessions(
+    source: Path,
+    feature_count: int = DEFAULT_FEATURE_COUNT,
+    class_count: int = DEFAULT_CLASS_COUNT,
+    *,
+    require_all_classes: bool = False,
+) -> SessionDataset:
+    """Load Recorder v1 sessions and validate manifest/NPZ label consistency.
+
+    ``manifest.jsonl`` is the event index and the NPZ is the numeric payload.
+    Unlabelled captures are rejected so they cannot silently enter training.
+    Session IDs are returned for leakage-free train/test splitting.
+    """
+    source = Path(source)
+    candidates = [source] if (source / "session.json").is_file() else sorted(
+        path.parent for path in source.rglob("session.json")
+    )
+    if not candidates:
+        raise FileNotFoundError(f"no Recorder sessions under {source}")
+
+    features: list[np.ndarray] = []
+    labels: list[int] = []
+    session_ids: list[str] = []
+    event_paths: list[Path] = []
+    seen_session_ids: set[str] = set()
+    for session_dir in candidates:
+        metadata = json.loads((session_dir / "session.json").read_text(encoding="utf-8"))
+        if metadata.get("format") != "acrylic-pan-session-v1":
+            raise ValueError(f"{session_dir}: unsupported session format")
+        session_id = str(metadata.get("session_id", ""))
+        if not session_id or session_id in seen_session_ids:
+            raise ValueError(f"{session_dir}: missing or duplicate session_id")
+        seen_session_ids.add(session_id)
+        manifest = session_dir / "manifest.jsonl"
+        if not manifest.is_file():
+            raise ValueError(f"{session_dir}: missing manifest.jsonl")
+        rows = [json.loads(line) for line in manifest.read_text(encoding="utf-8").splitlines() if line]
+        if int(metadata.get("event_count", -1)) != len(rows):
+            raise ValueError(f"{session_dir}: session event_count does not match manifest")
+        for row in rows:
+            label = row.get("class_id")
+            if not isinstance(label, int) or isinstance(label, bool) or not 0 <= label < class_count:
+                raise ValueError(f"{session_dir}: event has missing/invalid class_id")
+            relative = Path(str(row.get("file", "")))
+            event_path = (session_dir / relative).resolve()
+            try:
+                event_path.relative_to(session_dir.resolve())
+            except ValueError as error:
+                raise ValueError(f"{session_dir}: event path escapes session") from error
+            if not event_path.is_file():
+                raise ValueError(f"{session_dir}: missing event file {relative}")
+            with np.load(event_path, allow_pickle=False) as event:
+                npz_label = _scalar(event, ("class_id",))
+                if npz_label != label:
+                    raise ValueError(f"{event_path}: manifest/NPZ class_id mismatch")
+                if int(np.asarray(event["sample_rate_hz"]).reshape(-1)[0]) != int(row["sample_rate_hz"]):
+                    raise ValueError(f"{event_path}: manifest/NPZ sample_rate_hz mismatch")
+                features.append(extract_fft_features(event["samples"], feature_count))
+            labels.append(label)
+            session_ids.append(session_id)
+            event_paths.append(event_path)
+    if not features:
+        raise ValueError("recorded sessions contain no events")
+    label_array = np.asarray(labels, dtype=np.int64)
+    if require_all_classes and set(label_array.tolist()) != set(range(class_count)):
+        raise ValueError(f"dataset must contain every class 0..{class_count - 1}")
+    return SessionDataset(
+        np.stack(features), label_array, np.asarray(session_ids), tuple(event_paths)
+    )
+
+
+def split_dataset_by_session(
+    dataset: SessionDataset, test_fraction: float, seed: int,
+    class_count: int = DEFAULT_CLASS_COUNT,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """Split complete multi-class acquisition runs without event leakage."""
+    if not 0.0 < test_fraction < 1.0:
+        raise ValueError("test_fraction must be between zero and one")
+    rng = np.random.default_rng(seed)
+    all_labels = set(np.unique(dataset.labels).tolist())
+    required_labels = set(range(class_count))
+    if all_labels != required_labels:
+        raise ValueError(f"dataset must contain every class 0..{class_count - 1}")
+    sessions = np.unique(dataset.session_ids)
+    if len(sessions) < 2:
+        raise ValueError("dataset needs at least two complete acquisition sessions")
+    for session_id in sessions:
+        session_labels = set(dataset.labels[dataset.session_ids == session_id].tolist())
+        if session_labels != all_labels:
+            raise ValueError(f"session {session_id} does not contain every dataset class")
+    shuffled = rng.permutation(sessions)
+    test_count = max(1, int(round(len(shuffled) * test_fraction)))
+    test_count = min(test_count, len(shuffled) - 1)
+    test_sessions = {str(value) for value in shuffled[:test_count]}
+    train_sessions = {str(value) for value in shuffled[test_count:]}
+    train_mask = np.isin(dataset.session_ids, list(train_sessions))
+    test_mask = np.isin(dataset.session_ids, list(test_sessions))
+    if np.any(train_mask & test_mask) or not np.all(train_mask | test_mask):
+        raise RuntimeError("invalid session split")
+    if set(dataset.labels[train_mask].tolist()) != all_labels or set(dataset.labels[test_mask].tolist()) != all_labels:
+        raise RuntimeError("train and test must both contain every class")
+    return (
+        dataset.features[train_mask], dataset.labels[train_mask],
+        dataset.features[test_mask], dataset.labels[test_mask],
+    )
 
 
 def make_synthetic_events(

@@ -3,7 +3,7 @@
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Acrylic Pan Vibration Monitor</title><link rel="stylesheet" href="/style.css"></head>
 <body><main>
-  <header><div><h1>Acrylic Pan Vibration Monitor</h1><p>初期版：振動データの記録とFFT表示</p></div><span id="connection" class="badge">未接続</span></header>
+  <header><div><h1>Acrylic Pan Vibration Monitor</h1><p>振動データの記録・FFT表示・8エリアガイド採取</p></div><span id="connection" class="badge">未接続</span></header>
   <section class="controls card">
     <label>COMポート <select id="port"></select></label><button id="refresh">更新</button>
     <button id="connect" class="primary">接続</button><button id="disconnect">切断</button>
@@ -14,6 +14,25 @@
     <label>クラスID（任意） <input id="classId" type="number" min="0"></label>
     <button id="newSession">新規セッション</button><div id="sessionPath"></div></section>
   <section id="stats" class="stats"></section><div id="controlStatus">「測定トリガー」を押すと、Z軸振動を512点取得します。</div><div id="error" class="error"></div>
+  <section class="card collection-panel">
+    <div class="collection-toolbar">
+      <div><h2>8エリア ガイド付きデータ採取</h2><p>光っているエリアを叩いてください。受信後、自動的に次の測定を待ち受けます。</p></div>
+      <label>各エリアの回数 <input id="collectionRepetitions" type="number" min="1" max="1000" value="10"></label>
+      <button id="collectionStart" class="primary">採取開始</button>
+      <button id="collectionStop">採取停止</button>
+    </div>
+    <div id="collectionSummary" class="collection-summary">採取を開始するとエリア1から順に案内します。</div>
+    <div id="collectionGrid" class="collection-grid">
+      <div class="collection-cell" data-area="0"><b>エリア1</b><span>0 / 0</span></div>
+      <div class="collection-cell" data-area="1"><b>エリア2</b><span>0 / 0</span></div>
+      <div class="collection-cell" data-area="2"><b>エリア3</b><span>0 / 0</span></div>
+      <div class="collection-cell" data-area="3"><b>エリア4</b><span>0 / 0</span></div>
+      <div class="collection-cell" data-area="4"><b>エリア5</b><span>0 / 0</span></div>
+      <div class="collection-cell" data-area="5"><b>エリア6</b><span>0 / 0</span></div>
+      <div class="collection-cell" data-area="6"><b>エリア7</b><span>0 / 0</span></div>
+      <div class="collection-cell" data-area="7"><b>エリア8</b><span>0 / 0</span></div>
+    </div>
+  </section>
   <section class="card plot"><h2>振動波形</h2><canvas id="wave" width="1100" height="280"></canvas></section>
   <section class="card plot"><h2>FFTスペクトル（DC除去・Hann窓）</h2><canvas id="fft" width="1100" height="280"></canvas></section>
   <footer id="eventInfo">イベントを待っています。</footer>

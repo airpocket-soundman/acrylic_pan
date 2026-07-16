@@ -61,6 +61,9 @@ The PC decoder is `pc/acrylic_pan_monitor/protocol.py`.
 The collector boots stopped. `CAPTURE` starts exactly one sensor block and
 returns to stopped state after queuing `EVENT_DATA`, so repeated PC-controlled
 measurements are deterministic. `START` arms the next impact capture.
+Each transition from stopped to `START` clears stale history and primes a new
+128-sample ring history.  The PC must wait for the complete `EVENT_DATA` frame
+to be decoded and saved before sending the next `START`.
 
 Run `tools/test-host.ps1` to exercise a trigger exactly on a 512-sample block
 boundary and decode the C-produced packet with the Python PC implementation.

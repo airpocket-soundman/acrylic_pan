@@ -78,10 +78,11 @@ class Recorder:
         self.session_id: str | None = None
         self._metadata: dict[str, Any] = {}
         self._event_count = 0
+        self._closed = False
 
     @property
     def active(self) -> bool:
-        return self.session_dir is not None
+        return self.session_dir is not None and not self._closed
 
     @property
     def event_count(self) -> int:
@@ -93,6 +94,8 @@ class Recorder:
         now = datetime.now(timezone.utc)
         self.session_id = f"{now.astimezone().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:8]}"
         self.session_dir = self.output_root / self.session_id
+        self._closed = False
+        self._event_count = 0
         (self.session_dir / "events").mkdir(parents=True, exist_ok=False)
         self._metadata = {
             "format": "acrylic-pan-session-v1",
@@ -116,8 +119,8 @@ class Recorder:
     ) -> RecordedEvent:
         if not self.active or self.session_dir is None:
             raise RecordingError("recording session has not been started")
-        if class_id is not None and class_id < 0:
-            raise RecordingError("class_id must be non-negative")
+        if class_id is not None and not 0 <= class_id < 8:
+            raise RecordingError("class_id must be between 0 and 7")
 
         index = self._event_count + 1
         received_at = datetime.now(timezone.utc).isoformat()
@@ -153,6 +156,7 @@ class Recorder:
             return
         self._metadata["closed_at"] = datetime.now(timezone.utc).isoformat()
         self._write_session_metadata()
+        self._closed = True
 
     def _atomic_npz(
         self, destination: Path, event: EventData, class_id: int | None, received_at: str

@@ -67,6 +67,17 @@ int main(int argc, char **argv)
     CHECK(event->trigger_index == 0U);
     CHECK(event->peak_abs == 10U);
 
+    /* A stop/re-arm gap must not retain either a ready event or stale
+       pre-trigger history from the previous arming period. */
+    ApanCaptureReset(&capture);
+    CHECK(!ApanCaptureEventReady(&capture));
+    CHECK(capture.history_count == 0U);
+    CHECK(!capture.has_previous_sample);
+    CHECK(!capture.collecting);
+    ApanCaptureFeed(&capture, second_block, 1U);
+    CHECK(!ApanCaptureEventReady(&capture));
+    CHECK(!capture.collecting);
+
     command_size = ApanProtocolEncodeFrame(APAN_MESSAGE_CAPTURE, 0U, 77U, 0U,
                                            NULL, 0U, command_packet,
                                            sizeof(command_packet));

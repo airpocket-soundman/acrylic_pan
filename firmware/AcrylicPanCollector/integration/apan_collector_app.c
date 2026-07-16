@@ -367,6 +367,10 @@ void ApanCollectorAppProcess(void)
         case COMMAND_START:
             if (collector_stopped)
             {
+                /* A stopped interval is not contiguous sensor time.  Discard
+                   the previous event tail/partial event so the next trigger's
+                   128 pre-trigger samples all belong to this arming period. */
+                ApanCaptureReset(&capture);
                 collector_stopped = false;
                 SensorStart();
             }
@@ -375,6 +379,7 @@ void ApanCollectorAppProcess(void)
             break;
         case COMMAND_STOP:
             SensorStop();
+            ApanCaptureReset(&capture);
             collector_stopped = true;
             payload[0] = request_type;
             write_protocol(APAN_MESSAGE_ACK, request_sequence, payload, 1U);

@@ -48,6 +48,26 @@ class RecorderTests(unittest.TestCase):
                 row = next(csv.DictReader(input_file))
             self.assertEqual(row["class_id"], "")
 
+    def test_closed_recorder_starts_a_new_session_before_more_events(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            recorder = Recorder(temporary)
+            first = recorder.begin_session()
+            recorder.record_event(make_demo_event(1), class_id=0)
+            recorder.close()
+            self.assertFalse(recorder.active)
+            second = recorder.begin_session()
+            self.assertNotEqual(first, second)
+            self.assertTrue(recorder.active)
+            saved = recorder.record_event(make_demo_event(2), class_id=1)
+            self.assertEqual(saved.index, 1)
+
+    def test_rejects_class_outside_eight_area_model(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            recorder = Recorder(temporary)
+            recorder.begin_session()
+            with self.assertRaisesRegex(Exception, "between 0 and 7"):
+                recorder.record_event(make_demo_event(), class_id=8)
+
     def test_sequence_statistics_include_wrap_and_anomalies(self):
         stats = ReceiveStats()
         for sequence in (0xFFFFFFFE, 0xFFFFFFFF, 1, 1, 0):
