@@ -7,7 +7,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy import signal
-from postprocess import frequencies_from_dat,dynamic_displacement,NOTES
+from postprocess import frequencies_from_dat,dynamic_displacement,gradient_rolloff_compensation,NOTES
 
 def cosine_distances(features):
     f=features/np.maximum(np.linalg.norm(features,axis=1,keepdims=True),1e-15); d=1-f@f.T
@@ -39,15 +39,18 @@ def e4_relative_band_features(spectra,fft_f,low_hz,bands=18,shape_only=False):
 
 def main():
     p=argparse.ArgumentParser(); p.add_argument("--output",type=Path,required=True); a=p.parse_args()
-    meta=json.loads((a.output/"highfreq-metadata.json").read_text()); sensor_node=meta["sensor"]["node"]; fs=meta["sampling"]["hz"]
+    meta=json.loads((a.output/"highfreq-metadata.json").read_text()); sensor_node=meta["sensor"]["node"]; fs=meta["sampling"]["hz"]; expected=meta["sampling"]["samples"]
     freqs=frequencies_from_dat(a.output/"acrylic_pan_hf.dat"); times=[]; raw=[]
     for note in NOTES:
-        t,u=dynamic_displacement(a.output/f"hf_{note.lower()}.dat",sensor_node); times=t; raw.append(np.gradient(np.gradient(u,t),t))
+        t,u=dynamic_displacement(a.output/f"hf_{note.lower()}.dat",sensor_node)
+        if len(t)!=expected: raise RuntimeError(f"hf_{note.lower()}.dat has {len(t)} samples, expected {expected}")
+        times=t; raw.append(np.gradient(np.gradient(u,t),t))
     raw=np.array(raw); cutoffs=[0,100,250,500,750,1000]; scores=[]; e4_scores=[]; spectra_by_cutoff={}; fft_f=np.fft.rfftfreq(raw.shape[1],1/fs); window=np.hanning(raw.shape[1])
+    compensation=gradient_rolloff_compensation(fft_f,fs)
     for hp in cutoffs:
         sos=signal.butter(4,[max(hp,20),5000],btype="bandpass",fs=fs,output="sos")
         filtered=signal.sosfiltfilt(sos,raw,axis=1)
-        spectra=np.abs(np.fft.rfft(filtered*window,axis=1)); band=(fft_f>=max(hp,100))&(fft_f<=5000)
+        spectra=np.abs(np.fft.rfft(filtered*window,axis=1))/compensation; band=(fft_f>=max(hp,100))&(fft_f<=5000)
         lo,mean=cosine_distances(spectra[:,band]); scores.append({"highpass_hz":hp,"minimum_cosine_distance":lo,"mean_cosine_distance":mean}); spectra_by_cutoff[hp]=spectra
         low=max(hp,100)
         level_features,edges,level_unreferenced=e4_relative_band_features(spectra,fft_f,low,shape_only=False)
@@ -81,7 +84,7 @@ def main():
     axes[-1].set_xlabel("high-pass cutoff [Hz]")
     fig.suptitle("E4-referenced 18-band feature separability")
     fig.savefig(a.output/"e4-baseline-feature-separability.svg",format="svg",metadata={"Date":None}); plt.close(fig)
-    result={**meta,"computed_modes":len(freqs),"frequencies_hz":freqs,"maximum_computed_hz":freqs[-1] if freqs else None,"highpass_scores":scores,"e4_baseline_18_band_scores":e4_scores,"true_fft_resolution_hz":fs/raw.shape[1]}
+    result={**meta,"computed_modes":len(freqs),"frequencies_hz":freqs,"maximum_computed_hz":freqs[-1] if freqs else None,"highpass_scores":scores,"e4_baseline_18_band_scores":e4_scores,"true_fft_resolution_hz":fs/raw.shape[1],"acceleration_method":"double central difference of displacement; spectra divided by sinc(2f/fs)^2 differentiation roll-off"}
     (a.output/"highfreq-results.json").write_text(json.dumps(result,ensure_ascii=False,indent=2),encoding="utf-8")
     print(json.dumps({"modes":len(freqs),"max_hz":freqs[-1] if freqs else None,"samples":raw.shape[1],"scores":scores,"e4_scores":e4_scores}))
 if __name__=="__main__": main()

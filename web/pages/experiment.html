@@ -1,10 +1,79 @@
 <!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>学習・評価計画</title><link rel="stylesheet" href="../css/page.css"></head><body>
-<div class="eyebrow">07 / Training & validation</div><h1>中心8点を覚えるだけでなく、<br>エリア全体を演奏可能にする。</h1><p class="lead">教師座標の中心はX = 50, 150, 250, 350 mm、Y = 50, 150 mmです。ただし収録は中心点だけに限定せず、各100 mm角の内側へ打撃位置を散らします。</p>
-<h2>収録プロトコル</h2><div class="timeline"><div class="n">01</div><div><h3>治具を固定</h3><p>100 × 20 mm固定面、締付トルク、センサ中央位置、ケーブル拘束を記録。</p></div><div class="n">02</div><div><h3>各エリア80打撃を収録</h3><p>中心30、上下左右へのずらし30、境界寄り20。弱・中・強を均等に含めます。</p></div><div class="n">03</div><div><h3>別セッションで評価</h3><p>板を一度外して再装着し、各エリア40打撃。学習データとの混在を禁止します。</p></div><div class="n">04</div><div><h3>段階的に細分化</h3><p>8エリア合格後、50 mm格子を追加。連続座標誤差とクラス精度を併記します。</p></div></div>
-<h2>単打イベントのデータ</h2><table class="spec"><tr><th>信号</th><td>Z軸符号付き波形</td><td>6.4 kHz、128点、20 ms</td></tr><tr><th>プリトリガ</th><td>16点</td><td>DC基準と打撃開始前の状態</td></tr><tr><th>教師</th><td>8要素one-hot</td><td>座標、音階、エリアIDもメタデータに保存</td></tr><tr><th>変動要因</th><td>強度・打撃子・操作者</td><td>学習に含め、個別に性能を集計</td></tr></table>
-<h2>合格基準</h2><div class="grid"><div class="card"><span class="number">≥90%</span><small>8-ZONE ACCURACY</small><p>別セッションでの第一ゲート。デモ目標は95%以上。</p></div><div class="card"><span class="number">≤30 mm</span><small>MEDIAN POSITION ERROR</small><p>確率期待座標の暫定目標。95パーセンタイルも記録。</p></div><div class="card"><span class="number">&lt;50 ms</span><small>END-TO-END LATENCY</small><p>検出開始から発音まで。20 ms収録窓を含みます。</p></div></div>
+<div class="eyebrow">07 / Training & validation</div><h1>中心8点を覚えるだけでなく、<br>エリア全体を演奏可能にする。</h1><p class="lead">教師の骨格はX = 50, 150, 250, 350 mm、Y = 50, 150 mmの8中心です。細かな座標推定に備え、収録は中心の反復数よりも50 mm格子のカバレッジを重視して配分します。同一データから8クラス・軸ビン・直接座標回帰の3出力表現を比較できる設計です。</p>
+
+<h2>収録打点マップ</h2>
+<figure class="wide-figure"><svg viewBox="0 0 680 448" role="img" aria-labelledby="hitmap-title hitmap-desc" style="display:block;width:100%;height:auto">
+<title id="hitmap-title">学習データ収録の打点マップ</title>
+<desc id="hitmap-desc">400×200 mmアクリルパネル上の収録打点。セル中心8点、50 mm格子32点、境界プローブ10点、固定領域とセンサ周辺の打撃禁止域を示す。</desc>
+<defs><pattern id="hit-clamp-hatch" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="8" stroke="#e2633b" stroke-width="3"/></pattern></defs>
+<rect x="60" y="50" width="560" height="280" fill="#ffffff" stroke="#17313b" stroke-width="1.6"/>
+<line x1="200" y1="50" x2="200" y2="330" stroke="#8ab4b0" stroke-width="1"/>
+<line x1="340" y1="50" x2="340" y2="330" stroke="#8ab4b0" stroke-width="1"/>
+<line x1="480" y1="50" x2="480" y2="330" stroke="#8ab4b0" stroke-width="1"/>
+<line x1="60" y1="190" x2="620" y2="190" stroke="#8ab4b0" stroke-width="1"/>
+<rect x="340" y="50" width="140" height="28" fill="url(#hit-clamp-hatch)" stroke="#e2633b"/>
+<text x="410" y="68" text-anchor="middle" font-family="Segoe UI,sans-serif" font-size="11" fill="#b3401e">固定領域</text>
+<circle cx="340" cy="190" r="28" fill="none" stroke="#60727a" stroke-width="1" stroke-dasharray="4 3"/>
+<circle cx="340" cy="190" r="6" fill="#102733"/><circle cx="340" cy="190" r="2.5" fill="#f5b942"/>
+<g fill="#0d7f78">
+<circle cx="95" cy="85" r="4"/><circle cx="165" cy="85" r="4"/><circle cx="235" cy="85" r="4"/><circle cx="305" cy="85" r="4"/><circle cx="515" cy="85" r="4"/><circle cx="585" cy="85" r="4"/>
+<circle cx="375" cy="99" r="4"/><circle cx="445" cy="99" r="4"/>
+<circle cx="95" cy="155" r="4"/><circle cx="165" cy="155" r="4"/><circle cx="235" cy="155" r="4"/><circle cx="305" cy="155" r="4"/><circle cx="375" cy="155" r="4"/><circle cx="445" cy="155" r="4"/><circle cx="515" cy="155" r="4"/><circle cx="585" cy="155" r="4"/>
+<circle cx="95" cy="225" r="4"/><circle cx="165" cy="225" r="4"/><circle cx="235" cy="225" r="4"/><circle cx="305" cy="225" r="4"/><circle cx="375" cy="225" r="4"/><circle cx="445" cy="225" r="4"/><circle cx="515" cy="225" r="4"/><circle cx="585" cy="225" r="4"/>
+<circle cx="95" cy="295" r="4"/><circle cx="165" cy="295" r="4"/><circle cx="235" cy="295" r="4"/><circle cx="305" cy="295" r="4"/><circle cx="375" cy="295" r="4"/><circle cx="445" cy="295" r="4"/><circle cx="515" cy="295" r="4"/><circle cx="585" cy="295" r="4"/>
+</g>
+<g fill="#60a5fa" stroke="#111827" stroke-width="0.8">
+<rect x="196" y="116" width="8" height="8"/><rect x="336" y="116" width="8" height="8"/><rect x="476" y="116" width="8" height="8"/>
+<rect x="196" y="256" width="8" height="8"/><rect x="336" y="256" width="8" height="8"/><rect x="476" y="256" width="8" height="8"/>
+<rect x="126" y="186" width="8" height="8"/><rect x="266" y="186" width="8" height="8"/><rect x="406" y="186" width="8" height="8"/><rect x="546" y="186" width="8" height="8"/>
+</g>
+<g fill="#f5b942" stroke="#111827" stroke-width="1">
+<circle cx="130" cy="120" r="7"/><circle cx="270" cy="120" r="7"/><circle cx="410" cy="120" r="7"/><circle cx="550" cy="120" r="7"/>
+<circle cx="130" cy="260" r="7"/><circle cx="270" cy="260" r="7"/><circle cx="410" cy="260" r="7"/><circle cx="550" cy="260" r="7"/>
+</g>
+<g font-family="Segoe UI,sans-serif" font-size="11" font-weight="700" fill="#10212b" text-anchor="middle">
+<text x="130" y="106">C4</text><text x="270" y="106">D4</text><text x="410" y="106">E4</text><text x="550" y="106">G4</text>
+<text x="130" y="246">A4</text><text x="270" y="246">C5</text><text x="410" y="246">D5</text><text x="550" y="246">E5</text>
+</g>
+<g font-family="Consolas,monospace" font-size="10" fill="#60727a">
+<text x="60" y="346" text-anchor="middle">0</text><text x="200" y="346" text-anchor="middle">100</text><text x="340" y="346" text-anchor="middle">200</text><text x="480" y="346" text-anchor="middle">300</text><text x="620" y="346" text-anchor="middle">400</text>
+<text x="54" y="54" text-anchor="end">0</text><text x="54" y="194" text-anchor="end">100</text><text x="54" y="334" text-anchor="end">200</text>
+</g>
+<circle cx="70" cy="378" r="7" fill="#f5b942" stroke="#111827" stroke-width="1"/>
+<circle cx="295" cy="378" r="4" fill="#0d7f78"/>
+<rect x="495" y="374" width="8" height="8" fill="#60a5fa" stroke="#111827" stroke-width="0.8"/>
+<rect x="64" y="398" width="13" height="12" fill="url(#hit-clamp-hatch)" stroke="#e2633b"/>
+<circle cx="301" cy="404" r="9" fill="none" stroke="#60727a" stroke-width="1" stroke-dasharray="3 2"/>
+<circle cx="301" cy="404" r="4" fill="#102733"/><circle cx="301" cy="404" r="1.6" fill="#f5b942"/>
+<g font-family="Segoe UI,sans-serif" font-size="11" fill="#33464e">
+<text x="84" y="382">A: セル中心 8点 × 90打</text>
+<text x="307" y="382">B: 50 mm格子 32点 × 20打</text>
+<text x="509" y="382">C: 境界 10点 × 15打</text>
+<text x="84" y="408">固定領域（打撃禁止）</text>
+<text x="318" y="408">センサ＋半径20 mmは打撃禁止</text>
+<text x="620" y="408" text-anchor="end">単位: mm</text>
+</g>
+</svg><figcaption>A（橙丸）はセル中心のアンカー、B（青緑点）は50 mm格子のカバレッジ点、C（青四角）はセル境界上のテスト専用プローブ。固定領域と中央センサ半径20 mmは叩きません。</figcaption></figure>
+
+<table class="spec">
+<tr><th>A: セル中心 8点</th><td>X = 50/150/250/350 × Y = 50/150</td><td>各90打（3セッション × 30打）＝ 720打。8クラス分類の主力</td></tr>
+<tr><th>B: 50 mm格子 32点</th><td>X = 25〜375、Y = 25〜175の50 mm刻み</td><td>各20打（2セッション × 10打）＝ 640打。座標回帰・細分化用</td></tr>
+<tr><th>C: 境界プローブ 10点</th><td>セル縦境界 × 6点、横境界 y=100 × 4点</td><td>各15打 ＝ 150打。テスト専用（境界±20 mm精度の評価）</td></tr>
+<tr><th>打ち分け</th><td>マレットのみ・中強度</td><td>初期収録は全打をマレットの中強度で統一。8クラス成立の確認後に弱・強を追加収録</td></tr>
+<tr><th>合計</th><td>50点</td><td>約1,510打。実働2〜2.5時間を3〜4セッションに分割</td></tr>
+</table>
+<div class="status"><strong>固定領域近傍の2点</strong>B格子のうち(225, 25)と(275, 25)は固定縁から5 mmしかないため、(225, 35)と(275, 35)へ移動して収録します。ラベル座標が正確であれば格子から外れても問題ありません。</div>
+<div class="status warn"><strong>位置ラベルの精度が座標誤差の下限になります</strong>原寸グリッドを印刷した紙で各点をマーキングし、紙は必ず外してから収録します（貼ったままでは減衰特性が変わります）。1セッション内では打点の順番をランダム化し、温度や叩き方のドリフトが位置と相関するのを防ぎます。</div>
+
+<h2>収録プロトコル</h2><div class="timeline"><div class="n">00</div><div><h3>パイロット収録で成立確認</h3><p>A中心8点 × 15打だけ先に収録し、SNR、トリガ、±8 g飽和、8クラスの分離を確認。問題があれば治具・センサ固定を直してから本収録へ。</p></div><div class="n">01</div><div><h3>治具を固定</h3><p>100 × 20 mm固定面、締付トルク、センサ中央位置、ケーブル拘束を記録。以後のセッションで固定方法は変えません。</p></div><div class="n">02</div><div><h3>アンカーと格子を分散収録</h3><p>各セッションでA中心30打とB格子10打を収録。位置順はランダム化します。打撃はマレットの中強度で統一。セッション間では治具の締め直しなど実運用の変化を意図的に入れます。</p></div><div class="n">03</div><div><h3>最終セッションをテストに温存</h3><p>板を一度外して再装着して収録し、学習には一切使いません。境界プローブCもテスト専用です。</p></div><div class="n">04</div><div><h3>3つの出力表現を横並び比較</h3><p>8エリア合格後、同一データでジョイント8スコア・8＋軸ビン併設・直接座標回帰を学習し、距離誤差（中央値・95パーセンタイル）で選定します。</p></div></div>
+
+<h2>単打イベントのデータ</h2><table class="spec"><tr><th>信号</th><td>Z軸符号付き波形</td><td>25.6 kHz、1,280点、50 ms</td></tr><tr><th>プリトリガ</th><td>128点（5 ms）</td><td>DC基準と打撃開始前の状態</td></tr><tr><th>教師</th><td>8要素one-hot</td><td>座標、音階、エリアIDもメタデータに保存。軸ビン・座標回帰の教師は座標から後生成</td></tr><tr><th>変動要因</th><td>操作者・セッション</td><td>打具はマレット固定。弱・強打は拡張フェーズで追加し、個別に性能を集計</td></tr></table>
+
+<h2>合格基準</h2><div class="grid"><div class="card"><span class="number">≥90%</span><small>8-ZONE ACCURACY</small><p>別セッションでの第一ゲート。デモ目標は95%以上。</p></div><div class="card"><span class="number">≤30 mm</span><small>MEDIAN POSITION ERROR</small><p>確率期待座標の暫定目標。95パーセンタイルも記録。50 mm細分化は中央値15 mm以下が条件。</p></div><div class="card"><span class="number">&lt;50 ms</span><small>DETECT TO RESULT</small><p>打撃開始からRESULT送信開始まで（前5 ms＋後45 msの50 ms窓を含む）。発音はPC側遅延が加算。</p></div></div>
+
 <h2>混同行列で重点確認するペア</h2><div class="grid two"><div class="card"><h3>左右鏡像</h3><p>`(50, y) ↔ (350, y)` と `(150, y) ↔ (250, y)`。非対称固定の効果が最も直接現れます。</p></div><div class="card"><h3>上下鏡像</h3><p>`(x, 50) ↔ (x, 150)`。中央センサに対して上下が近い場合、固定辺までの距離差が主要特徴になります。</p></div></div>
+
 <h2>複数打撃の追加収録</h2><table class="spec"><tr><th>同時2点</th><td>全28組 × 30回以上</td><td>強度比0.5～2.0、開始差0～2 msを含める</td></tr><tr><th>100 ms連打</th><td>全方向の遷移</td><td>間隔100 / 150 / 200 ms、同一点連打も収録</td></tr><tr><th>教師形式</th><td>8要素multi-hot</td><td>同時打撃は2要素を1、連打は2つの別イベント</td></tr><tr><th>評価</th><td>完全一致率・ラベルF1</td><td>片方だけ検出、余分な3点目、2打目欠落を個別集計</td></tr></table>
-<div class="status"><strong>イベント検出の目標</strong>20 ms解析窓の終了後、打撃開始から40 ms以内に再アームします。100 ms後の2打目には60 ms以上の余裕がありますが、前打の残響上で新しい立上りを検出できることを実測します。</div>
+<div class="status"><strong>イベント検出の目標</strong>50 ms解析窓（前5 ms＋後45 ms）の終了後、打撃開始から60 ms以内に再アームします。100 ms後の2打目には40 msの余裕がありますが、前打の残響上で新しい立上りを検出できることを実測します。</div>
 <div class="status warn"><strong>精度が不足した場合の順序</strong>特徴の正規化 → 時間波形とFFTの比較 → 固定具剛性・位置の調整 → センサ取付の改善、の順に切り分けます。この設計ではセンサ数を増やさず、中央1個を維持します。</div>
 </body></html>

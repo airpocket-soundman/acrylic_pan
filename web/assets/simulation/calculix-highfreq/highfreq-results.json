@@ -381,33 +381,33 @@
   "highpass_scores": [
     {
       "highpass_hz": 0,
-      "minimum_cosine_distance": 0.1857980429747067,
-      "mean_cosine_distance": 0.2657426668742137
+      "minimum_cosine_distance": 0.1915747198281137,
+      "mean_cosine_distance": 0.26573819854157327
     },
     {
       "highpass_hz": 100,
-      "minimum_cosine_distance": 0.1862152308826257,
-      "mean_cosine_distance": 0.26546030475810395
+      "minimum_cosine_distance": 0.19195255925625032,
+      "mean_cosine_distance": 0.26546837082115593
     },
     {
       "highpass_hz": 250,
-      "minimum_cosine_distance": 0.17826665667978547,
-      "mean_cosine_distance": 0.2635670036607611
+      "minimum_cosine_distance": 0.18511930336763904,
+      "mean_cosine_distance": 0.2636995581796536
     },
     {
       "highpass_hz": 500,
-      "minimum_cosine_distance": 0.1767071249480512,
-      "mean_cosine_distance": 0.25775537803325854
+      "minimum_cosine_distance": 0.18577696009472566,
+      "mean_cosine_distance": 0.25874904536215443
     },
     {
       "highpass_hz": 750,
-      "minimum_cosine_distance": 0.18386143269376742,
-      "mean_cosine_distance": 0.2519014728029017
+      "minimum_cosine_distance": 0.18946633871420437,
+      "mean_cosine_distance": 0.25352949204591557
     },
     {
       "highpass_hz": 1000,
-      "minimum_cosine_distance": 0.18859350606288672,
-      "mean_cosine_distance": 0.2672992736279566
+      "minimum_cosine_distance": 0.19621653729737432,
+      "mean_cosine_distance": 0.26702583935976903
     }
   ],
   "e4_baseline_18_band_scores": [
@@ -419,16 +419,16 @@
         5000.0
       ],
       "level_and_shape": {
-        "minimum_rms_log10_distance": 0.1113228233601197,
-        "mean_rms_log10_distance": 0.18488510083266155,
+        "minimum_rms_log10_distance": 0.11160752576201578,
+        "mean_rms_log10_distance": 0.18453134262676757,
         "closest_pair": [
           "C4",
           "C5"
         ]
       },
       "shape_only": {
-        "minimum_rms_log10_distance": 0.10686335083277217,
-        "mean_rms_log10_distance": 0.1842711426709926,
+        "minimum_rms_log10_distance": 0.1072558184845822,
+        "mean_rms_log10_distance": 0.18358654001773791,
         "closest_pair": [
           "C4",
           "C5"
@@ -444,16 +444,16 @@
         5000.0
       ],
       "level_and_shape": {
-        "minimum_rms_log10_distance": 0.11115623921352073,
-        "mean_rms_log10_distance": 0.1845514912599883,
+        "minimum_rms_log10_distance": 0.11144189203537828,
+        "mean_rms_log10_distance": 0.18419860242308553,
         "closest_pair": [
           "C4",
           "C5"
         ]
       },
       "shape_only": {
-        "minimum_rms_log10_distance": 0.10660391737958724,
-        "mean_rms_log10_distance": 0.18388214184091664,
+        "minimum_rms_log10_distance": 0.10700146096734237,
+        "mean_rms_log10_distance": 0.18320110056895086,
         "closest_pair": [
           "C4",
           "C5"
@@ -469,16 +469,16 @@
         5000.0
       ],
       "level_and_shape": {
-        "minimum_rms_log10_distance": 0.0846087466523234,
-        "mean_rms_log10_distance": 0.1711398456046938,
+        "minimum_rms_log10_distance": 0.08394080825507397,
+        "mean_rms_log10_distance": 0.17150592896930691,
         "closest_pair": [
           "C5",
           "D5"
         ]
       },
       "shape_only": {
-        "minimum_rms_log10_distance": 0.0823416597703271,
-        "mean_rms_log10_distance": 0.17064789462903876,
+        "minimum_rms_log10_distance": 0.08155357533421131,
+        "mean_rms_log10_distance": 0.17058472900601881,
         "closest_pair": [
           "C5",
           "D5"
@@ -494,16 +494,16 @@
         5000.0
       ],
       "level_and_shape": {
-        "minimum_rms_log10_distance": 0.11537929443920365,
-        "mean_rms_log10_distance": 0.18682714349000848,
+        "minimum_rms_log10_distance": 0.11624906334280172,
+        "mean_rms_log10_distance": 0.18743690261970336,
         "closest_pair": [
           "A4",
           "C5"
         ]
       },
       "shape_only": {
-        "minimum_rms_log10_distance": 0.10754202201328987,
-        "mean_rms_log10_distance": 0.18764088062595521,
+        "minimum_rms_log10_distance": 0.10818552741410362,
+        "mean_rms_log10_distance": 0.18747987351863854,
         "closest_pair": [
           "A4",
           "C5"
@@ -519,16 +519,16 @@
         5000.0
       ],
       "level_and_shape": {
-        "minimum_rms_log10_distance": 0.14435058894168318,
-        "mean_rms_log10_distance": 0.20019420731263304,
+        "minimum_rms_log10_distance": 0.1451588051023637,
+        "mean_rms_log10_distance": 0.20038456008334987,
         "closest_pair": [
           "C5",
           "D5"
         ]
       },
       "shape_only": {
-        "minimum_rms_log10_distance": 0.1391798924407085,
-        "mean_rms_log10_distance": 0.2012280068225792,
+        "minimum_rms_log10_distance": 0.1386616151446054,
+        "mean_rms_log10_distance": 0.20081453244356381,
         "closest_pair": [
           "A4",
           "C5"
@@ -544,16 +544,16 @@
         5000.0
       ],
       "level_and_shape": {
-        "minimum_rms_log10_distance": 0.15008299675585735,
-        "mean_rms_log10_distance": 0.21316674807600264,
+        "minimum_rms_log10_distance": 0.14984138989574394,
+        "mean_rms_log10_distance": 0.21298669497631892,
         "closest_pair": [
           "A4",
           "C5"
         ]
       },
       "shape_only": {
-        "minimum_rms_log10_distance": 0.1400479459999582,
-        "mean_rms_log10_distance": 0.21175863396256916,
+        "minimum_rms_log10_distance": 0.13965121939212438,
+        "mean_rms_log10_distance": 0.2110743890658729,
         "closest_pair": [
           "A4",
           "C5"
@@ -562,5 +562,6 @@
       "baseline_translation_distance_error": 0.0
     }
   ],
-  "true_fft_resolution_hz": 20.0
+  "true_fft_resolution_hz": 20.0,
+  "acceleration_method": "double central difference of displacement; spectra divided by sinc(2f/fs)^2 differentiation roll-off"
 }

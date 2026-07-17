@@ -19,6 +19,16 @@ import numpy as np
 NOTES = ("C4","D4","E4","G4","A4","C5","D5","E5")
 
 
+def gradient_rolloff_compensation(fft_f, fs, passes=2, floor=0.05):
+    """Undo the sin(x)/x amplitude roll-off of repeated np.gradient differentiation.
+
+    Each central-difference pass scales a component at frequency f by
+    sinc(2 f / fs); the floor keeps near-Nyquist bins from exploding.
+    """
+    response = np.sinc(2.0 * np.asarray(fft_f) / fs) ** passes
+    return np.maximum(response, floor)
+
+
 def frequencies_from_dat(path):
     values=[]; active=False
     for line in path.read_text(errors="replace").splitlines():
@@ -125,7 +135,7 @@ def save_hit_perspective_animation(path,nodes,modes,metadata,duration=.06,frames
         modal=hit_modes[:,None]/wd[:,None]*np.exp(-damping*omega[:,None]*times)*np.sin(wd[:,None]*times)
         fields.append((top_modes@modal).T)
     common=max(np.max(np.abs(field)) for field in fields); fields=[field/max(common,1e-15) for field in fields]
-    triangles=tri.triangles; cmap=cm.get_cmap("RdBu_r"); norm=colors.Normalize(-1,1)
+    triangles=tri.triangles; cmap=matplotlib.colormaps["RdBu_r"]; norm=colors.Normalize(-1,1)
     fig=plt.figure(figsize=(12.8,6.5),constrained_layout=True); axes=[]; surfaces=[]
     for index,(hit,field) in enumerate(zip(metadata["hits"],fields),1):
         ax=fig.add_subplot(2,4,index,projection="3d"); axes.append(ax)
@@ -169,7 +179,8 @@ def main():
         if len(t)<100: raise RuntimeError(f"Insufficient dynamic samples for {note}: {len(t)}")
         time_ref=t; acceleration=np.gradient(np.gradient(u,t),t); signals.append(acceleration)
     common=max(np.max(np.abs(s)) for s in signals); window=np.hanning(len(time_ref)); fft_f=np.fft.rfftfreq(len(time_ref),np.median(np.diff(time_ref)))
-    spectra=[np.abs(np.fft.rfft(s*window))*2/max(window.sum(),1e-15) for s in signals]; fft_common=max(np.max(s) for s in spectra)
+    compensation=gradient_rolloff_compensation(fft_f,1/np.median(np.diff(time_ref)))
+    spectra=[np.abs(np.fft.rfft(s*window))*2/max(window.sum(),1e-15)/compensation for s in signals]; fft_common=max(np.max(s) for s in spectra)
     hits=[]
     for item,signal,spectrum in zip(meta["hits"],signals,spectra):
         hits.append({"note":item["note"],"x_mm":item["xyz_mm"][0],"y_mm":item["xyz_mm"][1],

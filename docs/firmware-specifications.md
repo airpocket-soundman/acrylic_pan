@@ -133,7 +133,7 @@ manifestへ別フィールドで保存する。
 - `ARM_BURST`: バースト収録開始
 - `DISARM`: トリガ待ち解除
 - `SET_TRIGGER`: しきい値、抑止時間、弱打下限
-- `EVENT_DATA`: 512点波形とメタデータ
+- `EVENT_DATA`: 1,280点波形とメタデータ
 - `BURST_DATA`: 2048点波形とメタデータ
 - `EVENT_REJECTED`: 品質フラグと統計のみ
 - `STATS`: sample/event/reject/overrun/CRCカウンタ
@@ -145,7 +145,7 @@ PCのarea ID、座標、note、session IDはボード処理に使用しない。
 
 - 25.6 kHzのサンプル数誤差0、連続10分でoverrun 0
 - 1 Hz × 100イベントでsequence欠落0、CRCエラー0
-- 前32点が全イベントに存在
+- 前128点のプリトリガが全イベントに存在
 - ±8 g飽和を確実にflag
 - 100 ms間隔の2打がBURST波形内に両方存在
 - STOP後100 ms以内にIDLE
