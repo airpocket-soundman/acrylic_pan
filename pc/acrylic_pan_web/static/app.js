@@ -1,6 +1,10 @@
 const $ = id => document.getElementById(id);
 let lastSequence = null;
 let lastAiSequence = null;
+const library = {sessionId: null, events: [], selected: null};
+const POINT_LABELS = {
+  center: '中心', up_left: '左上', up_right: '右上', down_left: '左下', down_right: '右下'
+};
 
 async function api(path, body) {
   const options = body === undefined ? {} : {
@@ -72,10 +76,7 @@ function drawAiResult(result) {
 function drawCollection(collection) {
   if (!collection) return;
   const summary = $('collectionSummary');
-  const pointLabels = {
-    center: '中心', left: '左', right: '右', up: '上', down: '下',
-    up_left: '左上', up_right: '右上', down_left: '左下', down_right: '右下'
-  };
+  const pointLabels = POINT_LABELS;
   if (collection.active) {
     summary.textContent = `エリア${collection.current_class_id + 1}の${pointLabels[collection.current_point_name] || collection.current_point_name}` +
       `（x=${collection.current_x_mm} mm, y=${collection.current_y_mm} mm）を叩いてください ` +
@@ -118,6 +119,15 @@ function drawCollection(collection) {
       positionProgress.innerHTML = header + rows;
     }
   }
+  // Before the first run the server still holds the default pattern, so the
+  // panel previews whatever the operator has picked in the dropdown instead.
+  const started = collection.active || collection.finished || collection.completed_samples > 0;
+  if (started) {
+    renderPoints(collection.per_position_counts, collection.panel,
+      collection.current_target_index, collection.active);
+  } else {
+    previewPoints().catch(error => { $('error').textContent = error.message; });
+  }
   const marker = $('collectionMarker');
   marker.hidden = !collection.active;
   if (collection.active) {
@@ -130,6 +140,72 @@ function drawCollection(collection) {
   $('collectionStop').disabled = !collection.active;
   $('collectionRepetitions').disabled = collection.active;
   $('collectionPattern').disabled = collection.active;
+}
+
+let pointsSignature = null;
+let previewPattern = null;
+let previewTargets = null;
+
+function renderClamp(panel) {
+  const element = $('collectionClamp');
+  const clamp = panel && panel.clamp;
+  if (!element || !clamp) return;
+  const percent = (value, span) => `${value / span * 100}%`;
+  element.style.left = percent(clamp.x_min, panel.width_mm);
+  element.style.top = percent(clamp.y_min, panel.height_mm);
+  element.style.width = percent(clamp.x_max - clamp.x_min, panel.width_mm);
+  element.style.height = percent(clamp.y_max - clamp.y_min, panel.height_mm);
+  element.title = `パネル固定具 x=${clamp.x_min}～${clamp.x_max} mm、` +
+    `y=${clamp.y_min}～${clamp.y_max} mm（この範囲は叩かない）`;
+  element.hidden = false;
+}
+
+function renderPoints(points, panel, activeIndex, interactive) {
+  renderClamp(panel);
+  // status() runs twice a second; rebuilding the DOM only on a real change
+  // keeps hover states and avoids flicker.
+  const signature = JSON.stringify([
+    points.map(point => [point.target_index, point.count, point.complete]),
+    activeIndex, interactive,
+  ]);
+  if (signature === pointsSignature) return;
+  pointsSignature = signature;
+  const container = $('collectionPoints');
+  container.classList.toggle('preview', !interactive);
+  container.innerHTML = points.map(point => {
+    const classes = ['collection-point'];
+    if (point.complete) classes.push('complete');
+    if (point.target_index === activeIndex) classes.push('active');
+    const name = POINT_LABELS[point.point_name] || point.point_name;
+    const title = `エリア${point.class_id + 1} ${name}（x=${point.x_mm} mm, y=${point.y_mm} mm）` +
+      (interactive ? `　${point.count}回採取済み${point.complete ? '（完了）' : ''}` : '');
+    return `<button type="button" class="${classes.join(' ')}" data-target="${point.target_index}"` +
+      ` style="left:${point.x_mm / panel.width_mm * 100}%;top:${point.y_mm / panel.height_mm * 100}%"` +
+      ` title="${escapeHtml(title)}"${interactive ? '' : ' disabled'}>` +
+      `${interactive ? point.count : ''}</button>`;
+  }).join('');
+  if (!interactive) return;
+  container.querySelectorAll('.collection-point').forEach(button => {
+    button.onclick = () => selectTarget(Number(button.dataset.target));
+  });
+}
+
+async function previewPoints(force) {
+  const pattern = $('collectionPattern').value;
+  if (force || pattern !== previewPattern || !previewTargets) {
+    previewTargets = await api(`/api/collection/targets?pattern=${encodeURIComponent(pattern)}`);
+    previewPattern = pattern;
+    pointsSignature = null;
+  }
+  renderPoints(previewTargets.targets, previewTargets.panel, null, false);
+}
+
+async function selectTarget(targetIndex) {
+  try {
+    await api('/api/collection/select', {target_index: targetIndex});
+    $('error').textContent = '';
+    await status();
+  } catch (error) { $('error').textContent = error.message; }
 }
 
 function plot(canvas, x, y, color, xlabel, ylabel, marker, yDecimals = 0) {
@@ -172,9 +248,177 @@ function drawDummyInput(input) {
 function drawEvent(event) {
   plot('wave', event.time_ms, event.samples, '#1777c8', '時間 [ms]', '加速度 [raw LSB]', event.trigger_time_ms);
   plot('fft', event.frequency_hz, event.magnitude_db, '#dd7b16', '周波数 [Hz]', '振幅 [dB]');
-  $('eventInfo').textContent = `${event.source} / sequence ${event.sequence} / ` +
-    `${event.sample_rate_hz.toLocaleString()} Hz / peak ${event.peak_abs.toLocaleString()} LSB / ` +
-    `trigger ${event.trigger_time_ms.toFixed(2)} ms`;
+  const stored = event.stored;
+  const origin = stored
+    ? `保存データ ${stored.session_id} No.${stored.index}（${areaLabel(stored.class_id)}）`
+    : event.source;
+  $('eventInfo').textContent = `${origin} / sequence ${event.sequence} / ` +
+    `${event.samples.length}点 / ${event.sample_rate_hz.toLocaleString()} Hz / ` +
+    `peak ${event.peak_abs.toLocaleString()} LSB / trigger ${event.trigger_time_ms.toFixed(2)} ms`;
+}
+
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, character =>
+    ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[character]));
+}
+
+function shortTime(iso) {
+  const parsed = new Date(iso);
+  return Number.isNaN(parsed.getTime()) ? (iso || '—') : parsed.toLocaleString('ja-JP', {hour12: false});
+}
+
+function areaLabel(classId) {
+  return classId === null || classId === undefined ? '未ラベル' : `エリア${classId + 1}`;
+}
+
+function pointLabel(annotations) {
+  const name = annotations && annotations.target_point_name;
+  if (!name) return '—';
+  const repetition = annotations.repetition ? ` #${annotations.repetition}` : '';
+  return `${POINT_LABELS[name] || name}${repetition}`;
+}
+
+function libraryRoot() {
+  return $('output') ? $('output').value : '';
+}
+
+async function loadSessions() {
+  const data = await api(`/api/library/sessions?root=${encodeURIComponent(libraryRoot())}`);
+  const select = $('librarySession');
+  const previous = library.sessionId;
+  select.innerHTML = data.sessions.map(session => {
+    const label = session.error
+      ? `${session.session_id}（読み取り不可）`
+      : `${session.session_id}　${session.event_count}件` +
+        (session.mode === 'guided_8area_points' ? '　ガイド採取' : '');
+    return `<option value="${escapeHtml(session.session_id)}">${escapeHtml(label)}</option>`;
+  }).join('');
+  library.sessions = data.sessions;
+  if (data.sessions.length === 0) {
+    library.sessionId = null;
+    library.events = [];
+    library.selected = null;
+    $('librarySummary').textContent = `${data.root} に保存済みセッションがありません。`;
+    $('librarySummary').classList.remove('warn');
+    $('libraryList').innerHTML = '<div class="library-empty">データがありません。</div>';
+    return drawLibrarySelection();
+  }
+  const keep = data.sessions.some(session => session.session_id === previous);
+  library.sessionId = keep ? previous : data.sessions[0].session_id;
+  select.value = library.sessionId;
+  await loadEvents();
+}
+
+async function loadEvents() {
+  if (!library.sessionId) return;
+  const data = await api(`/api/library/events?session=${encodeURIComponent(library.sessionId)}` +
+    `&root=${encodeURIComponent(libraryRoot())}`);
+  library.events = data.events;
+  if (!library.events.some(event => event.index === library.selected)) library.selected = null;
+  drawLibrarySummary();
+  drawLibraryList();
+  drawLibrarySelection();
+}
+
+function drawLibrarySummary() {
+  const session = (library.sessions || []).find(item => item.session_id === library.sessionId);
+  const summary = $('librarySummary');
+  if (!session) return;
+  if (session.error) {
+    summary.textContent = `${session.session_id}: ${session.error}`;
+    return summary.classList.add('warn');
+  }
+  const areas = session.class_ids.length ? session.class_ids.map(id => id + 1).join(', ') : 'なし';
+  summary.textContent = `${session.session_id}　${library.events.length}件　` +
+    `作成 ${shortTime(session.created_at)}　` +
+    `${session.closed_at ? '終了済み' : '記録中またはクローズ未了'}　ラベル: エリア ${areas}`;
+  summary.classList.toggle('warn', !session.consistent);
+  if (!session.consistent) {
+    summary.textContent += `　⚠ session.jsonのevent_count(${session.declared_event_count})と` +
+      `manifest行数(${library.events.length})が不一致です。`;
+  }
+}
+
+function drawLibraryList() {
+  const list = $('libraryList');
+  if (library.events.length === 0) {
+    list.innerHTML = '<div class="library-empty">このセッションにはイベントがありません。</div>';
+    return;
+  }
+  const header = '<div class="library-row library-header"><span>No.</span><span>ラベル</span>' +
+    '<span>打点</span><span>peak</span><span>受信時刻</span></div>';
+  const rows = library.events.map(event => {
+    const classes = ['library-row'];
+    if (event.index === library.selected) classes.push('selected');
+    if (!event.exists) classes.push('missing');
+    return `<button type="button" class="${classes.join(' ')}" data-index="${event.index}">` +
+      `<span>${event.index}</span><span>${escapeHtml(areaLabel(event.class_id))}</span>` +
+      `<span>${escapeHtml(pointLabel(event.annotations))}</span>` +
+      `<span>${event.peak_abs.toLocaleString()}</span>` +
+      `<span>${escapeHtml(shortTime(event.received_at))}${event.exists ? '' : '（ファイル欠落）'}</span></button>`;
+  }).join('');
+  list.innerHTML = header + rows;
+  list.querySelectorAll('.library-row[data-index]').forEach(row => {
+    row.onclick = () => showStoredEvent(Number(row.dataset.index));
+  });
+}
+
+function drawLibrarySelection() {
+  const event = library.events.find(item => item.index === library.selected);
+  $('libraryDelete').disabled = !event;
+  $('librarySelection').textContent = event
+    ? `表示中: No.${event.index} / ${areaLabel(event.class_id)} / ${pointLabel(event.annotations)} / sequence ${event.sequence}`
+    : '波形を表示するデータを選んでください。';
+}
+
+async function showStoredEvent(index) {
+  try {
+    const event = await api(`/api/library/event?session=${encodeURIComponent(library.sessionId)}` +
+      `&index=${index}&root=${encodeURIComponent(libraryRoot())}`);
+    library.selected = index;
+    drawEvent(event);
+    drawLibraryList();
+    drawLibrarySelection();
+    $('error').textContent = '';
+  } catch (error) { $('error').textContent = error.message; }
+}
+
+if ($('libraryList')) {
+  $('libraryRefresh').onclick = async () => {
+    try { await loadSessions(); $('error').textContent = ''; }
+    catch (error) { $('error').textContent = error.message; }
+  };
+  $('librarySession').onchange = async () => {
+    library.sessionId = $('librarySession').value;
+    library.selected = null;
+    try { await loadEvents(); } catch (error) { $('error').textContent = error.message; }
+  };
+  $('libraryDelete').onclick = async () => {
+    const event = library.events.find(item => item.index === library.selected);
+    if (!event) return;
+    if (!confirm(`No.${event.index}（${areaLabel(event.class_id)} / ${pointLabel(event.annotations)}）を削除します。\n` +
+      '波形ファイルとmanifestの記録が消え、元に戻せません。よろしいですか？')) return;
+    try {
+      await api('/api/library/delete', {
+        session: library.sessionId, index: event.index, root: libraryRoot()
+      });
+      library.selected = null;
+      await loadSessions();
+      $('error').textContent = '';
+    } catch (error) { $('error').textContent = error.message; }
+  };
+  $('libraryDeleteSession').onclick = async () => {
+    if (!library.sessionId) return;
+    if (!confirm(`セッション ${library.sessionId} を丸ごと削除します。\n` +
+      `${library.events.length}件の波形がすべて消え、元に戻せません。よろしいですか？`)) return;
+    try {
+      await api('/api/library/delete_session', {session: library.sessionId, root: libraryRoot()});
+      library.sessionId = null;
+      library.selected = null;
+      await loadSessions();
+      $('error').textContent = '';
+    } catch (error) { $('error').textContent = error.message; }
+  };
 }
 
 if ($('aiSelftest')) $('aiSelftest').onclick = async () => {
@@ -192,6 +436,10 @@ if ($('aiRunAll')) $('aiRunAll').onclick = async () => {
       await new Promise(resolve => setTimeout(resolve, 180));
     }
   } catch (error) { $('error').textContent = error.message; }
+};
+if ($('collectionPattern')) $('collectionPattern').onchange = async () => {
+  try { await previewPoints(true); $('error').textContent = ''; }
+  catch (error) { $('error').textContent = error.message; }
 };
 if ($('collectionStart')) $('collectionStart').onclick = async () => {
   try {
@@ -221,4 +469,9 @@ $('newSession').onclick = async () => {
     $('sessionPath').textContent = `記録先: ${data.session_dir}`;
   } catch (error) { $('error').textContent = error.message; }
 };
-ports(); status(); setInterval(status, 500);
+ports();
+// status() fills the 保存先 field, which is the root the library browser reads.
+status().then(() => {
+  if ($('libraryList')) return loadSessions().catch(error => { $('error').textContent = error.message; });
+});
+setInterval(status, 500);

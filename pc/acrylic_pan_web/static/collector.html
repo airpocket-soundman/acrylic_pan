@@ -17,7 +17,7 @@
   <section class="card collection-panel">
     <div class="collection-toolbar">
       <div><h2>8エリア ガイド付きデータ採取</h2><p>マーカー位置を叩いてください。受信後、自動的に次の測定を待ち受けます。</p></div>
-      <label>位置パターン <select id="collectionPattern"><option value="center">中心 1点</option><option value="five" selected>中心＋上下左右 5点</option><option value="nine">3×3 9点</option></select></label>
+      <label>位置パターン <select id="collectionPattern"><option value="center" selected>A: エリア中心 1点</option><option value="corners">B: 50 mm格子 四隅 4点</option></select></label>
       <label>各位置の回数 <input id="collectionRepetitions" type="number" min="1" max="1000" value="10"></label>
       <button id="collectionStart" class="primary">採取開始</button>
       <button id="collectionStop">採取停止</button>
@@ -32,12 +32,31 @@
       <div class="collection-cell" data-area="5"><b>エリア6</b><span>0 / 0</span></div>
       <div class="collection-cell" data-area="6"><b>エリア7</b><span>0 / 0</span></div>
       <div class="collection-cell" data-area="7"><b>エリア8</b><span>0 / 0</span></div>
+      <div id="collectionClamp" class="collection-clamp" hidden><span>固定具</span></div>
+      <div id="collectionPoints" class="collection-points"></div>
       <div id="collectionMarker" class="collection-marker" hidden><span></span></div>
     </div>
+    <p class="collection-hint">打点は選んだ位置パターンで表示します。採取中は任意の打点をクリックすると、順序に関係なくその位置へ切り替えられます。</p>
     <div class="panel-axis"><span>← 400 mm →</span><span>高さ 200 mm</span></div>
     <div class="position-progress-wrap">
       <h3>ラベル・打点別の採取件数</h3>
       <div id="positionProgress" class="position-progress" aria-live="polite"></div>
+    </div>
+  </section>
+  <section class="card library-panel">
+    <div class="library-toolbar">
+      <div><h2>収録済みデータ</h2><p>保存先のセッションを選ぶと一覧を表示します。行を選ぶと下のグラフに波形とFFTを描画します。</p></div>
+      <label>セッション <select id="librarySession"></select></label>
+      <button id="libraryRefresh">一覧更新</button>
+      <button id="libraryDeleteSession" class="danger">セッション削除</button>
+    </div>
+    <div id="librarySummary" class="library-summary">保存先を確認して「一覧更新」を押してください。</div>
+    <div class="library-list-wrap">
+      <div id="libraryList" class="library-list" aria-live="polite"></div>
+    </div>
+    <div class="library-actions">
+      <span id="librarySelection">波形を表示するデータを選んでください。</span>
+      <button id="libraryDelete" class="danger" disabled>表示中のデータを削除</button>
     </div>
   </section>
   <section class="card plot"><h2>振動波形</h2><canvas id="wave" width="1100" height="280"></canvas></section>

@@ -12,7 +12,7 @@ import queue
 import threading
 import webbrowser
 from typing import Any
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 
 import numpy as np
 
@@ -21,6 +21,7 @@ from pc.acrylic_pan_monitor.ai_validation import (
     compare_ai_result,
     load_golden_case,
 )
+from pc.acrylic_pan_monitor.library import Library, LibraryError
 from pc.acrylic_pan_monitor.protocol import (
     EventData,
     Frame,
@@ -41,27 +42,58 @@ AREA_WIDTH_MM = PANEL_WIDTH_MM / 4
 AREA_HEIGHT_MM = PANEL_HEIGHT_MM / 2
 DUMMY_MODEL_SAMPLE_RATE_HZ = 25_600
 
+# docs/design.md section 3 defines two acquisition series over the same panel:
+#   A: the eight area centres          -> "center"
+#   B: a 50 mm grid, X=25..375, Y=25..175 -> "corners"
+# Within each 100 x 100 mm area the B grid lands exactly on the four (+-25, +-25)
+# diagonal points, so 8 areas x 4 points reproduces the specified 32 grid points.
 POSITION_PATTERNS: dict[str, tuple[tuple[str, float, float], ...]] = {
     "center": (("center", 0.0, 0.0),),
-    "five": (
-        ("center", 0.0, 0.0),
-        ("left", -25.0, 0.0),
-        ("right", 25.0, 0.0),
-        ("up", 0.0, -25.0),
-        ("down", 0.0, 25.0),
-    ),
-    "nine": (
-        ("center", 0.0, 0.0),
-        ("left", -25.0, 0.0),
-        ("right", 25.0, 0.0),
-        ("up", 0.0, -25.0),
-        ("down", 0.0, 25.0),
+    "corners": (
         ("up_left", -25.0, -25.0),
         ("up_right", 25.0, -25.0),
         ("down_left", -25.0, 25.0),
         ("down_right", 25.0, 25.0),
     ),
 }
+
+# The clamp of docs/design.md section 2 holds x=200..300 mm, y=0..20 mm, which
+# leaves the two grid points at y=25 only 5 mm clear of it. Section 3 moves them
+# to (225, 35) and (275, 35). The exception is per-area by nature, so it is
+# applied to absolute panel coordinates exactly as the specification states it.
+CLAMP_FOOTPRINT_MM = {"x_min": 200.0, "x_max": 300.0, "y_min": 0.0, "y_max": 20.0}
+CLAMP_POINT_MOVES: dict[tuple[float, float], tuple[float, float]] = {
+    (225.0, 25.0): (225.0, 35.0),
+    (275.0, 25.0): (275.0, 35.0),
+}
+
+
+def panel_info() -> dict[str, Any]:
+    """Panel geometry for the GUI, so no dimension is duplicated in JavaScript."""
+    return {
+        "width_mm": PANEL_WIDTH_MM,
+        "height_mm": PANEL_HEIGHT_MM,
+        "clamp": dict(CLAMP_FOOTPRINT_MM),
+    }
+
+
+def event_payload(event: EventData, source: str) -> dict[str, Any]:
+    """Build the waveform/FFT payload shared by live, demo, and stored events."""
+    plot = prepare_plot_data(event)
+    return {
+        "sequence": event.sequence,
+        "sample_rate_hz": event.sample_rate_hz,
+        "trigger_index": event.trigger_index,
+        "trigger_time_ms": plot.trigger_time_ms,
+        "peak_abs": event.peak_abs,
+        "flags": event.flags,
+        "timestamp_us": event.timestamp_us,
+        "time_ms": plot.time_ms.tolist(),
+        "samples": plot.samples.tolist(),
+        "frequency_hz": plot.frequency_hz.tolist(),
+        "magnitude_db": plot.magnitude_db.tolist(),
+        "source": source,
+    }
 
 
 def prepare_dummy_input_plot(
@@ -121,24 +153,35 @@ def build_collection_targets(pattern: str) -> tuple[CollectionTarget, ...]:
     try:
         positions = POSITION_PATTERNS[pattern]
     except KeyError as error:
-        raise ValueError("position_pattern must be center, five, or nine") from error
+        raise ValueError("position_pattern must be center or corners") from error
     targets: list[CollectionTarget] = []
     for class_id in range(8):
         column, row = class_id % 4, class_id // 4
         center_x = (column + 0.5) * AREA_WIDTH_MM
         center_y = (row + 0.5) * AREA_HEIGHT_MM
         for point_id, (name, offset_x, offset_y) in enumerate(positions):
+            x, y = center_x + offset_x, center_y + offset_y
+            moved = CLAMP_POINT_MOVES.get((x, y))
+            if moved is not None:
+                # Re-derive the offset so x - offset_x still recovers the area
+                # centre, which the guided-run validator relies on.
+                x, y = moved
+                offset_x, offset_y = x - center_x, y - center_y
             targets.append(CollectionTarget(
-                class_id, point_id, name,
-                center_x + offset_x, center_y + offset_y,
-                offset_x, offset_y,
+                class_id, point_id, name, x, y, offset_x, offset_y,
             ))
     return tuple(targets)
 
 
 @dataclass
 class CollectionState:
-    """Progress for fixed-order, eight-area and intra-area targets."""
+    """Progress for eight-area and intra-area targets.
+
+    Targets are normally filled in order, but ``selected_index`` lets the
+    operator jump to any incomplete point. Because points can therefore be
+    filled out of order, the current point is derived from ``target_counts``
+    rather than from how many samples have been taken so far.
+    """
 
     active: bool = False
     finished: bool = False
@@ -151,16 +194,29 @@ class CollectionState:
     )
     target_counts: list[int] = field(default_factory=lambda: [0] * 8)
     order: tuple[int, ...] = tuple(range(8))
+    selected_index: int | None = None
 
     @property
     def total_samples(self) -> int:
         return len(self.targets) * self.repetitions
 
+    def is_complete(self, index: int) -> bool:
+        return self.repetitions > 0 and self.target_counts[index] >= self.repetitions
+
+    def first_incomplete_index(self) -> int | None:
+        for index in range(len(self.targets)):
+            if not self.is_complete(index):
+                return index
+        return None
+
     @property
     def current_target_index(self) -> int | None:
+        """The point being collected: the operator's pick, else the next gap."""
         if not self.active or self.completed_samples >= self.total_samples:
             return None
-        return self.completed_samples // self.repetitions
+        if self.selected_index is not None and not self.is_complete(self.selected_index):
+            return self.selected_index
+        return self.first_incomplete_index()
 
     @property
     def current_target(self) -> CollectionTarget | None:
@@ -195,15 +251,21 @@ class CollectionState:
             "current_target": target.as_dict() if target is not None else None,
             "current_target_index": target_index,
             "current_repetition": current_count + 1 if current_count is not None else None,
+            "selected_index": self.selected_index,
             "per_class_counts": list(self.per_class_counts),
             "per_position_counts": [
-                {**item.as_dict(), "count": self.target_counts[index]}
+                {
+                    **item.as_dict(),
+                    "target_index": index,
+                    "count": self.target_counts[index],
+                    "complete": self.is_complete(index),
+                }
                 for index, item in enumerate(self.targets)
             ],
             "position_pattern": self.position_pattern,
             "points_per_class": len(POSITION_PATTERNS[self.position_pattern]),
             "samples_per_class": len(POSITION_PATTERNS[self.position_pattern]) * self.repetitions,
-            "panel": {"width_mm": PANEL_WIDTH_MM, "height_mm": PANEL_HEIGHT_MM},
+            "panel": panel_info(),
             "targets": [item.as_dict() for item in self.targets],
             "order": list(self.order),
         }
@@ -312,7 +374,7 @@ class AcquisitionController:
                     "position_pattern": position_pattern,
                     "points_per_class": len(POSITION_PATTERNS[position_pattern]),
                     "point_count": len(POSITION_PATTERNS[position_pattern]),
-                    "panel": {"width_mm": PANEL_WIDTH_MM, "height_mm": PANEL_HEIGHT_MM},
+                    "panel": panel_info(),
                     "order": list(range(8)),
                     "targets": [target.as_dict() for target in targets],
                     "total_samples": len(targets) * repetitions,
@@ -340,6 +402,31 @@ class AcquisitionController:
         if self.link.connected:
             self.send_command("stop")
         return self.collection_status()
+
+    def select_target(self, target_index: int) -> dict[str, Any]:
+        """Jump to any incomplete point, ignoring the default fill order."""
+        with self._lock:
+            if not self.collection.active:
+                raise ValueError("採取を開始してから打点を選択してください。")
+            if not 0 <= target_index < len(self.collection.targets):
+                raise ValueError("打点の番号が範囲外です。")
+            if self.collection.is_complete(target_index):
+                raise ValueError("この打点は必要な回数の採取が完了しています。")
+            self.collection.selected_index = target_index
+            return self.collection.as_dict()
+
+    def preview_targets(self, pattern: str) -> dict[str, Any]:
+        """Target geometry for a pattern, so the panel can be drawn before start."""
+        targets = build_collection_targets(pattern)
+        return {
+            "position_pattern": pattern,
+            "points_per_class": len(POSITION_PATTERNS[pattern]),
+            "panel": panel_info(),
+            "targets": [
+                {**target.as_dict(), "target_index": index, "count": 0, "complete": False}
+                for index, target in enumerate(targets)
+            ],
+        }
 
     def collection_status(self) -> dict[str, Any]:
         with self._lock:
@@ -374,6 +461,72 @@ class AcquisitionController:
             sequence = (self.latest or {}).get("sequence", 0) + 1
         event = make_demo_event(sequence)
         return self._process_event(event, source="demo", count_as_received=False)
+
+    def _library(self, root: str | Path | None = None) -> Library:
+        if root:
+            return Library(Path(str(root)).expanduser())
+        with self._lock:
+            return Library(self.output_root)
+
+    def list_sessions(self, root: str | Path | None = None) -> dict[str, Any]:
+        library = self._library(root)
+        return {"root": str(library.root), "sessions": library.list_sessions()}
+
+    def list_stored_events(self, session_id: str, root: str | Path | None = None) -> dict[str, Any]:
+        library = self._library(root)
+        return {
+            "root": str(library.root),
+            "session_id": session_id,
+            "events": library.list_events(session_id),
+        }
+
+    def load_stored_event(
+        self, session_id: str, index: int, root: str | Path | None = None
+    ) -> dict[str, Any]:
+        """Return one saved waveform in the same shape as a live event.
+
+        This deliberately does not touch ``self.latest``: browsing the archive
+        must not overwrite the most recent captured event.
+        """
+        event, record = self._library(root).load_event(session_id, index)
+        payload = event_payload(event, "library")
+        payload["stored"] = {"session_id": session_id, **record}
+        return payload
+
+    def delete_stored_event(
+        self, session_id: str, index: int, root: str | Path | None = None
+    ) -> dict[str, Any]:
+        """Delete one saved event, keeping a live Recorder's count in step."""
+        with self._lock:
+            if self.collection.active:
+                raise ValueError("採取中は削除できません。採取を停止してから削除してください。")
+            library = self._library(root)
+            directory = library.session_dir(session_id)
+            result = library.delete_event(session_id, index)
+            self._resync_recorder(directory)
+            return result
+
+    def delete_stored_session(
+        self, session_id: str, root: str | Path | None = None
+    ) -> dict[str, Any]:
+        with self._lock:
+            if self.collection.active:
+                raise ValueError("採取中は削除できません。採取を停止してから削除してください。")
+            library = self._library(root)
+            directory = library.session_dir(session_id)
+            if self.recorder is not None and self._is_recorder_session(directory):
+                raise ValueError("記録中のセッションは削除できません。新規セッションを開始してから削除してください。")
+            return library.delete_session(session_id)
+
+    def _is_recorder_session(self, directory: Path) -> bool:
+        if self.recorder is None or self.recorder.session_dir is None:
+            return False
+        return self.recorder.session_dir.resolve() == directory and self.recorder.active
+
+    def _resync_recorder(self, directory: Path) -> None:
+        if self._is_recorder_session(directory):
+            assert self.recorder is not None
+            self.recorder.refresh_event_count()
 
     def status(self) -> dict[str, Any]:
         with self._lock:
@@ -417,21 +570,7 @@ class AcquisitionController:
             self.new_session(class_id=self.class_id)
 
     def _process_event(self, event: EventData, source: str, count_as_received: bool) -> dict[str, Any]:
-        plot = prepare_plot_data(event)
-        payload = {
-            "sequence": event.sequence,
-            "sample_rate_hz": event.sample_rate_hz,
-            "trigger_index": event.trigger_index,
-            "trigger_time_ms": plot.trigger_time_ms,
-            "peak_abs": event.peak_abs,
-            "flags": event.flags,
-            "timestamp_us": event.timestamp_us,
-            "time_ms": plot.time_ms.tolist(),
-            "samples": plot.samples.tolist(),
-            "frequency_hz": plot.frequency_hz.tolist(),
-            "magnitude_db": plot.magnitude_db.tolist(),
-            "source": source,
-        }
+        payload = event_payload(event, source)
         rearm = False
         with self._lock:
             if count_as_received:
@@ -473,6 +612,9 @@ class AcquisitionController:
                         self.collection.per_class_counts[collection_class] += 1
                         self.collection.target_counts[collection_target_index] += 1
                         self.collection.completed_samples += 1
+                        if self.collection.is_complete(collection_target_index):
+                            # Release the manual pick so the guide moves on by itself.
+                            self.collection.selected_index = None
                         if self.collection.completed_samples >= self.collection.total_samples:
                             self.collection.active = False
                             self.collection.finished = True
@@ -559,7 +701,8 @@ class ApiHandler(BaseHTTPRequestHandler):
     controller: AcquisitionController
 
     def do_GET(self) -> None:
-        path = urlparse(self.path).path
+        parsed = urlparse(self.path)
+        path = parsed.path
         if path == "/api/status":
             return self._json(self.controller.status())
         if path == "/api/ports":
@@ -572,7 +715,41 @@ class ApiHandler(BaseHTTPRequestHandler):
             return self._json(self.controller.status())
         if path == "/api/collection":
             return self._json(self.controller.collection_status())
+        if path == "/api/collection/targets":
+            pattern = (parse_qs(parsed.query).get("pattern") or ["center"])[0]
+            try:
+                return self._json(self.controller.preview_targets(pattern))
+            except ValueError as error:
+                return self._json({"error": str(error)}, HTTPStatus.BAD_REQUEST)
+        if path.startswith("/api/library/"):
+            return self._library_get(path, parse_qs(parsed.query))
         self._static(path)
+
+    def _library_get(self, path: str, query: dict[str, list[str]]) -> None:
+        def one(name: str) -> str | None:
+            values = query.get(name)
+            return values[0] if values else None
+
+        try:
+            if path == "/api/library/sessions":
+                return self._json(self.controller.list_sessions(one("root")))
+            if path == "/api/library/events":
+                session_id = one("session")
+                if session_id is None:
+                    raise ValueError("session is required")
+                return self._json(self.controller.list_stored_events(session_id, one("root")))
+            if path == "/api/library/event":
+                session_id, index = one("session"), one("index")
+                if session_id is None or index is None:
+                    raise ValueError("session and index are required")
+                return self._json(
+                    self.controller.load_stored_event(session_id, int(index), one("root"))
+                )
+            self._json({"error": "not found"}, HTTPStatus.NOT_FOUND)
+        except LibraryError as error:
+            self._json({"error": str(error)}, HTTPStatus.NOT_FOUND)
+        except (KeyError, TypeError, ValueError, OSError) as error:
+            self._json({"error": str(error)}, HTTPStatus.BAD_REQUEST)
 
     def do_POST(self) -> None:
         path = urlparse(self.path).path
@@ -598,10 +775,22 @@ class ApiHandler(BaseHTTPRequestHandler):
                 ))
             if path == "/api/collection/stop":
                 return self._json(self.controller.stop_collection())
+            if path == "/api/collection/select":
+                return self._json(self.controller.select_target(int(body["target_index"])))
             if path == "/api/session":
                 session = self.controller.new_session(body.get("output_root"), body.get("class_id"))
                 return self._json({"session_dir": str(session)})
+            if path == "/api/library/delete":
+                return self._json(self.controller.delete_stored_event(
+                    str(body["session"]), int(body["index"]), body.get("root"),
+                ))
+            if path == "/api/library/delete_session":
+                return self._json(self.controller.delete_stored_session(
+                    str(body["session"]), body.get("root"),
+                ))
             self._json({"error": "not found"}, HTTPStatus.NOT_FOUND)
+        except LibraryError as error:
+            self._json({"error": str(error)}, HTTPStatus.NOT_FOUND)
         except (KeyError, TypeError, ValueError, OSError) as error:
             self._json({"error": str(error)}, HTTPStatus.BAD_REQUEST)
         except Exception as error:

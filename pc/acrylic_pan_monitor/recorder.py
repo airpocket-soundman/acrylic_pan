@@ -78,6 +78,7 @@ class Recorder:
         self.session_id: str | None = None
         self._metadata: dict[str, Any] = {}
         self._event_count = 0
+        self._next_index = 0
         self._closed = False
 
     @property
@@ -96,6 +97,7 @@ class Recorder:
         self.session_dir = self.output_root / self.session_id
         self._closed = False
         self._event_count = 0
+        self._next_index = 0
         (self.session_dir / "events").mkdir(parents=True, exist_ok=False)
         self._metadata = {
             "format": "acrylic-pan-session-v1",
@@ -122,7 +124,7 @@ class Recorder:
         if class_id is not None and not 0 <= class_id < 8:
             raise RecordingError("class_id must be between 0 and 7")
 
-        index = self._event_count + 1
+        index = self._next_index + 1
         received_at = datetime.now(timezone.utc).isoformat()
         relative = Path("events") / f"event_{index:06d}_seq_{event.sequence:010d}.npz"
         destination = self.session_dir / relative
@@ -144,12 +146,31 @@ class Recorder:
             self._atomic_npz(destination, event, class_id, received_at)
             self._append_jsonl(record)
             self._append_csv(record)
-            self._event_count = index
+            self._next_index = index
+            self._event_count += 1
             self._metadata["event_count"] = self._event_count
             self._write_session_metadata()
         except Exception as error:
             raise RecordingError(f"could not save event {event.sequence}: {error}") from error
         return RecordedEvent(index, event.sequence, destination, class_id, received_at)
+
+    def refresh_event_count(self) -> int:
+        """Re-count manifest rows after something else deleted events.
+
+        ``record_event`` rewrites ``session.json`` from this in-memory count, so
+        a deletion made through ``library.Library`` would otherwise be undone by
+        the next saved event. Index numbering is deliberately not rewound:
+        indices stay unique for the life of the session.
+        """
+        if self.session_dir is None:
+            return 0
+        manifest = self.session_dir / "manifest.jsonl"
+        if not manifest.is_file():
+            return self._event_count
+        rows = manifest.read_text(encoding="utf-8").splitlines()
+        self._event_count = sum(1 for line in rows if line.strip())
+        self._metadata["event_count"] = self._event_count
+        return self._event_count
 
     def close(self) -> None:
         if not self.active:

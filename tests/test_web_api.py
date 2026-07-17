@@ -10,6 +10,7 @@ from unittest.mock import PropertyMock, patch
 from urllib.request import Request, urlopen
 
 from pc.acrylic_pan_web.server import (
+    CLAMP_FOOTPRINT_MM,
     AcquisitionController,
     build_collection_targets,
     create_server,
@@ -75,6 +76,241 @@ class WebApiTests(unittest.TestCase):
         self.assertIn(".collection-marker", collector_css)
         self.assertNotIn("AI推論を開始", collector_page)
         self.assertIn("FFT", page)
+
+    def connected_link(self):
+        """Patch the link as connected so start/re-arm behave as on real hardware."""
+        self.controller.link.send = lambda packet: None
+        return patch.object(
+            type(self.controller.link), "connected", new_callable=PropertyMock, return_value=True
+        )
+
+    def arm_collection(self, repetitions=2, pattern="corners"):
+        self.controller.start_collection(repetitions, self.temporary.name, pattern)
+        return self.controller.collection
+
+    def test_collection_targets_preview_matches_the_pattern(self):
+        _, corners = self.get_json("/api/collection/targets?pattern=corners")
+        self.assertEqual(len(corners["targets"]), 32)
+        self.assertEqual(corners["points_per_class"], 4)
+        self.assertEqual(corners["panel"], {
+            "width_mm": 400.0,
+            "height_mm": 200.0,
+            "clamp": {"x_min": 200.0, "x_max": 300.0, "y_min": 0.0, "y_max": 20.0},
+        })
+        self.assertEqual(corners["targets"][0]["target_index"], 0)
+        self.assertEqual(corners["targets"][0]["count"], 0)
+        self.assertFalse(corners["targets"][0]["complete"])
+        self.assertEqual((corners["targets"][0]["x_mm"], corners["targets"][0]["y_mm"]), (25.0, 25.0))
+
+        _, center = self.get_json("/api/collection/targets?pattern=center")
+        self.assertEqual(len(center["targets"]), 8)
+        self.assertEqual(center["targets"][0]["x_mm"], 50.0)
+        self.assertEqual(center["targets"][0]["y_mm"], 50.0)
+
+    def test_collection_targets_rejects_unknown_pattern(self):
+        with self.assertRaises(Exception) as caught:
+            urlopen(self.base + "/api/collection/targets?pattern=bogus", timeout=2)
+        self.assertEqual(caught.exception.code, 400)
+
+    def expect_bad_request(self, path, body):
+        request = Request(
+            self.base + path,
+            data=json.dumps(body).encode(),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with self.assertRaises(Exception) as caught:
+            urlopen(request, timeout=2)
+        self.assertEqual(caught.exception.code, 400)
+
+    def test_select_target_activates_any_incomplete_point(self):
+        with self.connected_link():
+            self.arm_collection(repetitions=2, pattern="corners")
+            _, before = self.get_json("/api/collection")
+            self.assertEqual(before["current_target_index"], 0)
+
+            status_code, after = self.post_json("/api/collection/select", {"target_index": 17})
+        self.assertEqual(status_code, 200)
+        self.assertEqual(after["selected_index"], 17)
+        self.assertEqual(after["current_target_index"], 17)
+        self.assertEqual(after["current_class_id"], 4, "target 17 is area 5's up_right point")
+        self.assertEqual(after["current_point_name"], "up_right")
+        self.assertEqual((after["current_x_mm"], after["current_y_mm"]), (75.0, 125.0))
+        self.assertEqual(after["current_repetition"], 1)
+
+    def test_selected_target_receives_the_next_event_and_its_label(self):
+        with self.connected_link():
+            collection = self.arm_collection(repetitions=2, pattern="corners")
+            self.post_json("/api/collection/select", {"target_index": 17})
+            self.controller._process_event(make_demo_event(1), "serial", True)
+            _, status = self.get_json("/api/collection")
+
+        self.assertEqual(collection.target_counts[17], 1)
+        self.assertEqual(collection.target_counts[0], 0, "the default first point must be untouched")
+        self.assertEqual(collection.per_class_counts[4], 1)
+        self.assertEqual(status["current_target_index"], 17, "stays until the repetitions are done")
+        self.assertEqual(status["current_repetition"], 2)
+
+    def test_selected_point_label_reaches_the_saved_manifest(self):
+        with self.connected_link():
+            self.arm_collection(repetitions=1, pattern="corners")
+            self.post_json("/api/collection/select", {"target_index": 17})
+            self.controller._process_event(make_demo_event(1), "serial", True)
+        assert self.controller.recorder is not None
+        session = self.controller.recorder.session_dir
+        assert session is not None
+        row = json.loads((session / "manifest.jsonl").read_text(encoding="utf-8").splitlines()[0])
+        self.assertEqual(row["class_id"], 4, "the manifest must record the point actually struck")
+        self.assertEqual(row["annotations"]["target_class_id"], 4)
+        self.assertEqual(row["annotations"]["target_point_id"], 1)
+        self.assertEqual(row["annotations"]["target_point_name"], "up_right")
+        self.assertEqual(row["annotations"]["target_x_mm"], 75.0)
+        self.assertEqual(row["annotations"]["target_y_mm"], 125.0)
+
+    def test_selection_releases_once_the_point_is_complete(self):
+        with self.connected_link():
+            collection = self.arm_collection(repetitions=2, pattern="corners")
+            self.post_json("/api/collection/select", {"target_index": 17})
+            for sequence in (1, 2):
+                self.controller._process_event(make_demo_event(sequence), "serial", True)
+            _, status = self.get_json("/api/collection")
+
+        self.assertTrue(collection.is_complete(17))
+        self.assertIsNone(collection.selected_index, "a finished point must not stay selected")
+        self.assertEqual(status["current_target_index"], 0, "the guide falls back to the first gap")
+
+    def test_out_of_order_points_still_complete_the_run(self):
+        """Every point must be reachable however the operator jumps around."""
+        with self.connected_link():
+            collection = self.arm_collection(repetitions=1, pattern="center")
+            for target_index in (7, 3, 0, 5, 1, 6, 2, 4):
+                self.post_json("/api/collection/select", {"target_index": target_index})
+                self.controller._process_event(make_demo_event(target_index + 1), "serial", True)
+
+        self.assertEqual(collection.target_counts, [1] * 8)
+        self.assertEqual(collection.completed_samples, 8)
+        self.assertFalse(collection.active)
+        self.assertTrue(collection.finished)
+
+    def test_select_rejects_completed_and_out_of_range_points(self):
+        with self.connected_link():
+            collection = self.arm_collection(repetitions=1, pattern="center")
+            self.post_json("/api/collection/select", {"target_index": 2})
+            self.controller._process_event(make_demo_event(1), "serial", True)
+            self.assertTrue(collection.is_complete(2))
+
+            for target_index in (2, 8, -1):
+                self.expect_bad_request("/api/collection/select", {"target_index": target_index})
+
+    def test_select_requires_an_active_collection(self):
+        self.expect_bad_request("/api/collection/select", {"target_index": 1})
+
+    def library_session(self, count=3):
+        """Record `count` demo events through the controller's own Recorder."""
+        self.controller.new_session(self.temporary.name, class_id=2)
+        for _ in range(count):
+            self.controller.demo()
+        assert self.controller.recorder is not None
+        assert self.controller.recorder.session_dir is not None
+        return self.controller.recorder.session_dir.name
+
+    def test_library_lists_sessions_and_events(self):
+        session_id = self.library_session(count=3)
+        _, sessions = self.get_json("/api/library/sessions")
+        self.assertEqual([item["session_id"] for item in sessions["sessions"]], [session_id])
+        self.assertEqual(sessions["sessions"][0]["event_count"], 3)
+
+        _, events = self.get_json(f"/api/library/events?session={session_id}")
+        self.assertEqual([event["index"] for event in events["events"]], [1, 2, 3])
+        self.assertEqual(events["events"][0]["class_id"], 2)
+
+    def test_library_event_returns_plottable_waveform_and_fft(self):
+        session_id = self.library_session(count=1)
+        _, event = self.get_json(f"/api/library/event?session={session_id}&index=1")
+        self.assertEqual(event["source"], "library")
+        self.assertEqual(len(event["samples"]), 512)
+        self.assertEqual(len(event["time_ms"]), 512)
+        self.assertEqual(len(event["frequency_hz"]), 257)
+        self.assertEqual(len(event["magnitude_db"]), 257)
+        self.assertEqual(event["stored"]["session_id"], session_id)
+        self.assertEqual(event["stored"]["index"], 1)
+
+    def test_library_browsing_does_not_disturb_the_latest_live_event(self):
+        session_id = self.library_session(count=2)
+        _, before = self.get_json("/api/events/latest")
+        self.get_json(f"/api/library/event?session={session_id}&index=1")
+        _, after = self.get_json("/api/events/latest")
+        self.assertEqual(after["sequence"], before["sequence"])
+        self.assertEqual(after["source"], before["source"])
+
+    def test_library_delete_removes_the_event(self):
+        session_id = self.library_session(count=3)
+        status_code, result = self.post_json("/api/library/delete", {"session": session_id, "index": 2})
+        self.assertEqual(status_code, 200)
+        self.assertEqual(result["event_count"], 2)
+
+        _, events = self.get_json(f"/api/library/events?session={session_id}")
+        self.assertEqual([event["index"] for event in events["events"]], [1, 3])
+        _, sessions = self.get_json("/api/library/sessions")
+        self.assertEqual(sessions["sessions"][0]["event_count"], 2)
+        self.assertTrue(sessions["sessions"][0]["consistent"])
+
+    def test_library_delete_keeps_active_recorder_metadata_consistent(self):
+        session_id = self.library_session(count=3)
+        self.post_json("/api/library/delete", {"session": session_id, "index": 2})
+        self.controller.demo()  # the live Recorder keeps writing into the same session
+
+        _, sessions = self.get_json("/api/library/sessions")
+        summary = sessions["sessions"][0]
+        self.assertEqual(summary["event_count"], 3)
+        self.assertTrue(summary["consistent"], "session.json must still match the manifest")
+        _, events = self.get_json(f"/api/library/events?session={session_id}")
+        self.assertEqual([event["index"] for event in events["events"]], [1, 3, 4])
+
+    def test_library_delete_is_refused_during_guided_collection(self):
+        session_id = self.library_session(count=2)
+        self.controller.collection.active = True
+        request = Request(
+            self.base + "/api/library/delete",
+            data=json.dumps({"session": session_id, "index": 1}).encode(),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with self.assertRaises(Exception) as caught:
+            urlopen(request, timeout=2)
+        self.assertEqual(caught.exception.code, 400)
+        _, events = self.get_json(f"/api/library/events?session={session_id}")
+        self.assertEqual(len(events["events"]), 2)
+
+    def test_library_rejects_traversal_and_unknown_ids(self):
+        for session_id in ("..", "../..", "not-a-session"):
+            request = self.base + f"/api/library/events?session={session_id}"
+            with self.assertRaises(Exception) as caught:
+                urlopen(request, timeout=2)
+            self.assertIn(caught.exception.code, (400, 404))
+
+    def test_library_delete_session_removes_everything(self):
+        session_id = self.library_session(count=2)
+        self.controller.new_session(self.temporary.name)  # stop writing into it
+        status_code, result = self.post_json("/api/library/delete_session", {"session": session_id})
+        self.assertEqual(status_code, 200)
+        self.assertEqual(result["removed_events"], 2)
+        _, sessions = self.get_json("/api/library/sessions")
+        self.assertNotIn(session_id, [item["session_id"] for item in sessions["sessions"]])
+
+    def test_library_refuses_to_delete_the_session_being_recorded(self):
+        session_id = self.library_session(count=1)
+        request = Request(
+            self.base + "/api/library/delete_session",
+            data=json.dumps({"session": session_id}).encode(),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with self.assertRaises(Exception) as caught:
+            urlopen(request, timeout=2)
+        self.assertEqual(caught.exception.code, 400)
+        _, sessions = self.get_json("/api/library/sessions")
+        self.assertIn(session_id, [item["session_id"] for item in sessions["sessions"]])
 
     def test_session_demo_latest_and_recording(self):
         _, session = self.post_json("/api/session", {"output_root": self.temporary.name, "class_id": 5})
@@ -188,39 +424,113 @@ class WebApiTests(unittest.TestCase):
         self.assertEqual((first["offset_x_mm"], first["offset_y_mm"]), (0.0, 0.0))
         self.assertEqual(first["repetition"], 1)
 
-    def test_collection_position_patterns_have_exact_panel_coordinates(self):
-        five = build_collection_targets("five")
-        self.assertEqual(len(five), 40)
+    def test_corner_pattern_reproduces_the_specified_50mm_grid(self):
+        """docs/design.md section 3: 32 grid points, X=25..375, Y=25..175."""
+        corners = build_collection_targets("corners")
+        self.assertEqual(len(corners), 32)
+        grid = sorted({(target.x_mm, target.y_mm) for target in corners})
+        self.assertEqual(len(grid), 32, "every grid point must be distinct")
+        expected = sorted(
+            {(x, y) for x in range(25, 400, 50) for y in range(25, 200, 50)}
+            - {(225, 25), (275, 25)}
+            | {(225.0, 35.0), (275.0, 35.0)}
+        )
+        self.assertEqual(grid, [(float(x), float(y)) for x, y in expected])
+
+    def test_clamp_points_move_clear_of_the_fixture(self):
+        """The two points under the x=200..300, y=0..20 clamp move to y=35."""
+        by_position = {
+            (target.class_id, target.point_name): target
+            for target in build_collection_targets("corners")
+        }
+        moved_left, moved_right = by_position[(2, "up_left")], by_position[(2, "up_right")]
+        self.assertEqual((moved_left.x_mm, moved_left.y_mm), (225.0, 35.0))
+        self.assertEqual((moved_right.x_mm, moved_right.y_mm), (275.0, 35.0))
+        self.assertEqual((moved_left.offset_x_mm, moved_left.offset_y_mm), (-25.0, -15.0))
+
+        # The area centre must still be recoverable from position minus offset,
+        # because validate_guided_collection derives it that way.
+        self.assertEqual(moved_left.x_mm - moved_left.offset_x_mm, 250.0)
+        self.assertEqual(moved_left.y_mm - moved_left.offset_y_mm, 50.0)
+
+        # Only those two move; the same point IDs elsewhere stay on the grid.
+        untouched = by_position[(1, "up_left")]
+        self.assertEqual((untouched.x_mm, untouched.y_mm), (125.0, 25.0))
+        self.assertEqual((untouched.offset_x_mm, untouched.offset_y_mm), (-25.0, -25.0))
+        self.assertEqual((by_position[(2, "down_left")].x_mm, by_position[(2, "down_left")].y_mm),
+                         (225.0, 75.0))
+
+    def test_no_collection_point_sits_under_the_clamp(self):
+        clamp = CLAMP_FOOTPRINT_MM
+        for pattern in ("center", "corners"):
+            for target in build_collection_targets(pattern):
+                inside = (clamp["x_min"] <= target.x_mm <= clamp["x_max"]
+                          and clamp["y_min"] <= target.y_mm <= clamp["y_max"])
+                self.assertFalse(inside, f"{pattern} {target.x_mm},{target.y_mm} is on the clamp")
+
+    def test_panel_payload_carries_the_clamp_geometry_for_the_diagram(self):
+        """The GUI draws the clamp from this, so it must not drift from the constant."""
+        for path in ("/api/collection/targets?pattern=corners", "/api/collection"):
+            _, payload = self.get_json(path)
+            self.assertEqual(payload["panel"]["clamp"], CLAMP_FOOTPRINT_MM)
+            self.assertEqual(payload["panel"]["width_mm"], 400.0)
+            self.assertEqual(payload["panel"]["height_mm"], 200.0)
+
+    def test_center_pattern_matches_the_specified_teaching_centres(self):
+        centers = build_collection_targets("center")
+        self.assertEqual(len(centers), 8)
         self.assertEqual(
-            [(target.point_name, target.x_mm, target.y_mm) for target in five[:5]],
+            [(target.x_mm, target.y_mm) for target in centers],
+            [(x, y) for y in (50.0, 150.0) for x in (50.0, 150.0, 250.0, 350.0)],
+        )
+
+    def test_collection_position_patterns_have_exact_panel_coordinates(self):
+        corners = build_collection_targets("corners")
+        self.assertEqual(len(corners), 32)
+        self.assertEqual(
+            [(target.point_name, target.x_mm, target.y_mm) for target in corners[:4]],
             [
-                ("center", 50.0, 50.0),
-                ("left", 25.0, 50.0),
-                ("right", 75.0, 50.0),
-                ("up", 50.0, 25.0),
-                ("down", 50.0, 75.0),
+                ("up_left", 25.0, 25.0),
+                ("up_right", 75.0, 25.0),
+                ("down_left", 25.0, 75.0),
+                ("down_right", 75.0, 75.0),
             ],
         )
-        nine = build_collection_targets("nine")
-        self.assertEqual(len(nine), 72)
-        self.assertEqual(nine[-1].point_name, "down_right")
-        self.assertEqual((nine[-1].x_mm, nine[-1].y_mm), (375.0, 175.0))
-        with self.assertRaisesRegex(ValueError, "center, five, or nine"):
+        self.assertEqual(corners[-1].point_name, "down_right")
+        self.assertEqual((corners[-1].x_mm, corners[-1].y_mm), (375.0, 175.0))
+        with self.assertRaisesRegex(ValueError, "center or corners"):
             build_collection_targets("invalid")
+        for retired in ("five", "nine"):
+            with self.assertRaises(ValueError):
+                build_collection_targets(retired)
 
-    def test_five_point_collection_is_training_loader_compatible(self):
+    def test_corner_collection_is_training_loader_compatible(self):
+        """A full B-series run, clamp exception included, must validate."""
         self.controller.link.send = lambda packet: None
         with patch.object(type(self.controller.link), "connected", new_callable=PropertyMock, return_value=True):
-            self.controller.start_collection(1, self.temporary.name, "five")
-            for sequence in range(1, 41):
+            self.controller.start_collection(1, self.temporary.name, "corners")
+            for sequence in range(1, 33):
                 self.controller._process_event(make_demo_event(sequence), "serial", True)
         assert self.controller.recorder is not None
         assert self.controller.recorder.session_dir is not None
         summaries = validate_guided_collection(
-            self.controller.recorder.session_dir, point_count=5, repetitions=1
+            self.controller.recorder.session_dir, point_count=4, repetitions=1
         )
         self.assertEqual(len(summaries), 1)
-        self.assertEqual(summaries[0].event_count, 40)
+        self.assertEqual(summaries[0].event_count, 32)
+
+    def test_center_collection_is_training_loader_compatible(self):
+        self.controller.link.send = lambda packet: None
+        with patch.object(type(self.controller.link), "connected", new_callable=PropertyMock, return_value=True):
+            self.controller.start_collection(2, self.temporary.name, "center")
+            for sequence in range(1, 17):
+                self.controller._process_event(make_demo_event(sequence), "serial", True)
+        assert self.controller.recorder is not None
+        assert self.controller.recorder.session_dir is not None
+        summaries = validate_guided_collection(
+            self.controller.recorder.session_dir, point_count=1, repetitions=2
+        )
+        self.assertEqual(summaries[0].event_count, 16)
 
     def test_collection_api_and_stop(self):
         packets = []
@@ -229,17 +539,17 @@ class WebApiTests(unittest.TestCase):
             status_code, started = self.post_json("/api/collection/start", {
                 "repetitions": 3,
                 "output_root": self.temporary.name,
-                "position_pattern": "five",
+                "position_pattern": "corners",
             })
             self.assertEqual(status_code, 200)
             self.assertEqual(started["current_class_id"], 0)
-            self.assertEqual(started["current_point_name"], "center")
-            self.assertEqual(started["position_pattern"], "five")
-            self.assertEqual(started["total_samples"], 120)
-            self.assertEqual(len(started["per_position_counts"]), 40)
+            self.assertEqual(started["current_point_name"], "up_left")
+            self.assertEqual(started["position_pattern"], "corners")
+            self.assertEqual(started["total_samples"], 96)
+            self.assertEqual(len(started["per_position_counts"]), 32)
             self.controller._process_event(make_demo_event(101), "serial", True)
             progressed = self.controller.collection_status()
-            self.assertEqual(progressed["current_point_name"], "center")
+            self.assertEqual(progressed["current_point_name"], "up_left")
             self.assertEqual(progressed["current_repetition"], 2)
             self.assertEqual(progressed["per_position_counts"][0]["count"], 1)
             _, stopped = self.post_json("/api/collection/stop", {})

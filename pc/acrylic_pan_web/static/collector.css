@@ -8,6 +8,76 @@
 
 .collection-grid .collection-cell { border-radius: 0; }
 
+/* The clamp of docs/design.md section 2. Drawn from server-supplied geometry;
+   it marks a region that must not be struck, so it never takes pointer events. */
+.collection-clamp {
+  position: absolute;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #6b7280;
+  border-top: 0;
+  border-radius: 0 0 6px 6px;
+  background: repeating-linear-gradient(
+    -45deg, #cbd5e1, #cbd5e1 5px, #94a3b8 5px, #94a3b8 10px
+  );
+  pointer-events: none;
+}
+
+.collection-clamp span {
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: #334155;
+  color: #fff;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.collection-points {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.collection-point {
+  position: absolute;
+  z-index: 3;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 2px solid #7c8b97;
+  border-radius: 50%;
+  background: #fff;
+  color: #48586a;
+  font-size: 11px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  transform: translate(-50%, -50%);
+  pointer-events: auto;
+  cursor: pointer;
+  transition: .12s;
+}
+
+.collection-point:hover { border-color: #126ac2; color: #0f4f92; transform: translate(-50%, -50%) scale(1.25); }
+.collection-point.complete { border-color: #2d9854; background: #dff3e6; color: #176b39; }
+.collection-point.active {
+  z-index: 5;
+  width: 22px;
+  height: 22px;
+  border-color: #b51f15;
+  background: #ffd56b;
+  color: #7c2018;
+  font-weight: 700;
+}
+/* The crosshair marker sits on top of the active dot, so clicks must reach it. */
+.collection-point.active:hover { transform: translate(-50%, -50%); border-color: #b51f15; }
+.collection-point:disabled { cursor: default; }
+.collection-points.preview .collection-point { cursor: default; }
+
+.collection-hint { margin: .6rem 0 0; color: #526474; font-size: 13px; }
+
 .collection-marker {
   position: absolute;
   z-index: 4;
@@ -55,3 +125,44 @@
 .position-count.active { background: #fff0b8; color: #7c4a00; outline: 2px solid #f59e0b; font-weight: 700; }
 .position-count.complete { background: #dcfce7; color: #166534; }
 .position-count.active.complete { background: #fde68a; color: #713f12; }
+
+.danger { color: #9a251d; border-color: #e2a9a4; background: #fff5f4; }
+.danger:disabled { color: #94a3b8; border-color: #dbe3ee; background: #f6f8fa; }
+
+.library-toolbar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.library-toolbar > div { margin-right: auto; }
+.library-toolbar h2 { font-size: 18px; margin: 0; }
+.library-toolbar p { margin: 4px 0 0; color: #526474; }
+.library-toolbar select { max-width: 360px; }
+.library-summary { margin: 12px 0; padding: 10px; border-radius: 7px; background: #edf2f6; }
+.library-summary.warn { background: #fdf1d8; color: #7c4a00; }
+.library-list-wrap { max-height: 260px; overflow-y: auto; border: 1px solid #dbe3ee; border-radius: 10px; background: #fff; }
+.library-list { display: flex; flex-direction: column; }
+.library-empty { padding: .8rem; color: #526474; }
+.library-row {
+  display: grid;
+  grid-template-columns: minmax(52px, .5fr) minmax(78px, .7fr) minmax(96px, 1fr) minmax(74px, .7fr) minmax(150px, 1.4fr);
+  gap: .4rem;
+  align-items: center;
+  padding: .45rem .55rem;
+  border-top: 1px solid #e8edf4;
+  text-align: left;
+  background: #fff;
+  border-left: 0; border-right: 0; border-bottom: 0;
+  border-radius: 0;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+.library-row:first-child { border-top: 0; }
+.library-row:hover { background: #f1f5f9; }
+.library-row.selected { background: #dbeafe; outline: 2px solid #2563eb; outline-offset: -2px; font-weight: 700; }
+.library-row.missing { color: #9a251d; background: #fff5f4; }
+.library-header { background: #f1f5f9; color: #334155; position: sticky; top: 0; cursor: default; font-weight: 700; z-index: 1; }
+.library-header:hover { background: #f1f5f9; }
+.library-actions { display: flex; gap: 12px; align-items: center; margin-top: .7rem; }
+.library-actions span { color: #526474; margin-right: auto; }
+
+@media (max-width: 800px) {
+  .library-row { grid-template-columns: minmax(44px, .5fr) minmax(64px, .7fr) minmax(72px, 1fr); }
+  .library-row > :nth-child(n+4) { display: none; }
+}

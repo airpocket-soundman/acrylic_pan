@@ -33,14 +33,18 @@ from sim.dummy_model_pipeline import (
 
 
 class SolistPipelineTests(unittest.TestCase):
-    def test_guided_collection_validates_five_and_nine_points(self):
-        point_names = ("center", "left", "right", "up", "down",
-                       "up_left", "up_right", "down_left", "down_right")
-        offsets = ((0, 0), (-10, 0), (10, 0), (0, -10), (0, 10),
-                   (-10, -10), (10, -10), (-10, 10), (10, 10))
+    def test_guided_collection_validates_centre_and_corner_runs(self):
+        """The two series of docs/design.md: 1 area centre and 4 grid corners."""
+        series = {
+            1: (("center",), ((0, 0),)),
+            4: (
+                ("up_left", "up_right", "down_left", "down_right"),
+                ((-25, -25), (25, -25), (-25, 25), (25, 25)),
+            ),
+        }
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            for point_count in (5, 9):
+            for point_count, (point_names, offsets) in series.items():
                 recorder = Recorder(root)
                 recorder.begin_session({"mode": "guided_8area_points", "point_count": point_count})
                 sequence = 1
@@ -63,8 +67,8 @@ class SolistPipelineTests(unittest.TestCase):
                             sequence += 1
                 recorder.close()
             summaries = validate_guided_collection(root, repetitions=2)
-            self.assertEqual(sorted(summary.point_count for summary in summaries), [5, 9])
-            self.assertEqual(sorted(summary.event_count for summary in summaries), [80, 144])
+            self.assertEqual(sorted(summary.point_count for summary in summaries), [1, 4])
+            self.assertEqual(sorted(summary.event_count for summary in summaries), [16, 64])
 
     def test_eight_class_recorder_sessions_split_without_leakage(self):
         with tempfile.TemporaryDirectory() as temporary:

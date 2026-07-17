@@ -193,9 +193,13 @@ def validate_guided_collection(
     point_count: int | None = None,
     repetitions: int | None = None,
 ) -> tuple[GuidedRunSummary, ...]:
-    """Validate complete 8-class x 5/9-point guided acquisition runs."""
-    if point_count is not None and point_count not in (5, 9):
-        raise ValueError("point_count must be 5 or 9")
+    """Validate complete guided acquisition runs.
+
+    ``point_count`` is 1 for the area-centre series or 4 for the 50 mm grid
+    series of docs/design.md section 3.
+    """
+    if point_count is not None and point_count not in (1, 4):
+        raise ValueError("point_count must be 1 or 4")
     source = Path(source)
     session_dirs = [source] if (source / "session.json").is_file() else sorted(
         path.parent for path in source.rglob("session.json")
@@ -213,7 +217,10 @@ def validate_guided_collection(
         rows = [json.loads(line) for line in
                 (session_dir / "manifest.jsonl").read_text(encoding="utf-8").splitlines() if line]
         entries: dict[tuple[int, int, int], tuple[str, float, float, float, float]] = {}
-        point_definitions: dict[int, tuple[str, float, float]] = {}
+        # Keyed per area: docs/design.md moves the two grid points under the
+        # clamp, so one point ID legitimately has different offsets per area.
+        point_definitions: dict[tuple[int, int], tuple[str, float, float]] = {}
+        point_names: dict[int, str] = {}
         class_centers: dict[int, tuple[float, float]] = {}
         for row in rows:
             annotations = row.get("annotations")
@@ -244,17 +251,17 @@ def validate_guided_collection(
                 raise ValueError(f"{session_dir}: duplicate class/point/repetition")
             entries[key] = (name, x, y, dx, dy)
             definition = (name, dx, dy)
-            if target_point in point_definitions and point_definitions[target_point] != definition:
+            if point_definitions.setdefault((target_class, target_point), definition) != definition:
                 raise ValueError(f"{session_dir}: point definition changes within run")
-            point_definitions[target_point] = definition
+            if point_names.setdefault(target_point, name) != name:
+                raise ValueError(f"{session_dir}: point name changes within run")
             center = (x - dx, y - dy)
             old_center = class_centers.setdefault(target_class, center)
             if not np.allclose(center, old_center, rtol=0, atol=1e-6):
                 raise ValueError(f"{session_dir}: inconsistent area center coordinates")
 
-        inferred_points = len(point_definitions)
-        expected_points = point_count or inferred_points
-        if expected_points not in (5, 9) or set(point_definitions) != set(range(expected_points)):
+        expected_points = point_count or len(point_names)
+        if expected_points not in (1, 4) or set(point_names) != set(range(expected_points)):
             raise ValueError(f"{session_dir}: point IDs must completely cover 0..{expected_points - 1}")
         expected_repetitions = repetitions or max((key[2] for key in entries), default=0)
         if expected_repetitions < 1:
