@@ -5,16 +5,18 @@ from pathlib import Path
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-from generate_model import build_mesh,write_set,HITS,SENSOR
+from generate_model import build_mesh,write_set,HITS,DEFAULT_THICKNESS_MM,thickness_z_grid
 
-X=list(range(0,401,10)); Y=list(range(0,201,10)); Z=[-1,0,1]
+X=list(range(0,401,10)); Y=list(range(0,201,10))
 MODES=280; FMAX=6000.; FS=25600.; DT=1/FS; DURATION=.05
 
 def main():
-    p=argparse.ArgumentParser(); p.add_argument("--output",type=Path,required=True); a=p.parse_args(); a.output.mkdir(parents=True,exist_ok=True)
-    nodes,coords,elements=build_mesh(X,Y,Z)
+    p=argparse.ArgumentParser(); p.add_argument("--output",type=Path,required=True); p.add_argument("--thickness-mm",type=float,default=DEFAULT_THICKNESS_MM); a=p.parse_args(); a.output.mkdir(parents=True,exist_ok=True)
+    if a.thickness_mm <= 0: p.error("--thickness-mm must be positive")
+    z_grid=thickness_z_grid(a.thickness_mm); sensor_xyz=(200,100,z_grid[-1])
+    nodes,coords,elements=build_mesh(X,Y,z_grid)
     fixed=[n for n,(x,y,z) in coords.items() if 200<=x<=300 and 0<=y<=20]
-    sensor=nodes[SENSOR]; hit_nodes={note:nodes[(x,y,1)] for note,x,y in HITS}; observation=[sensor,*hit_nodes.values()]
+    sensor=nodes[sensor_xyz]; hit_nodes={note:nodes[(x,y,z_grid[-1])] for note,x,y in HITS}; observation=[sensor,*hit_nodes.values()]
     inp=a.output/"acrylic_pan_hf.inp"
     with inp.open("w",encoding="ascii",newline="\n") as f:
         f.write("*HEADING\nAcrylic Pan high-frequency C3D20R model\n*NODE\n")
@@ -33,7 +35,7 @@ def main():
             f"*STEP,INC=5000\n*MODAL DYNAMIC,DIRECT\n{DT:.10f},{DURATION:.8f}\n*MODAL DAMPING,MODAL=DIRECT\n1,{MODES},0.012\n"
             f"*CLOAD,AMPLITUDE=IMPULSE\nHIT_{note},3,1.0\n*NODE PRINT,NSET=SENSOR,GLOBAL=YES,FREQUENCY=1\nU\n*END STEP\n")
         (a.output/f"hf_{note.lower()}.inp").write_text(dynamic,encoding="ascii",newline="\n")
-    meta={"solver":"CalculiX 2.20","profile":"high-frequency-50ms","element":"C3D20R","mesh":{"elements":len(elements),"nodes":len(coords),"xy_mm":10,"z_mm":1},"frequency":{"requested_modes":MODES,"max_hz":FMAX},"sampling":{"hz":FS,"period_us":DT*1e6,"duration_ms":DURATION*1000,"samples":round(FS*DURATION)},"sensor":{"node":sensor,"xyz_mm":SENSOR},"hits":[{"note":n,"node":hit_nodes[n],"xyz_mm":[x,y,1]} for n,x,y in HITS]}
+    meta={"solver":"CalculiX 2.20","profile":"high-frequency-50ms","element":"C3D20R","thickness_mm":a.thickness_mm,"mesh":{"elements":len(elements),"nodes":len(coords),"xy_mm":10,"z_grid_mm":z_grid,"through_thickness_elements":2},"frequency":{"requested_modes":MODES,"max_hz":FMAX},"sampling":{"hz":FS,"period_us":DT*1e6,"duration_ms":DURATION*1000,"samples":round(FS*DURATION)},"sensor":{"node":sensor,"xyz_mm":sensor_xyz},"hits":[{"note":n,"node":hit_nodes[n],"xyz_mm":[x,y,z_grid[-1]]} for n,x,y in HITS]}
     (a.output/"highfreq-metadata.json").write_text(json.dumps(meta,ensure_ascii=False,indent=2),encoding="utf-8")
     fig,ax=plt.subplots(figsize=(10,5),constrained_layout=True)
     for x in X: ax.plot([x,x],[0,200],color="#90a4ae",lw=.25)

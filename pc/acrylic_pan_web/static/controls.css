@@ -1,0 +1,35 @@
+/* Shared action-state language across every operating tab.
+   White = available, gray = unavailable, blue = currently active. */
+button {
+  color: #17202a;
+  cursor: pointer;
+  transition: background .12s, border-color .12s, color .12s, box-shadow .12s;
+}
+
+.primary {
+  background: #fff;
+  color: #17202a;
+  border-color: #aebac5;
+}
+
+button:not(:disabled):not(.is-running):hover {
+  background: #f1f5f9;
+  border-color: #7f91a2;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  background: #e5e7eb;
+  color: #94a3b8;
+  border-color: #cbd5e1;
+  box-shadow: none;
+  opacity: 1;
+}
+
+button.is-running,
+button.is-running:disabled {
+  background: #126ac2;
+  color: #fff;
+  border-color: #126ac2;
+  box-shadow: 0 0 0 3px rgba(18, 106, 194, .16);
+}

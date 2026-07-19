@@ -244,7 +244,7 @@ def make_demo_event(sequence: int = 1, seed: int = 7) -> EventData:
     """Generate a deterministic impact for GUI demos and automated tests."""
     sample_rate = 25_600
     count = 512
-    trigger = 128
+    trigger = 64
     sample_index = np.arange(count)
     seconds = sample_index / sample_rate
     envelope = np.where(sample_index >= trigger, np.exp(-(sample_index - trigger) / 95.0), 0.0)

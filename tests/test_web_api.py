@@ -15,7 +15,7 @@ from pc.acrylic_pan_web.server import (
     build_collection_targets,
     create_server,
 )
-from pc.acrylic_pan_monitor.protocol import Frame, MessageType, decode_frame
+from pc.acrylic_pan_monitor.protocol import EVENT_CHUNK_HEADER, Frame, MessageType, decode_frame
 from pc.acrylic_pan_monitor.recorder import make_demo_event
 from sim.solist_dataset import validate_guided_collection
 
@@ -60,17 +60,27 @@ class WebApiTests(unittest.TestCase):
         self.assertIsInstance(ports["ports"], list)
         with urlopen(self.base + "/", timeout=2) as response:
             page = response.read().decode("utf-8")
-        self.assertIn("Acrylic Pan AI Demo", page)
-        self.assertIn("AI推論を開始", page)
-        self.assertIn("ダミー入力波形（正規化値）", page)
-        self.assertIn("実センサ波形ではありません", page)
+        self.assertIn("Acrylic Pan 推論結果", page)
+        self.assertIn("推論開始", page)
+        self.assertIn("学習データ採取", page)
+        self.assertIn("推論結果", page)
+        self.assertIn("判定エリア", page)
+        self.assertIn("判定に使用した振動波形", page)
+        self.assertIn("振動波形のFFT", page)
+        self.assertEqual(page.count('data-class="'), 8)
         with urlopen(self.base + "/collector.html", timeout=2) as response:
             collector_page = response.read().decode("utf-8")
         self.assertIn("Acrylic Pan Vibration Monitor", collector_page)
         self.assertIn("8エリア ガイド付きデータ採取", collector_page)
         self.assertIn("採取開始", collector_page)
         self.assertIn("collectionPattern", collector_page)
+        self.assertIn('id="collectionRepetitions" type="number" min="1" max="1000" value="50"', collector_page)
         self.assertIn("collectionMarker", collector_page)
+        self.assertIn("collectionUndo", collector_page)
+        self.assertIn('href="/collector.html">学習データ採取', collector_page)
+        self.assertIn('href="/">推論結果', collector_page)
+        self.assertIn("libraryPrevious", collector_page)
+        self.assertIn("libraryNext", collector_page)
         with urlopen(self.base + "/collector.css", timeout=2) as response:
             collector_css = response.read().decode("utf-8")
         self.assertIn(".collection-marker", collector_css)
@@ -178,6 +188,52 @@ class WebApiTests(unittest.TestCase):
         self.assertTrue(collection.is_complete(17))
         self.assertIsNone(collection.selected_index, "a finished point must not stay selected")
         self.assertEqual(status["current_target_index"], 0, "the guide falls back to the first gap")
+
+    def test_undo_deletes_the_last_sample_and_restores_its_selected_target(self):
+        with self.connected_link():
+            collection = self.arm_collection(repetitions=2, pattern="corners")
+            self.post_json("/api/collection/select", {"target_index": 17})
+            self.controller._process_event(make_demo_event(1), "serial", True)
+            status_code, undone = self.post_json(
+                "/api/collection/undo", {"expected_completed_samples": 1}
+            )
+
+            self.assertEqual(status_code, 200)
+            self.assertEqual(undone["undone_event"]["target_index"], 17)
+            self.assertEqual(undone["completed_samples"], 0)
+            self.assertEqual(undone["current_target_index"], 17)
+            self.assertEqual(undone["current_repetition"], 1)
+            self.assertEqual(collection.target_counts[17], 0)
+            self.assertEqual(collection.per_class_counts[4], 0)
+
+            assert self.controller.recorder is not None
+            session_id = self.controller.recorder.session_id
+            _, events = self.get_json(f"/api/library/events?session={session_id}")
+            self.assertEqual(events["events"], [])
+
+            self.controller._process_event(make_demo_event(2), "serial", True)
+            _, events = self.get_json(f"/api/library/events?session={session_id}")
+
+        self.assertEqual([event["index"] for event in events["events"]], [2])
+        annotations = events["events"][0]["annotations"]
+        self.assertEqual(annotations["target_index"], 17)
+        self.assertEqual(annotations["collection_index"], 0)
+        self.assertEqual(annotations["repetition"], 1)
+
+    def test_undo_rejects_empty_or_stale_collection_progress(self):
+        with self.connected_link():
+            self.arm_collection(repetitions=2, pattern="center")
+            self.expect_bad_request(
+                "/api/collection/undo", {"expected_completed_samples": 0}
+            )
+            self.controller._process_event(make_demo_event(1), "serial", True)
+            self.expect_bad_request(
+                "/api/collection/undo", {"expected_completed_samples": 0}
+            )
+            _, events = self.get_json(
+                f"/api/library/events?session={self.controller.recorder.session_id}"
+            )
+        self.assertEqual(len(events["events"]), 1)
 
     def test_out_of_order_points_still_complete_the_run(self):
         """Every point must be reachable however the operator jumps around."""
@@ -298,19 +354,53 @@ class WebApiTests(unittest.TestCase):
         _, sessions = self.get_json("/api/library/sessions")
         self.assertNotIn(session_id, [item["session_id"] for item in sessions["sessions"]])
 
-    def test_library_refuses_to_delete_the_session_being_recorded(self):
+    def test_library_can_delete_the_last_session_after_collection_stops(self):
         session_id = self.library_session(count=1)
+        status_code, result = self.post_json(
+            "/api/library/delete_session", {"session": session_id}
+        )
+        self.assertEqual(status_code, 200)
+        self.assertEqual(result["removed_events"], 1)
+        self.assertIsNone(self.controller.recorder)
+        _, sessions = self.get_json("/api/library/sessions")
+        self.assertEqual(sessions["sessions"], [])
+
+        # A later event starts a genuinely new session rather than writing to
+        # the deleted directory.
+        self.controller.demo()
+        assert self.controller.recorder is not None
+        self.assertNotEqual(self.controller.recorder.session_id, session_id)
+
+    def test_collection_only_protects_its_current_session_from_deletion(self):
+        previous_session = self.library_session(count=1)
+        with self.connected_link():
+            self.arm_collection(repetitions=2, pattern="center")
+        assert self.controller.recorder is not None
+        current_session = self.controller.recorder.session_id
+
+        status_code, result = self.post_json(
+            "/api/library/delete_session", {"session": previous_session}
+        )
+        self.assertEqual(status_code, 200)
+        self.assertEqual(result["removed_events"], 1)
+        self.assertTrue(self.controller.collection.active)
+
         request = Request(
             self.base + "/api/library/delete_session",
-            data=json.dumps({"session": session_id}).encode(),
+            data=json.dumps({"session": current_session}).encode(),
             headers={"Content-Type": "application/json"},
             method="POST",
         )
         with self.assertRaises(Exception) as caught:
             urlopen(request, timeout=2)
         self.assertEqual(caught.exception.code, 400)
+        error = json.loads(caught.exception.read())
+        self.assertEqual(error["error"], "採取中のセッションのため削除できません。")
         _, sessions = self.get_json("/api/library/sessions")
-        self.assertIn(session_id, [item["session_id"] for item in sessions["sessions"]])
+        self.assertEqual(
+            [item["session_id"] for item in sessions["sessions"]],
+            [current_session],
+        )
 
     def test_session_demo_latest_and_recording(self):
         _, session = self.post_json("/api/session", {"output_root": self.temporary.name, "class_id": 5})
@@ -407,6 +497,10 @@ class WebApiTests(unittest.TestCase):
         session_dir = self.controller.recorder.session_dir
         session = json.loads((session_dir / "session.json").read_text(encoding="utf-8"))
         plan = session["user_metadata"]["collection_plan"]
+        sensor = session["user_metadata"]["sensor_configuration"]
+        self.assertEqual(sensor["range_g"], 32)
+        self.assertEqual(sensor["counts_per_g"], 1024)
+        self.assertEqual(sensor["pretrigger_samples"], 64)
         self.assertEqual(plan["repetitions"], 2)
         self.assertEqual(plan["position_pattern"], "center")
         self.assertEqual(plan["points_per_class"], 1)
@@ -423,6 +517,35 @@ class WebApiTests(unittest.TestCase):
         self.assertEqual((first["target_x_mm"], first["target_y_mm"]), (50.0, 50.0))
         self.assertEqual((first["offset_x_mm"], first["offset_y_mm"]), (0.0, 0.0))
         self.assertEqual(first["repetition"], 1)
+
+    def test_four_chunks_are_saved_as_one_long_collection_event(self):
+        packets = []
+        self.controller.link.send = packets.append
+        samples = tuple((index % 2000) - 1000 for index in range(2048))
+        with patch.object(type(self.controller.link), "connected", new_callable=PropertyMock, return_value=True):
+            self.controller.start_collection(1, self.temporary.name, "center")
+            for chunk_index in (2, 0, 3):
+                part = samples[chunk_index * 512:(chunk_index + 1) * 512]
+                payload = EVENT_CHUNK_HEADER.pack(
+                    55, chunk_index, 4, 25_600, 2048, 64, 1000, 512
+                ) + struct.pack("<512h", *part)
+                self.controller._queue.put(Frame(MessageType.EVENT_CHUNK, 200 + chunk_index, payload))
+            time.sleep(0.05)
+            self.assertEqual(self.controller.collection.completed_samples, 0)
+            part = samples[512:1024]
+            payload = EVENT_CHUNK_HEADER.pack(
+                55, 1, 4, 25_600, 2048, 64, 1000, 512
+            ) + struct.pack("<512h", *part)
+            self.controller._queue.put(Frame(MessageType.EVENT_CHUNK, 201, payload))
+            deadline = time.monotonic() + 1.0
+            while self.controller.collection.completed_samples == 0 and time.monotonic() < deadline:
+                time.sleep(0.01)
+        self.assertEqual(self.controller.collection.completed_samples, 1)
+        self.assertEqual(self.controller.stats.events_received, 1)
+        self.assertEqual(self.controller.stats.events_saved, 1)
+        self.assertEqual(len(packets), 2)  # initial START and one re-arm
+        assert self.controller.latest is not None
+        self.assertEqual(len(self.controller.latest["samples"]), 2048)
 
     def test_corner_pattern_reproduces_the_specified_50mm_grid(self):
         """docs/design.md section 3: 32 grid points, X=25..375, Y=25..175."""

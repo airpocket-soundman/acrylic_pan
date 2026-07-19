@@ -1,3 +1,4 @@
+param([double]$ThicknessMm = 3.0)
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
 $output = Join-Path $root "web\assets\simulation\calculix-highfreq"
@@ -16,7 +17,7 @@ docker run --rm `
   --mount "type=bind,src=$output,dst=/work" `
   --entrypoint bash `
   acrylic-pan-calculix:2.20 `
-  /solver/calculix/run-highfreq.sh /work
+  /solver/calculix/run-highfreq.sh /work $ThicknessMm
 if ($LASTEXITCODE -ne 0) { throw "CalculiX high-frequency analysis failed" }
 
 Write-Host "High-frequency results: $output"

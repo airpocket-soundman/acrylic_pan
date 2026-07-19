@@ -34,6 +34,22 @@ Copy-Item -Path (Join-Path $root 'integration\apan_collector_app.c') -Destinatio
 Copy-Item -LiteralPath (Join-Path $root 'integration\main_collector.c') `
     -Destination (Join-Path $destinationFull 'S_System\main.c') -Force
 
+# The vendor KX134 driver defaults to GSEL=0x00 (8 g).  Acrylic Pan impacts
+# saturate that range, so install the private project with GSEL1:GSEL0=10
+# (32 g, 1024 LSB/g).  Refuse an unexpected source instead of silently
+# producing a firmware image with an unknown range.
+$kx134File = Join-Path $destinationFull 'S_Signal\Kx134Acc.c'
+$kx134 = [IO.File]::ReadAllText($kx134File)
+$kx134Pattern = '(?m)^(#define\s+GSEL\s+)\(0x00\)\s*$'
+if ([regex]::Matches($kx134, $kx134Pattern).Count -ne 1) {
+    throw 'Expected the vendor KX134 GSEL=0x00 definition was not found.'
+}
+$kx134 = $kx134 -replace $kx134Pattern, '${1}(0x10)'
+if ($kx134 -notmatch '(?m)^#define\s+GSEL\s+\(0x10\)\s*$') {
+    throw 'KX134 GSEL could not be changed to the 32 g setting.'
+}
+[IO.File]::WriteAllText($kx134File, $kx134, [Text.UTF8Encoding]::new($false))
+
 $uartFile = Join-Path $destinationFull 'S_Uartf\Uart1.c'
 $uart = [IO.File]::ReadAllText($uartFile)
 $uart = $uart -replace '(?m)^//#define UARTF1_PARAM_DLR\s*\( 0x0019U \)', '#define UARTF1_PARAM_DLR ( 0x0019U )'
@@ -89,7 +105,7 @@ Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'S_AcrylicPan.subdir.mk') `
 
 $baseResponse = [IO.File]::ReadAllText((Join-Path $debug 'S_System\main.res'))
 $includeOption = '-I"' + $newForward + '/S_AcrylicPan" '
-foreach ($name in @('apan_capture', 'apan_protocol', 'apan_ai_selftest', 'apan_collector_app')) {
+foreach ($name in @('apan_capture', 'apan_protocol', 'apan_ai_selftest', 'apan_inference', 'apan_collector_app')) {
     $response = $baseResponse.Replace('[output_dir]"./S_System/"', '[output_dir]"./S_AcrylicPan/"')
     $response = $response.Replace('[output_filename]"main.asm"', ('[output_filename]"' + $name + '.asm"'))
     $response = $response.Replace('[file_c]"../S_System/main.c"', ('[file_c]"../S_AcrylicPan/' + $name + '.c"'))

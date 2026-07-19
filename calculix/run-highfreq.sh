@@ -1,8 +1,9 @@
 #!/bin/bash
 set -euo pipefail
 OUT=${1:-/work}
+THICKNESS_MM=${2:-3}
 mkdir -p "$OUT"
-python3 /solver/calculix/generate_highfreq_model.py --output "$OUT"
+python3 /solver/calculix/generate_highfreq_model.py --output "$OUT" --thickness-mm "$THICKNESS_MM"
 cd "$OUT"
 ccx acrylic_pan_hf 2>&1 | tee highfreq-run.log
 for note in c4 d4 e4 g4 a4 c5 d5 e5; do

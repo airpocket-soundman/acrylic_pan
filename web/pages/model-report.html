@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>モデル比較レポート</title>
+  <link rel="stylesheet" href="../css/page.css">
+</head>
+<body>
+  <div class="eyebrow">09 / Model report / 2026-07-18</div>
+  <h1>旧512点モデルから、<br>80 ms・周波数比較モデルへ。</h1>
+  <p class="lead">昨日までの実機推論モデルと、今日収録・選別した4セッションから作成したモデルを同じページで比較する。サンプリング周波数比較に加え、Solist AIのモデル制限を外したPC側NNでもXY直接回帰をセッション単位で検証した。</p>
+
+  <div class="grid">
+    <div class="card"><span class="number">98.63%</span><small>BEST 8-CLASS</small><p>6.4 kHz・FFT 128入力。新4セッションLOSO平均。</p></div>
+    <div class="card"><span class="number">5.68 mm</span><small>PC DIRECT XY</small><p>全層学習MLPの3初期値アンサンブル。Solist型は47.15 mm。</p></div>
+    <div class="card"><span class="number">1,534</span><small>CLEAN EVENTS</small><p>新4セッションの有効波形。各クラス176～200件。</p></div>
+  </div>
+
+  <h2>モデル世代の比較</h2>
+  <table class="spec">
+    <tr><th>項目</th><td><strong>旧モデル v1</strong></td><td><strong>今日の分類モデル</strong></td><td><strong>今日のXYモデル</strong></td></tr>
+    <tr><th>目的</th><td>8エリア分類</td><td>8エリア分類</td><td>x, yの2値直接回帰</td></tr>
+    <tr><th>原記録</th><td>25.6 kHz・512点・20 ms</td><td colspan="2">25.6 kHz・2,048点・80 ms</td></tr>
+    <tr><th>採用前処理</th><td>25.6 kHzの時間波形</td><td>FIR後1/4分周・6.4 kHz FFT</td><td>FIR後1/4分周・6.4 kHz 時間＋FFT</td></tr>
+    <tr><th>入力</th><td>時間波形128値</td><td>FFT帯域128値</td><td>時間64値＋FFT帯域64値</td></tr>
+    <tr><th>構造</th><td colspan="2">Input 128 / Hidden 32 / Output 8 / Hard sigmoid / MSE</td><td>Input 128 / Hidden 32 / Output 2 / Sigmoid / MSE</td></tr>
+    <tr><th>固定条件</th><td colspan="3">Solist-AI Seed 1 alpha / L2 0.1 / Bfloat16境界評価</td></tr>
+    <tr><th>評価方法</th><td>2セッション相互評価</td><td colspan="2">LOSO 4-fold（3セッション学習・未学習1セッション評価）</td></tr>
+    <tr><th>主結果</th><td>平均96.67%</td><td><strong>平均98.63%</strong></td><td><strong>平均距離47.15 mm</strong></td></tr>
+    <tr><th>状態</th><td>実機推論済み</td><td>次期実機候補</td><td>研究用・現時点では不採用</td></tr>
+  </table>
+
+  <h2>使用データセット</h2>
+  <table class="spec">
+    <tr><th>モデル</th><td>セッション</td><td>件数</td><td>クラス件数</td></tr>
+    <tr><th>旧v1</th><td><code>20260717_224111_5989080d</code><br><code>20260717_230800_09e74326</code></td><td>781</td><td>旧2セッションの選別済み中心打点</td></tr>
+    <tr><th>今日</th><td><code>20260718_074916_84b183d2</code><br><code>20260718_080557_9524983c</code><br><code>20260718_081909_9dd2d785</code><br><code>20260718_084143_ac8e6d56</code></td><td>1,534</td><td>176 / 187 / 196 / 200 / 193 / 199 / 197 / 186</td></tr>
+  </table>
+  <div class="status"><strong>データ分離</strong>同じセッションの波形を学習と評価へ混在させていない。削除したNG波形は欠番のまま除外し、番号を詰め直していない。データセットSHA-256は <code>023a63a013ecd7c1cb89342ddf709ede4d4891acf916cdddbc1c93c7c8c3b3ea</code>。</div>
+
+  <h2>サンプリング周波数・特徴方式の全比較</h2>
+  <p>12.8 kHzと6.4 kHzは、25.6 kHz原波形へKaiser FIRアンチエイリアス処理を施してから1/2・1/4分周した。単純間引きは使用していない。</p>
+  <table class="spec">
+    <tr><th>実効周波数</th><td>特徴</td><td>8クラス正解率</td><td>XY平均距離</td><td>XYエリア正解率</td></tr>
+    <tr><th>25.6 kHz</th><td>時間</td><td>98.24%</td><td>59.30 mm</td><td>61.67%</td></tr>
+    <tr><th>25.6 kHz</th><td>FFT</td><td>86.96%</td><td>71.19 mm</td><td>43.94%</td></tr>
+    <tr><th>25.6 kHz</th><td>時間＋FFT</td><td>92.96%</td><td>72.39 mm</td><td>50.33%</td></tr>
+    <tr><th>12.8 kHz</th><td>時間</td><td>97.72%</td><td>59.95 mm</td><td>61.47%</td></tr>
+    <tr><th>12.8 kHz</th><td>FFT</td><td>89.50%</td><td>71.83 mm</td><td>44.52%</td></tr>
+    <tr><th>12.8 kHz</th><td>時間＋FFT</td><td>97.46%</td><td>56.24 mm</td><td>60.56%</td></tr>
+    <tr><th>6.4 kHz</th><td>時間</td><td>97.59%</td><td>59.54 mm</td><td>62.91%</td></tr>
+    <tr><th><strong>6.4 kHz</strong></th><td><strong>FFT</strong></td><td><strong>98.63%</strong></td><td>55.69 mm</td><td>60.37%</td></tr>
+    <tr><th><strong>6.4 kHz</strong></th><td><strong>時間＋FFT</strong></td><td>98.50%</td><td><strong>47.15 mm</strong></td><td><strong>69.95%</strong></td></tr>
+  </table>
+
+  <h2>最良分類モデルのfold成績</h2>
+  <table class="spec">
+    <tr><th>未学習の評価セッション</th><td>評価件数</td><td>正解率</td><td>Balanced accuracy</td></tr>
+    <tr><th><code>074916</code></th><td>384</td><td>97.40%</td><td>97.40%</td></tr>
+    <tr><th><code>080557</code></th><td>391</td><td>98.98%</td><td>98.97%</td></tr>
+    <tr><th><code>081909</code></th><td>362</td><td>98.90%</td><td>98.81%</td></tr>
+    <tr><th><code>084143</code></th><td>397</td><td>99.24%</td><td>99.25%</td></tr>
+  </table>
+
+  <h2>XYモデルの評価</h2>
+  <div class="grid">
+    <div class="card"><span class="number">41.05 mm</span><small>MAE X</small><p>横4列の識別が主な誤差。直接回帰では中間値へ寄りやすい。</p></div>
+    <div class="card"><span class="number">16.60 mm</span><small>MAE Y</small><p>上下2段は比較的分離できている。</p></div>
+    <div class="card"><span class="number">62.84%</span><small>WITHIN 50 mm</small><p>25 mm以内は26.34%。連続位置推定としては不足。</p></div>
+  </div>
+  <div class="status warn"><strong>XY評価の限界</strong>教師座標は8エリア中心だけで、四隅や格子点を含まない。この結果は未学習座標を補間できることを示さない。直接XYを再評価するにはBパターンの四隅データを学習へ加え、別の格子・境界打点を評価専用に確保する必要がある。</div>
+
+  <h2>Solist制限を外したPC側NN</h2>
+  <p>同じ1,534波形、同じ6.4 kHz時間64＋FFT 64入力、同じLOSO 4-foldのまま、固定32隠れ層を全層学習の256－128－64隠れ層へ置き換えた。74,306パラメータを学習する直接XY MLPを3初期値で評価し、評価セッションに対する予測を平均した。</p>
+  <figure class="wide-figure"><img src="../assets/experiment/pc-xy-regression/pc-xy-regression-comparison.svg" alt="Solist型とPC側ニューラルネットワークのXY座標誤差比較"><figcaption>すべて未学習セッションによるLOSO評価。中心8座標の復号性能を比較している。</figcaption></figure>
+  <table class="spec">
+    <tr><th>モデル</th><td>学習可能パラメータ</td><td>平均距離</td><td>中央値</td><td>90%点</td><td>50 mm以内</td></tr>
+    <tr><th>Solist型・直接XY</th><td>64（出力beta）</td><td>47.15 mm</td><td>―</td><td>―</td><td>62.84%</td></tr>
+    <tr><th><strong>PC MLP・直接XY</strong></th><td>74,306（全層）</td><td><strong>5.68 mm</strong></td><td><strong>3.67 mm</strong></td><td><strong>11.94 mm</strong></td><td><strong>99.80%</strong></td></tr>
+    <tr><th>PC MLP・確率→XY</th><td>66,952（全層）</td><td>6.67 mm</td><td>2.65 mm</td><td>14.00 mm</td><td>97.91%</td></tr>
+  </table>
+  <div class="status"><strong>モデル表現力による改善を確認</strong>直接XYの平均距離は47.15 mmから5.68 mmへ87.9%低下した。単独3初期値も5.75～6.24 mmであり、改善方向は安定している。同じ信号に座標を復号できる情報が含まれ、現行Solist型の固定射影と小さな隠れ層が性能制約になっている可能性が高い。</div>
+  <div class="status warn"><strong>5.68 mmは連続位置精度ではない</strong>教師と評価の座標は同じ8中心で、異なるのは収録セッションである。中心＋四隅の学習と未学習格子点の実測評価を終えるまでは「任意位置を5.68 mmで推定」と解釈しない。</div>
+
+  <h2>判断</h2>
+  <div class="decision"><b>実機採用</b><p>6.4 kHz・FFT 128入力の8クラス分類。8出力をCPU側argmaxし、クラス中心を座標として使用する。</p><b>PC側研究モデル</b><p>全層学習のXY直接回帰。中心点復号では表現力の効果を確認したが、未知座標の補間は未検証。</p><b>次工程</b><p>中心＋四隅の実測データでPC側NNを再学習し、別セッションの未学習格子・境界点で連続座標性能を評価する。</p></div>
+
+  <h2>成果物</h2>
+  <ul class="source-list">
+    <li><code>artifacts/sampling_experiment_20260718/comparison_report.json</code> — 全条件・全foldの数値</li>
+    <li><code>artifacts/sampling_experiment_20260718/6400hz_fft/classification/model.npz</code> — 最良8クラスモデル</li>
+    <li><code>artifacts/sampling_experiment_20260718/6400hz_hybrid/xy/model.npz</code> — 最良XYモデル</li>
+    <li><code>artifacts/sampling_experiment_20260718/official_simulator_packages/</code> — 公式Simulator投入用CSV</li>
+    <li><code>docs/sampling-experiment-20260718.md</code> — 再現条件と詳細レポート</li>
+    <li><code>artifacts/pc_xy_regression/direct_xy_ensemble.joblib</code> — PC側の全データ学習済みXYアンサンブル</li>
+    <li><code>web/assets/experiment/pc-xy-regression/pc-xy-regression-results.json</code> — PC側NNの全fold・全初期値結果</li>
+    <li><code>docs/pc-xy-regression.md</code> — PC側NN比較の詳細</li>
+  </ul>
+  <div class="status"><strong>公式Simulatorについて</strong>導入済みSLV1.00.04には対応するヘッドレス学習CLIがない。今回の比較は公式Seed 1 alphaとBfloat16境界を再現した互換CLIで実施し、公式GUI用CSVを生成済み。公式GUIでの最終Save・出力照合は別工程。</div>
+</body>
+</html>

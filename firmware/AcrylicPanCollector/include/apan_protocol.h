@@ -14,13 +14,19 @@
 #define APAN_MESSAGE_SET_CONFIG (0x12U)
 #define APAN_MESSAGE_CAPTURE    (0x13U)
 #define APAN_MESSAGE_AI_SELFTEST (0x14U)
+#define APAN_MESSAGE_SET_MODE    (0x15U)
 #define APAN_MESSAGE_EVENT_DATA (0x20U)
 #define APAN_MESSAGE_AI_RESULT  (0x21U)
+#define APAN_MESSAGE_INFERENCE_EVENT (0x22U)
+#define APAN_MESSAGE_EVENT_CHUNK (0x23U)
 #define APAN_MESSAGE_ACK        (0x70U)
 #define APAN_MESSAGE_NACK       (0x71U)
-#define APAN_ENCODED_FRAME_CAPACITY (1070U)
+#define APAN_ENCODED_FRAME_CAPACITY (1110U)
 #define APAN_COMMAND_PAYLOAD_CAPACITY (16U)
 #define APAN_COMMAND_ENCODED_CAPACITY (64U)
+#define APAN_MODE_COLLECT   (0U)
+#define APAN_MODE_INFERENCE (1U)
+#define APAN_MODE_INSTRUMENT (2U)
 
 typedef struct
 {
@@ -53,5 +59,22 @@ size_t ApanProtocolEncodeEvent(const ApanEvent *event,
                                uint32_t timestamp_us,
                                uint8_t *encoded,
                                size_t capacity);
+
+/* One atomic live result: event metadata, class/scores, then 512 raw samples. */
+size_t ApanProtocolEncodeInferenceEvent(const ApanEvent *event,
+                                        uint8_t class_id,
+                                        const float outputs[8],
+                                        uint32_t sequence,
+                                        uint32_t timestamp_us,
+                                        uint8_t *encoded,
+                                        size_t capacity);
+
+size_t ApanProtocolEncodeEventChunk(const ApanEvent *event,
+                                    uint32_t event_id,
+                                    uint16_t chunk_index,
+                                    uint32_t sequence,
+                                    uint32_t timestamp_us,
+                                    uint8_t *encoded,
+                                    size_t capacity);
 
 #endif

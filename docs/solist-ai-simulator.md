@@ -1,5 +1,8 @@
 # Solist-AI Simulator 環境と8クラスモデル作成手順
 
+実測2セッションによる現在の学習結果と再現コマンドは
+[`real-model-training.md`](real-model-training.md)を参照する。
+
 この文書は、Acrylic Panの振動波形から4 × 2領域（8クラス）を識別するモデルを、ROHM公式 **Solist-AI Sim 教師あり学習対応版 SLV1.00.04** で作成・検証するための再現手順である。
 
 `D:\GitHub\IchiPing_solist_AI` で得られた知見を参照しているが、IchiPing固有の167入力・14/32出力モデルや学習データは流用しない。Acrylic Panでは実測KX134振動データ、128入力特徴、8出力one-hot教師を使う。

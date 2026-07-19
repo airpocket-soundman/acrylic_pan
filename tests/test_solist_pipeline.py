@@ -30,6 +30,15 @@ from sim.dummy_model_pipeline import (
     to_bfloat16_bits,
     train_model,
 )
+from sim.real_model_pipeline import (
+    FFT_FEATURE_COUNT,
+    INPUT_COUNT as REAL_INPUT_COUNT,
+    TIME_FEATURE_COUNT,
+    TRIGGER_INDEX,
+    extract_hybrid_features,
+    fit_beta,
+    time_sample_indices,
+)
 
 
 class SolistPipelineTests(unittest.TestCase):
@@ -136,6 +145,29 @@ class SolistPipelineTests(unittest.TestCase):
         features = extract_fft_features(np.sin(2 * np.pi * 1_000 * time), 128)
         self.assertEqual(features.shape, (128,))
         self.assertAlmostEqual((np.argmax(features) + 1) * sample_rate / 512, 1_000, delta=50)
+
+    def test_real_model_time_feature_contract(self):
+        sample_rate = 25_600
+        time = np.arange(512) / sample_rate
+        waveform = 1200.0 * np.sin(2 * np.pi * 1_000 * time)
+        features = extract_hybrid_features(waveform)
+        indices = time_sample_indices()
+        self.assertEqual(features.shape, (REAL_INPUT_COUNT,))
+        self.assertEqual((FFT_FEATURE_COUNT, TIME_FEATURE_COUNT), (0, 128))
+        self.assertEqual((indices[0], indices[-1]), (0, 447))
+        self.assertTrue(np.all(np.diff(indices) > 0))
+        self.assertTrue(np.isfinite(features).all())
+        self.assertLessEqual(float(np.max(np.abs(features))), 1.000001)
+        self.assertEqual(TRIGGER_INDEX, 64)
+
+    def test_real_model_beta_has_solist_shape(self):
+        rng = np.random.default_rng(12)
+        features = rng.normal(size=(24, REAL_INPUT_COUNT)).astype(np.float32)
+        labels = np.tile(np.arange(8), 3)
+        alpha = rng.normal(scale=0.05, size=(REAL_INPUT_COUNT, 32)).astype(np.float32)
+        beta = fit_beta(features, labels, alpha)
+        self.assertEqual(beta.shape, (32, 8))
+        self.assertTrue(np.isfinite(beta).all())
 
     def test_synthetic_eight_class_elm(self):
         features, labels = make_synthetic_events(samples_per_class=12, seed=7)

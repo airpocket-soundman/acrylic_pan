@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Acrylic Pan 楽器</title>
+  <link rel="stylesheet" href="/style.css?v=20260718-4">
+  <link rel="stylesheet" href="/controls.css?v=20260718-1">
+  <link rel="stylesheet" href="/tabs.css?v=20260718-4">
+  <link rel="stylesheet" href="/instrument.css?v=20260718-8">
+</head>
+<body><main>
+  <header>
+    <div><h1>Acrylic Pan Instrument</h1><p>8エリア推論を音階へ変換して、ブラウザからリアルタイムに発音します。</p></div>
+    <span id="connection" class="badge">未接続</span>
+  </header>
+  <nav class="app-tabs" role="tablist" aria-label="動作モード">
+    <a role="tab" aria-selected="false" href="/collector.html">学習データ採取</a>
+    <a role="tab" aria-selected="false" href="/">推論結果</a>
+    <a role="tab" aria-selected="false" href="/position.html">位置推定</a>
+    <a role="tab" aria-selected="true" class="active" href="/instrument.html">楽器</a>
+  </nav>
+
+  <section class="controls card">
+    <label>COMポート <select id="port"></select></label>
+    <button id="refresh">更新</button>
+    <button id="connect">接続</button>
+    <button id="disconnect" disabled>切断</button>
+    <button id="instrumentStart" disabled>演奏開始</button>
+    <button id="instrumentStop" disabled>演奏停止</button>
+    <span id="firmwareMode" class="badge">モード不明</span>
+  </section>
+  <div id="instrumentStatus" class="performance-status">「演奏開始」を押すと音声が有効になり、推論結果に合わせて発音します。</div>
+  <div id="error" class="error" role="alert"></div>
+
+  <section class="instrument-layout">
+    <div class="instrument-main">
+    <div class="card stage-card">
+      <div class="section-heading"><div><span class="kicker">LIVE HIT</span><h2>判定エリア</h2></div><div id="lastNote" class="last-note">—</div></div>
+      <div id="hitGrid" class="hit-grid instrument-grid" aria-label="400 × 200 mm アクリル板" aria-live="polite">
+        <button type="button" data-class="0"><b>エリア1</b><span>C4</span></button>
+        <button type="button" data-class="1"><b>エリア2</b><span>D4</span></button>
+        <button type="button" data-class="2"><b>エリア3</b><span>E4</span></button>
+        <button type="button" data-class="3"><b>エリア4</b><span>G4</span></button>
+        <button type="button" data-class="4"><b>エリア5</b><span>A4</span></button>
+        <button type="button" data-class="5"><b>エリア6</b><span>C5</span></button>
+        <button type="button" data-class="6"><b>エリア7</b><span>D5</span></button>
+        <button type="button" data-class="7"><b>エリア8</b><span>E5</span></button>
+      </div>
+      <div class="panel-size"><span>← 400 mm →</span><span>高さ 200 mm</span></div>
+      <div id="scoreBars" class="score-bars" aria-label="クラス一致度"></div>
+      <p class="hint">エリアをクリックすると、その場所に割り当てた音を試聴できます。</p>
+    </div>
+
+    <div class="instrument-controls-row">
+      <div class="card sound-card compact-card">
+        <div class="section-heading"><div><span class="kicker">SOUND</span><h2>音色</h2></div><button id="soundSettingsOpen" type="button">演奏設定</button></div>
+        <label class="primary-select">音色<select id="instrumentSelect">
+          <option value="steel_drum" selected>スチールドラム</option>
+          <option value="harpsichord">チェンバロ</option>
+          <option value="piano">ピアノ</option>
+          <option value="guitar">ギター</option>
+          <option value="drums">ドラム</option>
+        </select></label>
+      </div>
+      <div class="card mapping-card compact-card">
+        <div class="section-heading"><div><span class="kicker">AREA MAPPING</span><h2>音階プロファイル</h2></div><button id="mappingSettingsOpen" type="button">割り当て設定</button></div>
+        <label class="primary-select">プロファイル<select id="mappingProfileSelect"></select></label>
+        <p id="mappingSummary" class="mapping-summary"></p>
+      </div>
+    </div>
+    </div>
+    <div class="instrument-side">
+      <div class="card camera-card">
+        <div class="section-heading"><div><span class="kicker">CAMERA</span><h2>USBカメラ</h2></div><span id="cameraState" class="camera-state">準備中</span></div>
+        <div class="camera-viewport">
+          <video id="usbCamera" autoplay playsinline muted aria-label="USBカメラ映像"></video>
+          <div id="cameraPlaceholder" class="camera-placeholder">使用するUSBカメラを選んで「カメラ開始」を押してください</div>
+        </div>
+        <div class="camera-controls">
+          <label>カメラ<select id="cameraDevice"></select></label>
+          <button id="cameraStart" type="button">カメラ開始</button>
+          <button id="cameraStop" type="button" disabled>停止</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <dialog id="soundSettingsDialog" class="settings-dialog">
+    <form method="dialog" class="dialog-shell">
+      <div class="dialog-header"><div><span class="kicker">SOUND SETTINGS</span><h2>演奏設定</h2></div><button value="cancel" class="dialog-close" aria-label="演奏設定を閉じる">×</button></div>
+      <div class="dialog-body">
+        <div class="control-grid">
+          <label>全体音量 <output id="masterVolumeValue">70%</output><input id="masterVolume" type="range" min="0" max="1" step="0.01" value="0.70"></label>
+          <label>オクターブ <output id="transposeValue">0</output><input id="transpose" type="range" min="-2" max="2" step="1" value="0"></label>
+          <label>明るさ <output id="brightnessValue">65%</output><input id="brightness" type="range" min="0" max="1" step="0.01" value="0.65"></label>
+        </div>
+        <h3>エンベロープ</h3>
+        <div class="control-grid four">
+          <label id="attackControl">アタック <output id="attackValue">5 ms</output><input id="attack" type="range" min="0.001" max="0.5" step="0.001" value="0.005"></label>
+          <label>ディケイ <output id="decayValue">350 ms</output><input id="decay" type="range" min="0.03" max="1.5" step="0.01" value="0.35"></label>
+          <label>サステイン <output id="sustainValue">18%</output><input id="sustain" type="range" min="0" max="1" step="0.01" value="0.18"></label>
+          <label id="releaseControl">リリース <output id="releaseValue">900 ms</output><input id="release" type="range" min="0.03" max="3" step="0.01" value="0.90"></label>
+        </div>
+        <h3>エコー</h3>
+        <div class="control-grid four">
+          <label>ミックス <output id="echoMixValue">18%</output><input id="echoMix" type="range" min="0" max="0.75" step="0.01" value="0.18"></label>
+          <label id="echoDelayControl">ディレイ <output id="echoDelayValue">180 ms</output><input id="echoDelay" type="range" min="0.03" max="0.8" step="0.01" value="0.18"></label>
+          <label id="echoFeedbackControl">フィードバック <output id="echoFeedbackValue">24%</output><input id="echoFeedback" type="range" min="0" max="0.8" step="0.01" value="0.24"></label>
+          <label>打撃感度 <output id="velocityValue">70%</output><input id="velocity" type="range" min="0" max="1" step="0.01" value="0.70"></label>
+        </div>
+        <h3>連打・残響抑制</h3>
+        <div class="control-grid"><label id="retriggerGuardControl">連打の最小間隔 <output id="retriggerGuardMsValue">80 ms</output><input id="retriggerGuardMs" type="range" min="0" max="500" step="10" value="80"></label></div>
+        <p class="hint">この時間内に続けて届いた推論結果は残響として発音しません。0 msで抑制を無効化します。</p>
+      </div>
+      <div class="dialog-footer"><button id="resetSettings" type="button">初期設定に戻す</button><button value="cancel">閉じる</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="mappingSettingsDialog" class="settings-dialog mapping-dialog">
+    <form method="dialog" class="dialog-shell">
+      <div class="dialog-header"><div><span class="kicker">AREA MAPPING</span><h2>音階割り当て設定</h2></div><button value="cancel" class="dialog-close" aria-label="音階設定を閉じる">×</button></div>
+      <div class="dialog-body">
+        <div class="profile-toolbar" aria-label="音階割り当てプロファイル編集">
+          <label>編集するプロファイル<select id="mappingProfileEditSelect"></select></label>
+          <label>名前<input id="mappingProfileName" type="text" maxlength="40" value="標準プロファイル"></label>
+          <button id="mappingProfileAdd" type="button">複製して追加</button>
+          <button id="mappingProfileDelete" type="button">削除</button>
+          <button id="ascendingPreset" type="button">標準音階を設定</button>
+        </div>
+        <div class="mapping-grid">
+          <label><b>エリア1</b><select id="areaNote0"></select></label><label><b>エリア2</b><select id="areaNote1"></select></label>
+          <label><b>エリア3</b><select id="areaNote2"></select></label><label><b>エリア4</b><select id="areaNote3"></select></label>
+          <label><b>エリア5</b><select id="areaNote4"></select></label><label><b>エリア6</b><select id="areaNote5"></select></label>
+          <label><b>エリア7</b><select id="areaNote6"></select></label><label><b>エリア8</b><select id="areaNote7"></select></label>
+        </div>
+        <p class="hint">設定はこのPCのブラウザに自動保存されます。ドラム音色でも音階は打面の高さとして反映されます。</p>
+      </div>
+      <div class="dialog-footer"><button value="cancel">閉じる</button></div>
+    </form>
+  </dialog>
+</main><script src="/instrument.js?v=20260718-17"></script></body>
+</html>

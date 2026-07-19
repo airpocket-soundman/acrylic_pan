@@ -1,0 +1,84 @@
+{
+  "solver": "CalculiX CrunchiX 2.20",
+  "comparison": "3 mm production plate versus 5 mm candidate",
+  "controlled_conditions": [
+    "400 x 200 mm PMMA",
+    "C3D20R",
+    "same in-plane mesh",
+    "same fixed volume in x-y",
+    "modal damping ratio 1.2%",
+    "25.6 kHz",
+    "50 ms",
+    "eight unit point impulses"
+  ],
+  "fixed_highpass_hz": 100,
+  "fixed_highpass_metrics": {
+    "3": {
+      "minimum_cosine_distance": 0.19520497495737232,
+      "mean_cosine_distance": 0.2840508817876919,
+      "minimum_18band_level_and_shape_distance": 0.13559841613536452,
+      "minimum_18band_shape_only_distance": 0.13522755889351668,
+      "closest_18band_level_and_shape_pair": [
+        "G4",
+        "E5"
+      ],
+      "closest_18band_shape_only_pair": [
+        "G4",
+        "E5"
+      ]
+    },
+    "5": {
+      "minimum_cosine_distance": 0.1876074336151845,
+      "mean_cosine_distance": 0.29479686174230535,
+      "minimum_18band_level_and_shape_distance": 0.1493021453366836,
+      "minimum_18band_shape_only_distance": 0.15247711611766238,
+      "closest_18band_level_and_shape_pair": [
+        "G4",
+        "D5"
+      ],
+      "closest_18band_shape_only_pair": [
+        "G4",
+        "D5"
+      ]
+    }
+  },
+  "five_over_three_ratios_at_100hz": {
+    "minimum_cosine_distance": 0.9610791613080203,
+    "mean_cosine_distance": 1.0378311797061954,
+    "minimum_18band_level_and_shape_distance": 1.1010611302984468,
+    "minimum_18band_shape_only_distance": 1.1275594809614855
+  },
+  "best_fft_profile_cutoff": {
+    "3": {
+      "highpass_hz": 500,
+      "minimum_cosine_distance": 0.2004301811133904,
+      "mean_cosine_distance": 0.28637705620481546
+    },
+    "5": {
+      "highpass_hz": 1000,
+      "minimum_cosine_distance": 0.19037735303847836,
+      "mean_cosine_distance": 0.2908226537135291
+    }
+  },
+  "computed_modes": {
+    "3": 198,
+    "5": 134
+  },
+  "maximum_computed_hz": {
+    "3": 5967.227,
+    "5": 5947.275
+  },
+  "first_mode_hz": {
+    "3": 13.34928,
+    "5": 22.06872
+  },
+  "five_over_three_eigenfrequency_ratio_first_20": {
+    "mean": 1.6174470262155762,
+    "minimum": 1.2768611658964288,
+    "maximum": 1.6595426860295073
+  },
+  "source_results": {
+    "3_mm": "../calculix-highfreq/highfreq-results.json",
+    "5_mm": "5mm-highfreq-results.json"
+  }
+}

@@ -1,0 +1,109 @@
+{
+  "solver": "CalculiX 2.20",
+  "profile": "high-frequency-50ms",
+  "element": "C3D20R",
+  "thickness_mm": 5.0,
+  "mesh": {
+    "elements": 1600,
+    "nodes": 9285,
+    "xy_mm": 10,
+    "z_grid_mm": [
+      -2.5,
+      0.0,
+      2.5
+    ],
+    "through_thickness_elements": 2
+  },
+  "frequency": {
+    "requested_modes": 280,
+    "max_hz": 6000.0
+  },
+  "sampling": {
+    "hz": 25600.0,
+    "period_us": 39.0625,
+    "duration_ms": 50.0,
+    "samples": 1280
+  },
+  "sensor": {
+    "node": 7572,
+    "xyz_mm": [
+      200,
+      100,
+      2.5
+    ]
+  },
+  "hits": [
+    {
+      "note": "C4",
+      "node": 6697,
+      "xyz_mm": [
+        50,
+        50,
+        2.5
+      ]
+    },
+    {
+      "note": "D4",
+      "node": 6737,
+      "xyz_mm": [
+        150,
+        50,
+        2.5
+      ]
+    },
+    {
+      "note": "E4",
+      "node": 6777,
+      "xyz_mm": [
+        250,
+        50,
+        2.5
+      ]
+    },
+    {
+      "note": "G4",
+      "node": 6817,
+      "xyz_mm": [
+        350,
+        50,
+        2.5
+      ]
+    },
+    {
+      "note": "A4",
+      "node": 8327,
+      "xyz_mm": [
+        50,
+        150,
+        2.5
+      ]
+    },
+    {
+      "note": "C5",
+      "node": 8367,
+      "xyz_mm": [
+        150,
+        150,
+        2.5
+      ]
+    },
+    {
+      "note": "D5",
+      "node": 8407,
+      "xyz_mm": [
+        250,
+        150,
+        2.5
+      ]
+    },
+    {
+      "note": "E5",
+      "node": 8447,
+      "xyz_mm": [
+        350,
+        150,
+        2.5
+      ]
+    }
+  ]
+}

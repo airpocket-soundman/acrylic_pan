@@ -20,6 +20,7 @@
 #include "mcu.h"
 #include "smpl_common.h"
 #include "smpl_common_led.h"
+#include "timer0_1.h"
 #include "wdt.h"
 
 int32_t main(void)
@@ -36,6 +37,7 @@ int32_t main(void)
     SoftwareInterruptInit();
     TimeControlInit();
     PeriodicHandler10msInit();
+    timer0_start();
     Uart1PeripheralInit();
     SystemErrorInit();
 

@@ -1,0 +1,9 @@
+[hidden] { display:none !important; }
+.app-tabs { display:flex; gap:8px; margin:0 0 12px; border-bottom:1px solid #cbd5e1; }
+.app-tabs a { padding:11px 18px; color:#475569; text-decoration:none; border-radius:8px 8px 0 0; }
+.app-tabs a.active { color:#0f172a; background:#fff; border:1px solid #cbd5e1; border-bottom-color:#fff; margin-bottom:-1px; font-weight:700; }
+.hit-grid { display:grid; grid-template-columns:repeat(4,1fr); grid-template-rows:repeat(2,1fr); gap:8px; margin:16px 0 6px; aspect-ratio:2/1; }
+.hit-grid > div { padding:22px 8px; border:2px solid #cbd5e1; border-radius:10px; text-align:center; background:#f8fafc; transition:.15s; }
+.hit-grid > div.active { background:#f59e0b; border-color:#b45309; color:#111827; transform:scale(1.03); font-weight:800; box-shadow:0 0 0 4px rgba(245,158,11,.2); }
+.panel-size { display:flex; justify-content:space-between; color:#64748b; font-size:13px; }
+.diagnostics summary { cursor:pointer; font-weight:700; }

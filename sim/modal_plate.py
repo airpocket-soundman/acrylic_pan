@@ -1,4 +1,4 @@
-"""Preliminary modal analysis for the 400 x 200 x 2 mm acrylic panel.
+"""Preliminary modal analysis for the 400 x 200 x 3 mm acrylic panel.
 
 The plate is represented by a finite-difference Kirchhoff plate model.  The
 asymmetric clamp sandwiches a 100 x 20 mm area of the acrylic, represented by
@@ -25,7 +25,7 @@ from .sensor_signal import serializable_sensor_data
 
 WIDTH = 0.400
 HEIGHT = 0.200
-THICKNESS = 0.002
+THICKNESS = 0.003
 YOUNGS_MODULUS = 3.2e9
 POISSON = 0.35
 DENSITY = 1180.0
@@ -192,7 +192,7 @@ def main() -> None:
         "model": {
             "width_mm": 400,
             "height_mm": 200,
-            "thickness_mm": 2,
+            "thickness_mm": int(round(THICKNESS * 1000)),
             "youngs_modulus_gpa": 3.2,
             "poisson_ratio": POISSON,
             "density_kg_m3": DENSITY,

@@ -1,7 +1,8 @@
 [CmdletBinding()]
 param(
     [string]$Image = "acrylic-pan-calculix:2.20",
-    [string]$Container = "acrylic-pan-calculix-run"
+    [string]$Container = "acrylic-pan-calculix-run",
+    [double]$ThicknessMm = 3.0
 )
 $ErrorActionPreference = "Stop"
 $root = $PSScriptRoot
@@ -17,5 +18,5 @@ docker run --rm --name $Container --network none --read-only `
     --env MPLCONFIGDIR=/tmp/matplotlib `
     --env XDG_CACHE_HOME=/tmp/cache `
     --volume "${output}:/work" `
-    --volume "${root}\web\assets\simulation:/reference:ro" $Image
+    --volume "${root}\web\assets\simulation:/reference:ro" $Image /work $ThicknessMm
 if ($LASTEXITCODE -ne 0) { throw "CalculiX analysis failed." }

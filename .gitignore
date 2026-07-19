@@ -1,11 +1,13 @@
 __pycache__/
 *.py[cod]
+*.obj
 .venv/
 tmp/
 .local/
 
 # Raw captures and generated models can become large.
 data/raw/
+data/*.log
 artifacts/
 
 # Large reproducible CalculiX high-frequency solver intermediates.
@@ -15,6 +17,17 @@ web/assets/simulation/calculix-highfreq/*.12d
 web/assets/simulation/calculix-highfreq/*.cvg
 web/assets/simulation/calculix-highfreq/*.sta
 web/assets/simulation/calculix-highfreq/spooles.out
+
+# Large reproducible 50-point XY-grid solver intermediates.
+web/assets/simulation/calculix-xy-grid/*.eig
+web/assets/simulation/calculix-xy-grid/*.frd
+web/assets/simulation/calculix-xy-grid/*.inp
+web/assets/simulation/calculix-xy-grid/*.dat
+web/assets/simulation/calculix-xy-grid/*.12d
+web/assets/simulation/calculix-xy-grid/*.cvg
+web/assets/simulation/calculix-xy-grid/*.sta
+web/assets/simulation/calculix-xy-grid/*.log
+web/assets/simulation/calculix-xy-grid/spooles.out
 
 # Local Solist-AI vendor software and documentation.
 solist-ai/

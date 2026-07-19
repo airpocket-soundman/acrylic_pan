@@ -1,0 +1,433 @@
+{
+  "solver": "CalculiX 2.20",
+  "profile": "high-frequency-50ms",
+  "element": "C3D20R",
+  "thickness_mm": 5.0,
+  "mesh": {
+    "elements": 1600,
+    "nodes": 9285,
+    "xy_mm": 10,
+    "z_grid_mm": [
+      -2.5,
+      0.0,
+      2.5
+    ],
+    "through_thickness_elements": 2
+  },
+  "frequency": {
+    "requested_modes": 280,
+    "max_hz": 6000.0
+  },
+  "sampling": {
+    "hz": 25600.0,
+    "period_us": 39.0625,
+    "duration_ms": 50.0,
+    "samples": 1280
+  },
+  "sensor": {
+    "node": 7572,
+    "xyz_mm": [
+      200,
+      100,
+      2.5
+    ]
+  },
+  "hits": [
+    {
+      "note": "C4",
+      "node": 6697,
+      "xyz_mm": [
+        50,
+        50,
+        2.5
+      ]
+    },
+    {
+      "note": "D4",
+      "node": 6737,
+      "xyz_mm": [
+        150,
+        50,
+        2.5
+      ]
+    },
+    {
+      "note": "E4",
+      "node": 6777,
+      "xyz_mm": [
+        250,
+        50,
+        2.5
+      ]
+    },
+    {
+      "note": "G4",
+      "node": 6817,
+      "xyz_mm": [
+        350,
+        50,
+        2.5
+      ]
+    },
+    {
+      "note": "A4",
+      "node": 8327,
+      "xyz_mm": [
+        50,
+        150,
+        2.5
+      ]
+    },
+    {
+      "note": "C5",
+      "node": 8367,
+      "xyz_mm": [
+        150,
+        150,
+        2.5
+      ]
+    },
+    {
+      "note": "D5",
+      "node": 8407,
+      "xyz_mm": [
+        250,
+        150,
+        2.5
+      ]
+    },
+    {
+      "note": "E5",
+      "node": 8447,
+      "xyz_mm": [
+        350,
+        150,
+        2.5
+      ]
+    }
+  ],
+  "computed_modes": 134,
+  "frequencies_hz": [
+    22.06872,
+    36.57829,
+    57.79794,
+    96.72577,
+    142.2176,
+    191.447,
+    238.0843,
+    258.7224,
+    288.37,
+    325.4979,
+    344.5826,
+    371.8055,
+    481.698,
+    518.1745,
+    582.0146,
+    623.641,
+    671.8034,
+    684.4534,
+    762.5898,
+    790.8123,
+    812.8372,
+    903.0589,
+    952.9982,
+    991.6323,
+    1041.513,
+    1069.509,
+    1127.806,
+    1208.182,
+    1217.867,
+    1267.32,
+    1317.961,
+    1371.74,
+    1404.052,
+    1432.138,
+    1484.264,
+    1555.282,
+    1580.239,
+    1668.975,
+    1716.45,
+    1772.034,
+    1835.095,
+    1839.435,
+    1915.108,
+    1932.604,
+    1986.14,
+    2024.516,
+    2084.071,
+    2145.879,
+    2176.155,
+    2204.548,
+    2222.857,
+    2319.234,
+    2370.307,
+    2455.508,
+    2458.412,
+    2513.76,
+    2573.152,
+    2629.355,
+    2674.482,
+    2712.366,
+    2718.679,
+    2826.69,
+    2846.455,
+    2910.238,
+    2962.808,
+    2971.662,
+    3010.2,
+    3056.805,
+    3150.951,
+    3185.859,
+    3222.69,
+    3265.967,
+    3425.075,
+    3456.601,
+    3462.354,
+    3468.388,
+    3562.923,
+    3604.46,
+    3645.6,
+    3660.514,
+    3661.535,
+    3728.096,
+    3786.869,
+    3837.448,
+    3872.281,
+    3912.618,
+    3941.682,
+    3951.004,
+    4024.025,
+    4036.01,
+    4060.827,
+    4110.355,
+    4149.066,
+    4194.293,
+    4273.453,
+    4329.931,
+    4386.263,
+    4406.169,
+    4425.498,
+    4544.683,
+    4554.484,
+    4571.366,
+    4600.631,
+    4666.605,
+    4732.718,
+    4778.671,
+    4882.608,
+    4947.827,
+    4966.361,
+    4998.474,
+    5022.353,
+    5028.352,
+    5052.203,
+    5126.477,
+    5178.757,
+    5197.204,
+    5287.322,
+    5292.21,
+    5349.016,
+    5373.987,
+    5400.491,
+    5478.922,
+    5501.528,
+    5531.445,
+    5557.544,
+    5629.647,
+    5687.949,
+    5702.354,
+    5761.213,
+    5803.738,
+    5877.39,
+    5881.062,
+    5883.912,
+    5947.275
+  ],
+  "maximum_computed_hz": 5947.275,
+  "highpass_scores": [
+    {
+      "highpass_hz": 0,
+      "minimum_cosine_distance": 0.1881535870902935,
+      "mean_cosine_distance": 0.2951643776736798
+    },
+    {
+      "highpass_hz": 100,
+      "minimum_cosine_distance": 0.1876074336151845,
+      "mean_cosine_distance": 0.29479686174230535
+    },
+    {
+      "highpass_hz": 250,
+      "minimum_cosine_distance": 0.17911720678496534,
+      "mean_cosine_distance": 0.2927085428830721
+    },
+    {
+      "highpass_hz": 500,
+      "minimum_cosine_distance": 0.17454237081503043,
+      "mean_cosine_distance": 0.2938683042358749
+    },
+    {
+      "highpass_hz": 750,
+      "minimum_cosine_distance": 0.1829351569980452,
+      "mean_cosine_distance": 0.29887090697099
+    },
+    {
+      "highpass_hz": 1000,
+      "minimum_cosine_distance": 0.19037735303847836,
+      "mean_cosine_distance": 0.2908226537135291
+    }
+  ],
+  "e4_baseline_18_band_scores": [
+    {
+      "highpass_hz": 0,
+      "features": 18,
+      "band_range_hz": [
+        100.0,
+        5000.0
+      ],
+      "level_and_shape": {
+        "minimum_rms_log10_distance": 0.14935627776701135,
+        "mean_rms_log10_distance": 0.22852028455848536,
+        "closest_pair": [
+          "G4",
+          "D5"
+        ]
+      },
+      "shape_only": {
+        "minimum_rms_log10_distance": 0.15256270018384976,
+        "mean_rms_log10_distance": 0.2211900276146881,
+        "closest_pair": [
+          "G4",
+          "D5"
+        ]
+      },
+      "baseline_translation_distance_error": 0.0
+    },
+    {
+      "highpass_hz": 100,
+      "features": 18,
+      "band_range_hz": [
+        100.0,
+        5000.0
+      ],
+      "level_and_shape": {
+        "minimum_rms_log10_distance": 0.1493021453366836,
+        "mean_rms_log10_distance": 0.2285693125249859,
+        "closest_pair": [
+          "G4",
+          "D5"
+        ]
+      },
+      "shape_only": {
+        "minimum_rms_log10_distance": 0.15247711611766238,
+        "mean_rms_log10_distance": 0.22111537512364476,
+        "closest_pair": [
+          "G4",
+          "D5"
+        ]
+      },
+      "baseline_translation_distance_error": 0.0
+    },
+    {
+      "highpass_hz": 250,
+      "features": 18,
+      "band_range_hz": [
+        250.0,
+        5000.0
+      ],
+      "level_and_shape": {
+        "minimum_rms_log10_distance": 0.1618722974830073,
+        "mean_rms_log10_distance": 0.25105635882775973,
+        "closest_pair": [
+          "A4",
+          "E5"
+        ]
+      },
+      "shape_only": {
+        "minimum_rms_log10_distance": 0.16112041785653705,
+        "mean_rms_log10_distance": 0.24476069774707596,
+        "closest_pair": [
+          "A4",
+          "E5"
+        ]
+      },
+      "baseline_translation_distance_error": 0.0
+    },
+    {
+      "highpass_hz": 500,
+      "features": 18,
+      "band_range_hz": [
+        500.0,
+        5000.0
+      ],
+      "level_and_shape": {
+        "minimum_rms_log10_distance": 0.16170968490574986,
+        "mean_rms_log10_distance": 0.26710704234587634,
+        "closest_pair": [
+          "A4",
+          "E5"
+        ]
+      },
+      "shape_only": {
+        "minimum_rms_log10_distance": 0.16039984438067512,
+        "mean_rms_log10_distance": 0.25876651061089073,
+        "closest_pair": [
+          "A4",
+          "E5"
+        ]
+      },
+      "baseline_translation_distance_error": 0.0
+    },
+    {
+      "highpass_hz": 750,
+      "features": 18,
+      "band_range_hz": [
+        750.0,
+        5000.0
+      ],
+      "level_and_shape": {
+        "minimum_rms_log10_distance": 0.15146503914964182,
+        "mean_rms_log10_distance": 0.268871069034092,
+        "closest_pair": [
+          "G4",
+          "D5"
+        ]
+      },
+      "shape_only": {
+        "minimum_rms_log10_distance": 0.15345306397863892,
+        "mean_rms_log10_distance": 0.2587274607723563,
+        "closest_pair": [
+          "G4",
+          "D5"
+        ]
+      },
+      "baseline_translation_distance_error": 0.0
+    },
+    {
+      "highpass_hz": 1000,
+      "features": 18,
+      "band_range_hz": [
+        1000.0,
+        5000.0
+      ],
+      "level_and_shape": {
+        "minimum_rms_log10_distance": 0.1986133237083855,
+        "mean_rms_log10_distance": 0.265833130161477,
+        "closest_pair": [
+          "A4",
+          "E5"
+        ]
+      },
+      "shape_only": {
+        "minimum_rms_log10_distance": 0.1984421124324916,
+        "mean_rms_log10_distance": 0.2595784725140971,
+        "closest_pair": [
+          "A4",
+          "E5"
+        ]
+      },
+      "baseline_translation_distance_error": 0.0
+    }
+  ],
+  "true_fft_resolution_hz": 20.0,
+  "acceleration_method": "double central difference of displacement; spectra divided by sinc(2f/fs)^2 differentiation roll-off"
+}

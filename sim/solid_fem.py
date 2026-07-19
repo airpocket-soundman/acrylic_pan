@@ -20,7 +20,7 @@ from scipy import sparse
 from scipy.sparse.linalg import eigsh
 from .sensor_signal import serializable_sensor_data
 
-WIDTH, HEIGHT, THICKNESS = 0.400, 0.200, 0.002
+WIDTH, HEIGHT, THICKNESS = 0.400, 0.200, 0.003
 E, NU, RHO = 3.2e9, 0.35, 1180.0
 FIXED_X, FIXED_Y = (0.200, 0.300), (0.000, 0.020)
 SENSOR = (0.200, 0.100)
@@ -124,9 +124,11 @@ def save_mode(path: Path, xs, ys, zs, mode: np.ndarray, frequency: float, number
     w = mode[3 * top + 2].reshape(ny, nx); w /= max(np.max(np.abs(w)), 1e-15)
     xx, yy = np.meshgrid(xs * 1000, ys * 1000)
     fig = plt.figure(figsize=(7.2, 4.5), constrained_layout=True); ax = fig.add_subplot(projection="3d")
-    surf = ax.plot_surface(xx, yy, 1 + 14 * w, cmap="RdBu_r", vmin=-1, vmax=1,
+    top_z_mm = zs[-1] * 1000
+    bottom_z_mm = zs[0] * 1000
+    surf = ax.plot_surface(xx, yy, top_z_mm + 14 * w, cmap="RdBu_r", vmin=-1, vmax=1,
                            linewidth=0.15, edgecolor=(0, 0, 0, 0.22), antialiased=True)
-    for y in (0, 200): ax.plot([0, 400], [y, y], [-1, -1], color="#374151", linewidth=1)
+    for y in (0, 200): ax.plot([0, 400], [y, y], [bottom_z_mm, bottom_z_mm], color="#374151", linewidth=1)
     ax.set(xlabel="x [mm]", ylabel="y [mm]", zlabel="z (exaggerated) [mm]",
            title=f"3-D solid FEM — Mode {number}: {frequency:.1f} Hz")
     ax.set_box_aspect((2, 1, 0.35)); ax.view_init(28, -62)
@@ -141,13 +143,14 @@ def save_mesh(path: Path, xs, ys, zs):
     for z in zs * 1000:
         zz = np.full_like(xx, z)
         ax.plot_wireframe(xx, yy, zz, rstride=1, cstride=1, color="#52717c", linewidth=0.25, alpha=0.72)
+    bottom_z_mm, top_z_mm = zs[0] * 1000, zs[-1] * 1000
     for x in xs * 1000:
-        for y in (0, 200): ax.plot([x, x], [y, y], [-1, 1], color="#52717c", linewidth=0.35)
+        for y in (0, 200): ax.plot([x, x], [y, y], [bottom_z_mm, top_z_mm], color="#52717c", linewidth=0.35)
     for y in ys * 1000:
-        for x in (0, 400): ax.plot([x, x], [y, y], [-1, 1], color="#52717c", linewidth=0.35)
+        for x in (0, 400): ax.plot([x, x], [y, y], [bottom_z_mm, top_z_mm], color="#52717c", linewidth=0.35)
     fx = np.linspace(200, 300, 9); fy = np.linspace(0, 20, 3); fxx, fyy = np.meshgrid(fx, fy)
-    for z in (-1, 1): ax.plot_surface(fxx, fyy, np.full_like(fxx, z), color="#e2633b", alpha=0.68, shade=False)
-    ax.scatter([200], [100], [1], marker="D", s=45, c="#34d399", edgecolors="#111827", label="sensor")
+    for z in (bottom_z_mm, top_z_mm): ax.plot_surface(fxx, fyy, np.full_like(fxx, z), color="#e2633b", alpha=0.68, shade=False)
+    ax.scatter([200], [100], [top_z_mm], marker="D", s=45, c="#34d399", edgecolors="#111827", label="sensor")
     ax.set(xlabel="x [mm]", ylabel="y [mm]", zlabel="z [mm]",
            title=f"3-D solid mesh — {len(xs)-1} × {len(ys)-1} × {len(zs)-1} HEX8 elements")
     ax.set_box_aspect((2, 1, 0.18)); ax.set_zlim(-12, 12); ax.view_init(25, -62); ax.legend(loc="upper right")
@@ -222,8 +225,8 @@ def main():
               "mesh": {"elements": [ex, ey, ez], "nodes": len(xs)*len(ys)*len(zs),
                        "degrees_of_freedom": 3*len(xs)*len(ys)*len(zs), "fixed_nodes": len(fixed_nodes)},
               "material": {"E_GPa": E/1e9, "poisson": NU, "density_kg_m3": RHO},
-              "geometry_mm": [400, 200, 2], "fixed_volume_mm": {"x": [200, 300], "y": [0, 20], "z": [-1, 1]},
-              "sensor_mm": [200, 100, 1], "frequencies_hz": np.round(frequencies, 3).tolist(), "hits": hits,
+              "geometry_mm": [400, 200, THICKNESS*1000], "fixed_volume_mm": {"x": [200, 300], "y": [0, 20], "z": [zs[0]*1000, zs[-1]*1000]},
+              "sensor_mm": [200, 100, zs[-1]*1000], "frequencies_hz": np.round(frequencies, 3).tolist(), "hits": hits,
               "limitations": ["linear isotropic PMMA", "perfectly fixed clamp volume", "no sensor/adhesive mass", "small deformation"]}
     (args.output/"solid3d-results.json").write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
     hit_nodes = [nearest_top_node(*hit, xs, ys, zs) for hit in HITS]

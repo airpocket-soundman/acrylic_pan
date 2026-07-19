@@ -7,7 +7,12 @@
 #define EVENT_HEADER_SIZE (12U)
 #define CRC_SIZE          (4U)
 #define EVENT_PAYLOAD_SIZE (EVENT_HEADER_SIZE + (APAN_EVENT_SAMPLES * 2U))
-#define RAW_FRAME_SIZE (RAW_HEADER_SIZE + EVENT_PAYLOAD_SIZE + CRC_SIZE)
+#define AI_RESULT_SIZE (36U)
+#define EVENT_CHUNK_HEADER_SIZE (20U)
+#define EVENT_CHUNK_SAMPLES (512U)
+#define INFERENCE_PAYLOAD_SIZE (EVENT_HEADER_SIZE + AI_RESULT_SIZE + (APAN_EVENT_SAMPLES * 2U))
+#define MAX_PAYLOAD_SIZE INFERENCE_PAYLOAD_SIZE
+#define RAW_FRAME_SIZE (RAW_HEADER_SIZE + MAX_PAYLOAD_SIZE + CRC_SIZE)
 
 static uint8_t raw_frame[RAW_FRAME_SIZE];
 
@@ -202,7 +207,7 @@ size_t ApanProtocolEncodeFrame(uint8_t message_type, uint16_t flags,
 {
     uint32_t crc;
     size_t raw_size;
-    if (payload_size > EVENT_PAYLOAD_SIZE)
+    if (payload_size > MAX_PAYLOAD_SIZE)
     {
         return 0U;
     }
@@ -223,6 +228,48 @@ size_t ApanProtocolEncodeFrame(uint8_t message_type, uint16_t flags,
     return cobs_encode(raw_frame, raw_size + CRC_SIZE, encoded, capacity);
 }
 
+size_t ApanProtocolEncodeInferenceEvent(const ApanEvent *event,
+                                        uint8_t class_id,
+                                        const float outputs[8],
+                                        uint32_t sequence,
+                                        uint32_t timestamp_us,
+                                        uint8_t *encoded,
+                                        size_t capacity)
+{
+    uint8_t *payload = &raw_frame[RAW_HEADER_SIZE];
+    uint16_t i;
+
+    if ((event == NULL) || (event->sample_count != APAN_INFERENCE_SAMPLES))
+    {
+        return 0U;
+    }
+
+    put_u32_le(&payload[0], APAN_SAMPLE_RATE_HZ);
+    put_u16_le(&payload[4], APAN_EVENT_SAMPLES);
+    put_u16_le(&payload[6], event->trigger_index);
+    put_u16_le(&payload[8], event->peak_abs);
+    put_u16_le(&payload[10], 0U);
+    payload[12] = 0xFFU;
+    payload[13] = class_id;
+    payload[14] = 0U;
+    payload[15] = 0U;
+    for (i = 0U; i < 8U; i++)
+    {
+        union { float value; uint32_t bits; } packed;
+        uint16_t offset = (uint16_t)(16U + (i * 4U));
+        packed.value = outputs[i];
+        put_u32_le(&payload[offset], packed.bits);
+    }
+    for (i = 0U; i < APAN_EVENT_SAMPLES; i++)
+    {
+        put_u16_le(&payload[EVENT_HEADER_SIZE + AI_RESULT_SIZE + (i * 2U)],
+                   (uint16_t)event->samples[i]);
+    }
+    return ApanProtocolEncodeFrame(APAN_MESSAGE_INFERENCE_EVENT, 0U, sequence,
+                                   timestamp_us, payload, INFERENCE_PAYLOAD_SIZE,
+                                   encoded, capacity);
+}
+
 size_t ApanProtocolEncodeEvent(const ApanEvent *event,
                                uint32_t sequence,
                                uint32_t timestamp_us,
@@ -231,18 +278,72 @@ size_t ApanProtocolEncodeEvent(const ApanEvent *event,
 {
     uint8_t *payload = &raw_frame[RAW_HEADER_SIZE];
     uint16_t i;
+    uint16_t sample_count;
+
+    if (event == NULL) { return 0U; }
+    sample_count = event->sample_count;
+    if ((sample_count == 0U) || (sample_count > APAN_EVENT_SAMPLES))
+    {
+        return 0U;
+    }
 
     put_u32_le(&payload[0], APAN_SAMPLE_RATE_HZ);
-    put_u16_le(&payload[4], APAN_EVENT_SAMPLES);
+    put_u16_le(&payload[4], sample_count);
     put_u16_le(&payload[6], event->trigger_index);
     put_u16_le(&payload[8], event->peak_abs);
     put_u16_le(&payload[10], 0U);
-    for (i = 0U; i < APAN_EVENT_SAMPLES; i++)
+    for (i = 0U; i < sample_count; i++)
     {
         put_u16_le(&payload[EVENT_HEADER_SIZE + (i * 2U)], (uint16_t)event->samples[i]);
     }
 
     return ApanProtocolEncodeFrame(APAN_MESSAGE_EVENT_DATA, 0U, sequence,
-                                   timestamp_us, payload, EVENT_PAYLOAD_SIZE,
+                                   timestamp_us, payload,
+                                   (uint16_t)(EVENT_HEADER_SIZE + sample_count * 2U),
                                    encoded, capacity);
+}
+
+size_t ApanProtocolEncodeEventChunk(const ApanEvent *event,
+                                    uint32_t event_id,
+                                    uint16_t chunk_index,
+                                    uint32_t sequence,
+                                    uint32_t timestamp_us,
+                                    uint8_t *encoded,
+                                    size_t capacity)
+{
+    uint8_t *payload = &raw_frame[RAW_HEADER_SIZE];
+    uint16_t chunk_count;
+    uint16_t chunk_samples;
+    uint16_t offset;
+    uint16_t i;
+
+    if ((event == NULL) || (event->sample_count == 0U) ||
+        (event->sample_count > APAN_EVENT_CAPACITY))
+    {
+        return 0U;
+    }
+    chunk_count = (uint16_t)((event->sample_count + EVENT_CHUNK_SAMPLES - 1U) /
+                             EVENT_CHUNK_SAMPLES);
+    if (chunk_index >= chunk_count) { return 0U; }
+    offset = (uint16_t)(chunk_index * EVENT_CHUNK_SAMPLES);
+    chunk_samples = (uint16_t)(event->sample_count - offset);
+    if (chunk_samples > EVENT_CHUNK_SAMPLES) { chunk_samples = EVENT_CHUNK_SAMPLES; }
+
+    put_u32_le(&payload[0], event_id);
+    put_u16_le(&payload[4], chunk_index);
+    put_u16_le(&payload[6], chunk_count);
+    put_u32_le(&payload[8], APAN_SAMPLE_RATE_HZ);
+    put_u16_le(&payload[12], event->sample_count);
+    put_u16_le(&payload[14], event->trigger_index);
+    put_u16_le(&payload[16], event->peak_abs);
+    put_u16_le(&payload[18], chunk_samples);
+    for (i = 0U; i < chunk_samples; i++)
+    {
+        put_u16_le(&payload[EVENT_CHUNK_HEADER_SIZE + i * 2U],
+                   (uint16_t)event->samples[offset + i]);
+    }
+    return ApanProtocolEncodeFrame(
+        APAN_MESSAGE_EVENT_CHUNK, 0U, sequence, timestamp_us, payload,
+        (uint16_t)(EVENT_CHUNK_HEADER_SIZE + chunk_samples * 2U),
+        encoded, capacity);
 }

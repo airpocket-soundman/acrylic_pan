@@ -24,8 +24,8 @@ int main(int argc, char **argv)
     size_t command_size;
     FILE *output;
     ApanCapture threshold_capture;
-    ApanCaptureConfig production_threshold = { 2000U, 800U };
-    int16_t gravity_history[128];
+    ApanCaptureConfig production_threshold = { 1000U, 200U, 2000U, 16U };
+    int16_t gravity_history[APAN_PRETRIGGER_SAMPLES];
 
     CHECK(argc == 2);
     for (i = 0U; i < 512U; i++)
@@ -41,33 +41,48 @@ int main(int argc, char **argv)
 
     /* Trigger is the first sample of the next block: validates boundary jerk. */
     ApanCaptureFeed(&capture, second_block, 512U);
+    CHECK(!ApanCaptureEventReady(&capture));
+    ApanCaptureFeed(&capture, first_block, 512U);
+    CHECK(!ApanCaptureEventReady(&capture));
+    ApanCaptureFeed(&capture, first_block, 512U);
+    CHECK(!ApanCaptureEventReady(&capture));
+    ApanCaptureFeed(&capture, first_block, 512U);
     CHECK(ApanCaptureEventReady(&capture));
     event = ApanCaptureGetEvent(&capture);
     CHECK(event != NULL);
-    CHECK(event->trigger_index == 128U);
+    CHECK(event->trigger_index == APAN_PRETRIGGER_SAMPLES);
+    CHECK(event->sample_count == APAN_COLLECTION_SAMPLES);
     CHECK(event->peak_abs == 2000U);
-    for (i = 0U; i < 128U; i++)
+    for (i = 0U; i < APAN_PRETRIGGER_SAMPLES; i++)
     {
         CHECK(event->samples[i] == 10);
     }
-    CHECK(event->samples[128] == 2000);
-    CHECK(event->samples[129] == 1);
-    CHECK(event->samples[511] == 383);
-
-    encoded_size = ApanProtocolEncodeEvent(event, 42U, 123456U,
-                                           encoded, sizeof(encoded));
-    CHECK(encoded_size > 0U);
-    CHECK(encoded[encoded_size - 1U] == 0U);
-    output = fopen(argv[1], "wb");
-    CHECK(output != NULL);
-    CHECK(fwrite(encoded, 1U, encoded_size, output) == encoded_size);
-    CHECK(fclose(output) == 0);
+    CHECK(event->samples[APAN_PRETRIGGER_SAMPLES] == 2000);
+    CHECK(event->samples[APAN_PRETRIGGER_SAMPLES + 1U] == 1);
+    CHECK(event->samples[511] == 447);
+    CHECK(event->samples[2047] == 10);
+    for (i = 0U; i < 4U; i++)
+    {
+        encoded_size = ApanProtocolEncodeEventChunk(
+            event, 9U, (uint16_t)i, (uint32_t)(42U + i), 123456U,
+            encoded, sizeof(encoded));
+        CHECK(encoded_size > 0U);
+        CHECK(encoded[encoded_size - 1U] == 0U);
+        if (i == 0U)
+        {
+            output = fopen(argv[1], "wb");
+            CHECK(output != NULL);
+            CHECK(fwrite(encoded, 1U, encoded_size, output) == encoded_size);
+            CHECK(fclose(output) == 0);
+        }
+    }
 
     ApanCaptureReleaseEvent(&capture);
     CHECK(ApanCaptureForceBlock(&capture, first_block, 512U));
     event = ApanCaptureGetEvent(&capture);
     CHECK(event != NULL);
     CHECK(event->trigger_index == 0U);
+    CHECK(event->sample_count == APAN_INFERENCE_SAMPLES);
     CHECK(event->peak_abs == 10U);
 
     /* A stop/re-arm gap must not retain either a ready event or stale
@@ -95,23 +110,45 @@ int main(int argc, char **argv)
     CHECK(command.sequence == 77U);
     CHECK(command.payload_size == 0U);
 
-    /* Static Z gravity satisfies the level gate, so the jerk threshold must
-       reject a 1999-LSB adjacent difference and accept the 2000-LSB boundary. */
-    for (i = 0U; i < 128U; i++)
+    /* At 32 g, static Z gravity is about 1024 LSB and satisfies the raw level
+       gate. A 1000-LSB crossing is only a candidate: it must be followed by
+       2000 LSB of baseline-relative displacement within 16 samples. */
+    for (i = 0U; i < APAN_PRETRIGGER_SAMPLES; i++)
     {
-        gravity_history[i] = 4000;
+        gravity_history[i] = 1000;
     }
     ApanCaptureInit(&threshold_capture, &production_threshold);
-    ApanCaptureFeed(&threshold_capture, gravity_history, 128U);
-    gravity_history[0] = 5999;
+    ApanCaptureFeed(&threshold_capture, gravity_history, APAN_PRETRIGGER_SAMPLES);
+    gravity_history[0] = 1999;
     ApanCaptureFeed(&threshold_capture, gravity_history, 1U);
     CHECK(!threshold_capture.collecting);
-    gravity_history[0] = 4000;
+    gravity_history[0] = 1000;
     ApanCaptureFeed(&threshold_capture, gravity_history, 1U);
     CHECK(!threshold_capture.collecting);
-    gravity_history[0] = 6000;
+    gravity_history[0] = 2000;
     ApanCaptureFeed(&threshold_capture, gravity_history, 1U);
     CHECK(threshold_capture.collecting);
+    CHECK(threshold_capture.event.trigger_index == APAN_PRETRIGGER_SAMPLES);
+    for (i = 0U; i < 15U; i++)
+    {
+        gravity_history[0] = 1000;
+        ApanCaptureFeed(&threshold_capture, gravity_history, 1U);
+    }
+    CHECK(!threshold_capture.collecting);
+    CHECK(!ApanCaptureEventReady(&threshold_capture));
+
+    ApanCaptureReset(&threshold_capture);
+    for (i = 0U; i < APAN_PRETRIGGER_SAMPLES; i++)
+    {
+        gravity_history[i] = 1000;
+    }
+    ApanCaptureFeed(&threshold_capture, gravity_history, APAN_PRETRIGGER_SAMPLES);
+    gravity_history[0] = 2000;
+    ApanCaptureFeed(&threshold_capture, gravity_history, 1U);
+    gravity_history[0] = 4000;
+    ApanCaptureFeed(&threshold_capture, gravity_history, 1U);
+    CHECK(threshold_capture.collecting);
+    CHECK(threshold_capture.candidate_confirmed);
     CHECK(threshold_capture.event.trigger_index == APAN_PRETRIGGER_SAMPLES);
     return 0;
 }

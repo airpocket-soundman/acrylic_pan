@@ -23,7 +23,7 @@
 
 - MCU: ML63Q2557、48 MHz、Flash 256 KB、RAM 16 KB
 - センサ: KX134-1211、Z軸、符号付き16 bit
-- 初期設定: ±8 g、ODR 25.6 kHz（最大）、High Performance、LPF ODR/2
+- 初期設定: ±32 g、ODR 25.6 kHz（最大）、High Performance、LPF ODR/2
 - USB: FT2232H Channel B / UARTF1、115200 bps、8-N-1、フロー制御なし
 - センサ位置: `(200,100) mm`
 
@@ -77,7 +77,7 @@ CRC不一致、長さ不一致をPCで検出する。
 
 ### 2.5 共通品質フラグ
 
-- `CLIPPED`: ±8 g付近で飽和
+- `CLIPPED`: ±32 g付近で飽和
 - `TOO_WEAK`: トリガ後ピークが採用下限未満
 - `MULTI_PEAK`: 同一窓に複数の立上り
 - `BUFFER_OVERRUN`: サンプル欠落
@@ -106,11 +106,11 @@ BOOT -> SELF_TEST -> IDLE -> ARMED -> CAPTURING -> QUEUED -> TRANSMITTING
 
 - リングバッファ: Z軸2048点、80 ms、int16
 - トリガ: `abs(z[n]-z[n-1])` を基本とするjerkしきい値
-- 保存: 1,280点、前128点（5 ms）+ 後1,152点（45 ms）
-- trigger index: 128
+- 保存: 2,048点、前64点（2.5 ms）+ トリガを含む後1,984点（77.5 ms）
+- trigger index: 64
 - 再トリガ抑止: 初期150 ms、PCから変更可能
 - 1 Hz程度の単打収録に使用
-- 1イベント約2.5 KB、UART送信は1 Hz程度の教師収録に限定
+- 1イベント約4.1 KB。512点ずつ4フレームに分け、UART送信は1 Hz程度の教師収録に限定
 
 トリガ時刻は仮位置である。PCは保存波形内の最大jerkを再探索し、整列済み位置を
 manifestへ別フィールドで保存する。
@@ -145,8 +145,8 @@ PCのarea ID、座標、note、session IDはボード処理に使用しない。
 
 - 25.6 kHzのサンプル数誤差0、連続10分でoverrun 0
 - 1 Hz × 100イベントでsequence欠落0、CRCエラー0
-- 前128点のプリトリガが全イベントに存在
-- ±8 g飽和を確実にflag
+- 前64点のプリトリガが全イベントに存在
+- ±32 g飽和を確実にflag
 - 100 ms間隔の2打がBURST波形内に両方存在
 - STOP後100 ms以内にIDLE
 - センサ切断時にERRORへ遷移
@@ -176,12 +176,12 @@ PCのarea ID、座標、note、session IDはボード処理に使用しない。
 ### 4.3 イベント処理
 
 ```text
-Z 25.6 kHz連続取得 -> 連続HPF -> jerkトリガ -> 前128点（5 ms）を含む1,280点
+Z 25.6 kHz連続取得 -> 連続HPF -> jerkトリガ -> 前64点（2.5 ms）を含む1,280点
 -> 打撃開始再整列 -> LPF -> 2分周 -> 640点 -> Hann窓 -> 1024点FFT -> 帯域圧縮 -> 正規化 -> Solist-AI
 -> 8スコア -> 単打/同時2点判定 -> RESULT送信
 ```
 
-- 入力窓は前5 ms＋後45 msの合50 ms
+- 入力窓は前2.5 ms＋トリガを含む後47.5 msの合50 ms
 - 打撃開始から60 ms以内に再アーム
 - 100 ms以上離れた打撃を別イベントとして処理
 - 前打の残響を含む学習データで2打目を評価

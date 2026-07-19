@@ -1,6 +1,7 @@
 const $ = id => document.getElementById(id);
 let lastSequence = null;
 let lastAiSequence = null;
+let collectionCompletedSamples = 0;
 const library = {sessionId: null, events: [], selected: null};
 const POINT_LABELS = {
   center: '中心', up_left: '左上', up_right: '右上', down_left: '左下', down_right: '右下'
@@ -25,16 +26,52 @@ async function ports() {
 
 function stat(label, value) { return `<div class="stat"><b>${value}</b>${label}</div>`; }
 
+function setButtonState(id, disabled, running = false) {
+  const button = $(id);
+  if (!button) return;
+  button.disabled = disabled;
+  button.classList.toggle('is-running', running);
+  button.setAttribute('aria-pressed', running ? 'true' : 'false');
+}
+
+function updateActionState(data) {
+  const connected = Boolean(data.connected);
+  const collection = data.collection || {};
+  const collecting = Boolean(collection.active);
+  const inferring = Boolean(data.inference_active);
+  setButtonState('connect', connected, connected);
+  setButtonState('disconnect', !connected);
+  setButtonState('ping', !connected);
+  setButtonState('capture', !connected || collecting || data.device_mode !== 'collection');
+  setButtonState('collectionStart', !connected || collecting, collecting);
+  setButtonState('collectionStop', !connected || !collecting);
+  setButtonState('collectionUndo', !connected || !collecting || collection.completed_samples <= 0);
+  setButtonState('inferenceStart', !connected || inferring, inferring);
+  setButtonState('inferenceStop', !connected || !inferring);
+  if ($('port')) $('port').disabled = connected;
+}
+
 async function status() {
   try {
     const data = await api('/api/status');
     const stats = data.stats;
     $('connection').textContent = data.connected ? `接続中 ${data.port}` : '未接続';
     $('connection').classList.toggle('online', data.connected);
+    if ($('firmwareMode')) {
+      const labels = {collection: 'データ採取モード', inference: '推論モード', unknown: 'モード不明'};
+      $('firmwareMode').textContent = labels[data.device_mode] || data.device_mode;
+      $('firmwareMode').classList.toggle('online', data.device_mode === 'inference' && data.inference_active);
+    }
     $('output').value = $('output').value || data.output_root;
     $('sessionPath').textContent = data.session_dir ? `記録先: ${data.session_dir}` : '';
     $('error').textContent = data.last_error || '';
     if (data.last_control) $('controlStatus').textContent = `ボードAPI: ${JSON.stringify(data.last_control)}`;
+    if (data.assembly && data.assembly.progress) {
+      const progress = data.assembly.progress;
+      $('controlStatus').textContent = `長時間波形を受信中: ${progress.received_chunks} / ${progress.total_chunks}`;
+    } else if (data.assembly && data.assembly.retry_required) {
+      $('controlStatus').textContent = '長時間波形が欠落したため、同じ打点を再測定します。';
+    }
     $('stats').innerHTML = stat('受信', stats.events_received) + stat('保存', stats.events_saved) +
       stat('欠落', stats.missing_sequences) + stat('CRC等', stats.decoder_errors) +
       stat('重複', stats.duplicate_sequences) + stat('順序逆転', stats.out_of_order_sequences) +
@@ -44,6 +81,7 @@ async function status() {
       lastAiSequence = data.latest_ai.sequence;
       drawAiResult(data.latest_ai);
     }
+    updateActionState(data);
     const event = await api('/api/events/latest');
     if (event.sequence !== undefined && (event.sequence !== lastSequence || event.source === 'demo')) {
       lastSequence = event.sequence;
@@ -55,7 +93,9 @@ async function status() {
 function drawAiResult(result) {
   const comparison = result.comparison || {};
   const summary = $('aiSummary');
-  let message = `テスト ${result.case_id} / 実機クラス ${result.predicted_class}`;
+  let message = result.case_id === 0xFF
+    ? `判定: エリア${result.predicted_class + 1}`
+    : `テスト ${result.case_id} / 実機クラス ${result.predicted_class}`;
   summary.classList.remove('pass', 'fail');
   if (comparison.available) {
     message += ` / PC基準クラス ${comparison.expected_class}` +
@@ -67,14 +107,20 @@ function drawAiResult(result) {
   $('aiOutputs').innerHTML = result.outputs.map((value, index) => {
     const expected = comparison.expected_outputs ? comparison.expected_outputs[index] : null;
     const error = comparison.absolute_errors ? comparison.absolute_errors[index] : null;
-    return `<div class="ai-output"><b>class ${index}</b><span>${value.toFixed(6)}</span>` +
+    return `<div class="ai-output"><b>エリア${index + 1}</b><span>${value.toFixed(6)}</span>` +
       (expected === null ? '' : `<small>PC ${expected.toFixed(6)}<br>差 ${error.toFixed(6)}</small>`) + '</div>';
   }).join('');
   if (result.input_plot) drawDummyInput(result.input_plot);
+  if ($('hitGrid')) {
+    $('hitGrid').querySelectorAll('[data-class]').forEach(cell => {
+      cell.classList.toggle('active', Number(cell.dataset.class) === result.predicted_class);
+    });
+  }
 }
 
 function drawCollection(collection) {
   if (!collection) return;
+  collectionCompletedSamples = collection.completed_samples;
   const summary = $('collectionSummary');
   const pointLabels = POINT_LABELS;
   if (collection.active) {
@@ -121,8 +167,12 @@ function drawCollection(collection) {
   }
   // Before the first run the server still holds the default pattern, so the
   // panel previews whatever the operator has picked in the dropdown instead.
-  const started = collection.active || collection.finished || collection.completed_samples > 0;
-  if (started) {
+  const selectedPattern = $('collectionPattern').value;
+  const selectedPatternDiffers = !collection.active &&
+    selectedPattern !== collection.position_pattern;
+  const showCollectionTargets = !selectedPatternDiffers &&
+    (collection.active || collection.finished || collection.completed_samples > 0);
+  if (showCollectionTargets) {
     renderPoints(collection.per_position_counts, collection.panel,
       collection.current_target_index, collection.active);
   } else {
@@ -138,6 +188,7 @@ function drawCollection(collection) {
   }
   $('collectionStart').disabled = collection.active;
   $('collectionStop').disabled = !collection.active;
+  $('collectionUndo').disabled = !collection.active || collection.completed_samples <= 0;
   $('collectionRepetitions').disabled = collection.active;
   $('collectionPattern').disabled = collection.active;
 }
@@ -361,14 +412,27 @@ function drawLibraryList() {
   list.querySelectorAll('.library-row[data-index]').forEach(row => {
     row.onclick = () => showStoredEvent(Number(row.dataset.index));
   });
+  const selectedRow = list.querySelector(`.library-row[data-index="${library.selected}"]`);
+  if (selectedRow) selectedRow.scrollIntoView({block: 'nearest'});
 }
 
 function drawLibrarySelection() {
   const event = library.events.find(item => item.index === library.selected);
+  const position = library.events.findIndex(item => item.index === library.selected);
   $('libraryDelete').disabled = !event;
+  $('libraryPrevious').disabled = position <= 0;
+  $('libraryNext').disabled = library.events.length === 0 || position >= library.events.length - 1;
   $('librarySelection').textContent = event
     ? `表示中: No.${event.index} / ${areaLabel(event.class_id)} / ${pointLabel(event.annotations)} / sequence ${event.sequence}`
     : '波形を表示するデータを選んでください。';
+}
+
+async function stepStoredEvent(direction) {
+  if (library.events.length === 0) return;
+  const position = library.events.findIndex(item => item.index === library.selected);
+  const nextPosition = position < 0 ? 0 : position + direction;
+  if (nextPosition < 0 || nextPosition >= library.events.length) return;
+  await showStoredEvent(library.events[nextPosition].index);
 }
 
 async function showStoredEvent(index) {
@@ -393,6 +457,12 @@ if ($('libraryList')) {
     library.selected = null;
     try { await loadEvents(); } catch (error) { $('error').textContent = error.message; }
   };
+  $('libraryPrevious').onclick = async () => {
+    await stepStoredEvent(-1);
+  };
+  $('libraryNext').onclick = async () => {
+    await stepStoredEvent(1);
+  };
   $('libraryDelete').onclick = async () => {
     const event = library.events.find(item => item.index === library.selected);
     if (!event) return;
@@ -402,8 +472,13 @@ if ($('libraryList')) {
       await api('/api/library/delete', {
         session: library.sessionId, index: event.index, root: libraryRoot()
       });
+      const deletedPosition = library.events.findIndex(item => item.index === event.index);
+      const replacement = library.events[deletedPosition + 1] || library.events[deletedPosition - 1];
       library.selected = null;
       await loadSessions();
+      if (replacement && library.events.some(item => item.index === replacement.index)) {
+        await showStoredEvent(replacement.index);
+      }
       $('error').textContent = '';
     } catch (error) { $('error').textContent = error.message; }
   };
@@ -438,7 +513,11 @@ if ($('aiRunAll')) $('aiRunAll').onclick = async () => {
   } catch (error) { $('error').textContent = error.message; }
 };
 if ($('collectionPattern')) $('collectionPattern').onchange = async () => {
-  try { await previewPoints(true); $('error').textContent = ''; }
+  try {
+    $('collectionRepetitions').value = $('collectionPattern').value === 'center' ? 50 : 10;
+    await previewPoints(true);
+    $('error').textContent = '';
+  }
   catch (error) { $('error').textContent = error.message; }
 };
 if ($('collectionStart')) $('collectionStart').onclick = async () => {
@@ -456,8 +535,44 @@ if ($('collectionStop')) $('collectionStop').onclick = async () => {
   try { await api('/api/collection/stop', {}); await status(); }
   catch (error) { $('error').textContent = error.message; }
 };
+if ($('inferenceStart')) $('inferenceStart').onclick = async () => {
+  try {
+    await api('/api/inference/start', {});
+    $('controlStatus').textContent = '推論中です。アクリル板をたたいてください。';
+    await status();
+  } catch (error) { $('error').textContent = error.message; }
+};
+if ($('inferenceStop')) $('inferenceStop').onclick = async () => {
+  try { await api('/api/inference/stop', {}); await status(); }
+  catch (error) { $('error').textContent = error.message; }
+};
+if ($('collectionUndo')) $('collectionUndo').onclick = async () => {
+  if (!confirm('直前に保存した1件を削除し、同じ位置を取り直します。よろしいですか？')) return;
+  const button = $('collectionUndo');
+  button.disabled = true;
+  try {
+    const result = await api('/api/collection/undo', {
+      expected_completed_samples: collectionCompletedSamples
+    });
+    const undone = result.undone_event;
+    await status();
+    if ($('libraryList')) await loadSessions();
+    $('error').textContent = '';
+    $('controlStatus').textContent =
+      `直前の1件（エリア${undone.class_id + 1}、記録No.${undone.index}）を削除しました。同じ位置をもう一度たたいてください。`;
+  } catch (error) {
+    await status();
+    $('error').textContent = error.message;
+  }
+};
 $('refresh').onclick = ports;
-$('connect').onclick = async () => { try { await api('/api/connect', {port: $('port').value}); await status(); } catch (error) { $('error').textContent = error.message; } };
+$('connect').onclick = async () => {
+  try {
+    await api('/api/connect', {port: $('port').value});
+    await api('/api/device/mode', {mode: $('inferenceStart') ? 'inference' : 'collection'});
+    await status();
+  } catch (error) { $('error').textContent = error.message; }
+};
 $('disconnect').onclick = async () => { await api('/api/disconnect', {}); await status(); };
 $('ping').onclick = async () => { try { await api('/api/command', {command: 'ping'}); await status(); } catch (error) { $('error').textContent = error.message; } };
 $('capture').onclick = async () => { try { await api('/api/command', {command: 'capture'}); await status(); } catch (error) { $('error').textContent = error.message; } };
@@ -470,6 +585,26 @@ $('newSession').onclick = async () => {
   } catch (error) { $('error').textContent = error.message; }
 };
 ports();
+document.querySelectorAll('.app-tabs a').forEach(link => {
+  link.addEventListener('click', async event => {
+    event.preventDefault();
+    try {
+      const current = await api('/api/status');
+      if (!current.connected) { window.location.href = link.href; return; }
+      const href = link.getAttribute('href');
+      const mode = href === '/collector.html' ? 'collection' :
+        (href === '/instrument.html' ? 'instrument' : 'inference');
+      if (current.collection && current.collection.active) {
+        throw new Error('データ採取中はタブを切り替えられません。先に採取を停止してください。');
+      }
+      if (current.inference_active && current.device_mode !== mode) {
+        await api('/api/inference/stop', {});
+      }
+      if (current.device_mode !== mode) await api('/api/device/mode', {mode});
+      window.location.href = link.href;
+    } catch (error) { $('error').textContent = error.message; }
+  });
+});
 // status() fills the 保存先 field, which is the root the library browser reads.
 status().then(() => {
   if ($('libraryList')) return loadSessions().catch(error => { $('error').textContent = error.message; });

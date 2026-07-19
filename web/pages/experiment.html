@@ -1,6 +1,10 @@
 <!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>学習・評価計画</title><link rel="stylesheet" href="../css/page.css"></head><body>
 <div class="eyebrow">07 / Training & validation</div><h1>中心8点を覚えるだけでなく、<br>エリア全体を演奏可能にする。</h1><p class="lead">教師の骨格はX = 50, 150, 250, 350 mm、Y = 50, 150 mmの8中心です。細かな座標推定に備え、収録は中心の反復数よりも50 mm格子のカバレッジを重視して配分します。同一データから8クラス・軸ビン・直接座標回帰の3出力表現を比較できる設計です。</p>
 
+<h2>2026-07-18 4セッション比較結果</h2>
+<div class="grid"><div class="card"><span class="number">98.63%</span><small>8-CLASS / 6.4 kHz FFT</small><p>1,534件をLOSO 4-foldで評価。分類後の中心座標換算は平均2.41 mm。</p></div><div class="card"><span class="number">47.15 mm</span><small>DIRECT XY / 6.4 kHz HYBRID</small><p>XY直接回帰の平均距離誤差。8中心教師だけの粗い回帰で、未学習座標の補間性能ではありません。</p></div><div class="card"><span class="number">69.95%</span><small>XY-DERIVED AREA</small><p>XY出力からエリアを求めた正解率。現段階では8クラス方式を採用します。</p></div></div>
+<div class="status"><strong>採用候補</strong>25.6 kHz原記録へFIRアンチエイリアス処理を施し、1/4分周した6.4 kHz FFT 128入力。旧モデルとの比較と全条件は、左メニューの「モデル比較レポート」を参照してください。</div>
+
 <h2>収録打点マップ</h2>
 <figure class="wide-figure"><svg viewBox="0 0 680 448" role="img" aria-labelledby="hitmap-title hitmap-desc" style="display:block;width:100%;height:auto">
 <title id="hitmap-title">学習データ収録の打点マップ</title>
@@ -67,7 +71,7 @@
 
 <h2>収録プロトコル</h2><div class="timeline"><div class="n">00</div><div><h3>パイロット収録で成立確認</h3><p>A中心8点 × 15打だけ先に収録し、SNR、トリガ、±8 g飽和、8クラスの分離を確認。問題があれば治具・センサ固定を直してから本収録へ。</p></div><div class="n">01</div><div><h3>治具を固定</h3><p>100 × 20 mm固定面、締付トルク、センサ中央位置、ケーブル拘束を記録。以後のセッションで固定方法は変えません。</p></div><div class="n">02</div><div><h3>アンカーと格子を分散収録</h3><p>各セッションでA中心30打とB格子10打を収録。位置順はランダム化します。打撃はマレットの中強度で統一。セッション間では治具の締め直しなど実運用の変化を意図的に入れます。</p></div><div class="n">03</div><div><h3>最終セッションをテストに温存</h3><p>板を一度外して再装着して収録し、学習には一切使いません。境界プローブCもテスト専用です。</p></div><div class="n">04</div><div><h3>3つの出力表現を横並び比較</h3><p>8エリア合格後、同一データでジョイント8スコア・8＋軸ビン併設・直接座標回帰を学習し、距離誤差（中央値・95パーセンタイル）で選定します。</p></div></div>
 
-<h2>単打イベントのデータ</h2><table class="spec"><tr><th>信号</th><td>Z軸符号付き波形</td><td>25.6 kHz、1,280点、50 ms</td></tr><tr><th>プリトリガ</th><td>128点（5 ms）</td><td>DC基準と打撃開始前の状態</td></tr><tr><th>教師</th><td>8要素one-hot</td><td>座標、音階、エリアIDもメタデータに保存。軸ビン・座標回帰の教師は座標から後生成</td></tr><tr><th>変動要因</th><td>操作者・セッション</td><td>打具はマレット固定。弱・強打は拡張フェーズで追加し、個別に性能を集計</td></tr></table>
+<h2>単打イベントのデータ</h2><table class="spec"><tr><th>信号</th><td>Z軸符号付き波形</td><td>25.6 kHz、2,048点、80 ms</td></tr><tr><th>プリトリガ</th><td>64点（2.5 ms）</td><td>DC基準と打撃開始前の状態</td></tr><tr><th>教師</th><td>8要素one-hot / XY 2値</td><td>座標、音階、エリアIDもメタデータに保存。座標回帰の教師はx/400、y/200</td></tr><tr><th>変動要因</th><td>操作者・セッション</td><td>打具はマレット固定。弱・強打は拡張フェーズで追加し、個別に性能を集計</td></tr></table>
 
 <h2>合格基準</h2><div class="grid"><div class="card"><span class="number">≥90%</span><small>8-ZONE ACCURACY</small><p>別セッションでの第一ゲート。デモ目標は95%以上。</p></div><div class="card"><span class="number">≤30 mm</span><small>MEDIAN POSITION ERROR</small><p>確率期待座標の暫定目標。95パーセンタイルも記録。50 mm細分化は中央値15 mm以下が条件。</p></div><div class="card"><span class="number">&lt;50 ms</span><small>DETECT TO RESULT</small><p>打撃開始からRESULT送信開始まで（前5 ms＋後45 msの50 ms窓を含む）。発音はPC側遅延が加算。</p></div></div>
 

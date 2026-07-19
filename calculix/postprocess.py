@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import subprocess
 from pathlib import Path
 
 import matplotlib
@@ -17,6 +18,14 @@ from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 import numpy as np
 
 NOTES = ("C4","D4","E4","G4","A4","C5","D5","E5")
+
+
+def save_video_preview(video_path: Path, image_path: Path, seconds: float = 2.0):
+    subprocess.run(
+        ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-ss", str(seconds),
+         "-i", str(video_path), "-frames:v", "1", str(image_path)],
+        check=True,
+    )
 
 
 def gradient_rolloff_compensation(fft_f, fs, passes=2, floor=0.05):
@@ -67,8 +76,8 @@ def dynamic_displacement(path, sensor_node):
     return np.array(times),np.array(values)
 
 
-def save_mode(path,nodes,mode,number,frequency):
-    ids=[n for n,xyz in nodes.items() if abs(xyz[2]-1)<1e-8 and n in mode]
+def save_mode(path,nodes,mode,number,frequency,top_z):
+    ids=[n for n,xyz in nodes.items() if abs(xyz[2]-top_z)<1e-8 and n in mode]
     x=np.array([nodes[n][0] for n in ids]); y=np.array([nodes[n][1] for n in ids]); z=np.array([mode[n][2] for n in ids])
     z/=max(np.max(np.abs(z)),1e-15); tri=mtri.Triangulation(x,y)
     fig,ax=plt.subplots(figsize=(7.2,3.8),constrained_layout=True)
@@ -92,7 +101,8 @@ def save_comparison(path,calc,old2d,old3d):
 
 def save_hit_animation(path,nodes,modes,metadata,duration=.06,frames=120):
     """Animate all eight point impacts from CalculiX mass-normalized modes."""
-    top_ids=[n for n,xyz in nodes.items() if abs(xyz[2]-1)<1e-8 and all(n in mode for _,mode in modes)]
+    top_z=metadata["sensor"]["xyz_mm"][2]
+    top_ids=[n for n,xyz in nodes.items() if abs(xyz[2]-top_z)<1e-8 and all(n in mode for _,mode in modes)]
     x=np.array([nodes[n][0] for n in top_ids]); y=np.array([nodes[n][1] for n in top_ids]); tri=mtri.Triangulation(x,y)
     frequencies=np.array([f for f,_ in modes]); omega=2*np.pi*frequencies; damping=.012
     wd=omega*np.sqrt(1-damping**2); times=np.linspace(0,duration,frames)
@@ -124,7 +134,8 @@ def save_hit_animation(path,nodes,modes,metadata,duration=.06,frames=120):
 
 def save_hit_perspective_animation(path,nodes,modes,metadata,duration=.06,frames=120,visual_z_mm=18.0):
     """Animate visibly exaggerated out-of-plane motion in an oblique view."""
-    top_ids=[n for n,xyz in nodes.items() if abs(xyz[2]-1)<1e-8 and all(n in mode for _,mode in modes)]
+    top_z=metadata["sensor"]["xyz_mm"][2]
+    top_ids=[n for n,xyz in nodes.items() if abs(xyz[2]-top_z)<1e-8 and all(n in mode for _,mode in modes)]
     x=np.array([nodes[n][0] for n in top_ids]); y=np.array([nodes[n][1] for n in top_ids]); tri=mtri.Triangulation(x,y)
     frequencies=np.array([f for f,_ in modes]); omega=2*np.pi*frequencies; damping=.012
     wd=omega*np.sqrt(1-damping**2); times=np.linspace(0,duration,frames)
@@ -170,9 +181,12 @@ def main():
     if args.long_videos_only:
         save_hit_animation(args.output/"calculix-eight-hits-long.mp4",nodes,modes,meta,duration=.32,frames=240)
         save_hit_perspective_animation(args.output/"calculix-eight-hits-perspective-long.mp4",nodes,modes,meta,duration=.32,frames=240)
+        save_video_preview(args.output/"calculix-eight-hits-long.mp4",args.output/"calculix-eight-hits-preview.png")
+        save_video_preview(args.output/"calculix-eight-hits-perspective-long.mp4",args.output/"calculix-eight-hits-perspective-preview.png")
         print(json.dumps({"duration_ms":320,"frames":240,"frequencies_hz":frequencies[:3]}))
         return
-    for index,(frequency,mode) in enumerate(modes[:8],1): save_mode(args.output/f"calculix-mode-{index}.svg",nodes,mode,index,frequency)
+    top_z=meta["sensor"]["xyz_mm"][2]
+    for index,(frequency,mode) in enumerate(modes[:8],1): save_mode(args.output/f"calculix-mode-{index}.svg",nodes,mode,index,frequency,top_z)
     signals=[]; time_ref=None
     for note in NOTES:
         t,u=dynamic_displacement(args.output/f"hit_{note.lower()}.dat",meta["sensor"]["node"])
@@ -199,6 +213,8 @@ def main():
     save_hit_perspective_animation(args.output/"calculix-eight-hits-perspective.mp4",nodes,modes,meta)
     save_hit_animation(args.output/"calculix-eight-hits-long.mp4",nodes,modes,meta,duration=.32,frames=240)
     save_hit_perspective_animation(args.output/"calculix-eight-hits-perspective-long.mp4",nodes,modes,meta,duration=.32,frames=240)
+    save_video_preview(args.output/"calculix-eight-hits-long.mp4",args.output/"calculix-eight-hits-preview.png")
+    save_video_preview(args.output/"calculix-eight-hits-perspective-long.mp4",args.output/"calculix-eight-hits-perspective-preview.png")
     result={**meta,"frequencies_hz":frequencies,"outputs":{"modes":min(8,len(modes)),"dynamic_samples":len(time_ref),"frequency_resolution_hz":round(float(fft_f[1]-fft_f[0]),6)}}
     (args.output/"calculix-results.json").write_text(json.dumps(result,ensure_ascii=False,indent=2),encoding="utf-8")
     print(json.dumps({"frequencies_hz":frequencies[:12],"samples":len(time_ref)}))

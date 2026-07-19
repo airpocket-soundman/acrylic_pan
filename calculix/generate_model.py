@@ -13,10 +13,14 @@ import matplotlib.pyplot as plt
 
 X_GRID = [0, 25, 50, 75, 100, 125, 150, 175, 190, 200, 210, 225, 250, 275, 290, 300, 310, 325, 350, 375, 400]
 Y_GRID = [0, 5, 10, 15, 20, 30, 50, 75, 90, 100, 110, 125, 150, 175, 200]
-Z_GRID = [-1, 0, 1]
+DEFAULT_THICKNESS_MM = 3.0
 HITS = [("C4", 50, 50), ("D4", 150, 50), ("E4", 250, 50), ("G4", 350, 50),
         ("A4", 50, 150), ("C5", 150, 150), ("D5", 250, 150), ("E5", 350, 150)]
-SENSOR = (200, 100, 1)
+
+
+def thickness_z_grid(thickness_mm):
+    half = thickness_mm / 2.0
+    return [-half, 0.0, half]
 
 
 def chunks(values, count=16):
@@ -59,12 +63,12 @@ def write_set(handle, name, node_numbers):
         handle.write(",".join(map(str, group)) + "\n")
 
 
-def save_mesh_figure(path, coordinates, elements, fixed):
+def save_mesh_figure(path, coordinates, elements, fixed, sensor):
     fig, ax = plt.subplots(figsize=(10, 5), constrained_layout=True)
     for x in X_GRID: ax.plot([x,x], [0,200], color="#78909c", lw=0.45)
     for y in Y_GRID: ax.plot([0,400], [y,y], color="#78909c", lw=0.45)
     ax.fill_between([200,300], 0, 20, color="#e2633b", alpha=0.55, label="fixed volume")
-    ax.scatter([SENSOR[0]], [SENSOR[1]], marker="D", s=55, color="#34d399", edgecolor="#111827", label="sensor")
+    ax.scatter([sensor[0]], [sensor[1]], marker="D", s=55, color="#34d399", edgecolor="#111827", label="sensor")
     ax.scatter([h[1] for h in HITS], [h[2] for h in HITS], marker="*", s=75, color="#f5b942", edgecolor="#111827", label="hit points")
     ax.set(xlim=(0,400), ylim=(200,0), xlabel="x [mm]", ylabel="y [mm]",
            title=f"CalculiX graded C3D20R mesh — {len(elements)} elements, {len(coordinates)} nodes")
@@ -74,12 +78,17 @@ def save_mesh_figure(path, coordinates, elements, fixed):
 
 def main():
     parser = argparse.ArgumentParser(); parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--thickness-mm", type=float, default=DEFAULT_THICKNESS_MM)
     args = parser.parse_args(); args.output.mkdir(parents=True, exist_ok=True)
-    nodes, coordinates, elements = build_mesh()
+    if args.thickness_mm <= 0:
+        parser.error("--thickness-mm must be positive")
+    z_grid = thickness_z_grid(args.thickness_mm)
+    sensor_xyz = (200, 100, z_grid[-1])
+    nodes, coordinates, elements = build_mesh(z_grid=z_grid)
     fixed = [n for n,(x,y,z) in coordinates.items() if 200-1e-8 <= x <= 300+1e-8 and 0-1e-8 <= y <= 20+1e-8]
-    top = [n for n,(x,y,z) in coordinates.items() if abs(z-1) < 1e-8]
-    sensor = nodes[SENSOR]
-    hit_nodes = {note:nodes[(x,y,1)] for note,x,y in HITS}
+    top = [n for n,(x,y,z) in coordinates.items() if abs(z-z_grid[-1]) < 1e-8]
+    sensor = nodes[sensor_xyz]
+    hit_nodes = {note:nodes[(x,y,z_grid[-1])] for note,x,y in HITS}
     observation = [sensor, *hit_nodes.values()]
 
     inp = args.output / "acrylic_pan.inp"
@@ -100,15 +109,16 @@ def main():
         f.write("*NODE FILE,NSET=TOPSURFACE,GLOBAL=YES\nU\n*NODE PRINT,NSET=OBSERVATION,GLOBAL=YES\nU\n*END STEP\n")
 
     metadata = {"solver":"CalculiX CrunchiX 2.20","element":"C3D20R","integration":"reduced",
-                "mesh":{"elements":len(elements),"nodes":len(coordinates),"x_grid_mm":X_GRID,"y_grid_mm":Y_GRID,"z_grid_mm":Z_GRID},
+                "thickness_mm":args.thickness_mm,
+                "mesh":{"elements":len(elements),"nodes":len(coordinates),"x_grid_mm":X_GRID,"y_grid_mm":Y_GRID,"z_grid_mm":z_grid},
                 "material":{"E_MPa":3200,"poisson":0.35,"density_tonne_mm3":1.18e-9},
-                "fixed":{"x_mm":[200,300],"y_mm":[0,20],"z_mm":[-1,1],"nodes":len(fixed)},
-                "sensor":{"node":sensor,"xyz_mm":SENSOR},
-                "hits":[{"note":note,"node":hit_nodes[note],"xyz_mm":[x,y,1]} for note,x,y in HITS],
+                "fixed":{"x_mm":[200,300],"y_mm":[0,20],"z_mm":[z_grid[0],z_grid[-1]],"nodes":len(fixed)},
+                "sensor":{"node":sensor,"xyz_mm":sensor_xyz},
+                "hits":[{"note":note,"node":hit_nodes[note],"xyz_mm":[x,y,z_grid[-1]]} for note,x,y in HITS],
                 "frequency_step":{"requested_modes":30,"range_hz":[0,1200],"storage":True}}
     (args.output/"model-metadata.json").write_text(json.dumps(metadata,ensure_ascii=False,indent=2),encoding="utf-8")
     (args.output/"mesh-nodes.json").write_text(json.dumps({str(k):v for k,v in coordinates.items()}),encoding="utf-8")
-    save_mesh_figure(args.output/"calculix-graded-mesh.svg",coordinates,elements,fixed)
+    save_mesh_figure(args.output/"calculix-graded-mesh.svg",coordinates,elements,fixed,sensor_xyz)
     base = inp.read_text(encoding="ascii").split("*STEP", 1)[0]
     for note, _x, _y in HITS:
         job = f"hit_{note.lower()}"

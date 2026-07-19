@@ -5,7 +5,7 @@ param(
     [ValidateRange(1, 65535)]
     [int]$Port = 8765,
     [string]$Output = "data/raw/sessions",
-    [ValidateSet("index.html", "collector.html")]
+    [ValidateSet("index.html", "collector.html", "position.html", "instrument.html")]
     [string]$Page = "index.html",
     [switch]$NoBrowser,
     [switch]$InstallDependencies
@@ -27,7 +27,7 @@ if ($InstallDependencies) {
     if ($LASTEXITCODE -ne 0) { throw "Installing Python dependencies failed." }
 }
 
-& $Python -c "import numpy, serial"
+& $Python -c "import joblib, numpy, serial, sklearn"
 if ($LASTEXITCODE -ne 0) {
     throw "Required Python packages are missing. Run again with -InstallDependencies."
 }

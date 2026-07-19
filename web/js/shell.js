@@ -1,4 +1,4 @@
-const pages = new Set(['overview','hardware','mechanics','simulation-plate','simulation','simulation-calculix','ai','firmware','implementation-plan','solist-simulator','experiment','references']);
+const pages = new Set(['overview','hardware','mechanics','simulation-plate','simulation','simulation-calculix','fem-measured-report','ai','firmware','implementation-plan','solist-simulator','model-report','experiment','references']);
 const frame = document.getElementById('content-frame');
 const sidebar = document.querySelector('.sidebar');
 const menuButton = document.querySelector('.menu-button');

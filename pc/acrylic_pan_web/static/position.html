@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Acrylic Pan 位置推定</title>
+  <link rel="stylesheet" href="/style.css?v=20260719-1">
+  <link rel="stylesheet" href="/controls.css?v=20260718-1">
+  <link rel="stylesheet" href="/tabs.css?v=20260719-1">
+  <link rel="stylesheet" href="/position.css?v=20260719-4">
+</head>
+<body><main>
+  <header><div><h1>Acrylic Pan 位置推定</h1><p>PCニューラルネットワークのXY推定座標と校正済み不確実性をリアルタイム表示します</p></div><span id="connection" class="badge">未接続</span></header>
+  <nav class="app-tabs" role="tablist" aria-label="動作モード">
+    <a role="tab" aria-selected="false" href="/collector.html">学習データ採取</a>
+    <a role="tab" aria-selected="false" href="/">推論結果</a>
+    <a role="tab" aria-selected="true" class="active" href="/position.html">位置推定</a>
+    <a role="tab" aria-selected="false" href="/instrument.html">楽器</a>
+  </nav>
+  <section class="controls card">
+    <label>COMポート <select id="port"></select></label><button id="refresh">更新</button>
+    <button id="connect">接続</button><button id="disconnect" disabled>切断</button>
+    <button id="positionStart" disabled>位置推定開始</button><button id="positionStop" disabled>停止</button>
+    <button id="positionDemo" type="button">表示デモ</button><span id="firmwareMode" class="badge">モード不明</span>
+  </section>
+  <div id="positionStatus" class="position-status">接続後、「位置推定開始」を押してアクリル板をたたいてください。</div>
+  <div id="error" class="error" role="alert"></div>
+
+  <section class="position-layout">
+    <div class="position-main">
+      <div class="card position-stage">
+      <div class="position-heading"><div><span class="kicker">XY ESTIMATE + UNCERTAINTY</span><h2>推定座標・不確実性分布</h2></div><div id="coordinateReadout" class="coordinate-readout">X — / Y —</div></div>
+      <div id="positionPanel" class="position-panel" aria-label="400 × 200 mm アクリル板上の推定座標と不確実性分布" aria-live="polite">
+        <canvas id="positionHeatmap" width="800" height="400"></canvas>
+        <div class="panel-grid" aria-hidden="true"></div>
+        <div id="positionMarker" class="position-marker" hidden><span></span></div>
+        <div class="sensor-marker" aria-label="加速度センサ位置"><span>sensor</span></div>
+        <div class="clamp-marker" aria-label="固定領域"><span>固定</span></div>
+      </div>
+      <div class="position-axis"><span>0 mm</span><span>400 mm</span></div>
+      <p id="scopeNote" class="scope-note">8中心点の教師データから推定したXY座標と、検証誤差で校正した不確実性分布です。</p>
+      </div>
+      <aside class="position-side">
+        <div class="card metric-card"><span class="kicker">ESTIMATE</span><div class="metric-row"><span>推定座標</span><strong id="metricCoordinate">—</strong></div><div class="metric-row"><span>信頼水準</span><strong id="metricConfidence">—</strong></div><div class="metric-row"><span>90%誤差楕円</span><strong id="metricRegion">—</strong></div><div class="metric-row"><span>分布形状</span><strong id="metricSigma">—</strong></div><div class="metric-row"><span>処理方式</span><strong id="metricMethod">—</strong></div></div>
+        <div class="card"><span class="kicker">AREA PROBABILITY</span><h2>8エリア確率</h2><div id="areaProbabilities" class="area-probabilities"></div></div>
+        <div class="card interpolation-note"><strong>表示の意味</strong><p>白い十字がXY回帰の推定座標です。色分布はLOSO検証の実測誤差で90%被覆に校正した二次元ガウスで、モデル間の予測差も不確実性として加えています。</p></div>
+      </aside>
+    </div>
+    <aside class="position-camera">
+      <div class="card camera-card">
+        <div class="position-heading"><div><span class="kicker">CAMERA</span><h2>USBカメラ</h2></div><span id="cameraState" class="camera-state">準備中</span></div>
+        <div class="camera-viewport">
+          <video id="usbCamera" autoplay playsinline muted aria-label="USBカメラ映像"></video>
+          <div id="cameraPlaceholder" class="camera-placeholder">使用するUSBカメラを選んで「カメラ開始」を押してください</div>
+        </div>
+        <div class="camera-controls">
+          <label>カメラ<select id="cameraDevice"></select></label>
+          <button id="cameraStart" type="button">カメラ開始</button>
+          <button id="cameraStop" type="button" disabled>停止</button>
+        </div>
+      </div>
+    </aside>
+  </section>
+</main><script src="/position.js?v=20260719-5"></script></body>
+</html>
