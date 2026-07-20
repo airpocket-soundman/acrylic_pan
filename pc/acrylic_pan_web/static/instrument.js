@@ -1,7 +1,7 @@
 const $ = id => document.getElementById(id);
 const STORAGE_KEY = 'acrylicPanInstrumentV1';
-const DEFAULT_NOTES = ['C4', 'D4', 'E4', 'G4', 'A4', 'C5', 'D5', 'E5'];
-const MARIO_NOTES = ['E4', 'G4', 'A4', 'A#4', 'B4', 'C5', 'E5', 'G5'];
+const DEFAULT_NOTES = ['C4','D4','E4','F4','G4','A4','B4','C5','D5','E5','F5','G5'];
+const MARIO_NOTES = ['E4', 'G4', 'A4', 'A#4', 'B4', 'C5', 'E5', 'G5'].concat(['A5','B5','C6','E6']);
 const DEFAULTS = {instrument:'steel_drum',masterVolume:.70,transpose:0,brightness:.65,attack:.005,decay:.35,sustain:.18,release:.90,echoMix:.18,echoDelay:.18,echoFeedback:.24,velocity:.70,retriggerGuardMs:80,notes:DEFAULT_NOTES};
 const NOTE_NAMES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
 const STEEL_PARTIALS = [[1,.82,1],[2,.22,.72],[3.01,.09,.44],[4.08,.042,.28],[5.16,.018,.18]];
@@ -13,6 +13,7 @@ let inferenceLoopRunning = false;
 let audio = null;
 let hitClearTimer = null;
 let cameraStream = null;
+let panelClassCount = 8;
 const CAMERA_STORAGE_KEY = 'acrylicPanCameraDevice';
 
 async function api(path, body) {
@@ -25,6 +26,7 @@ async function api(path, body) {
     error.status = response.status;
     throw error;
   }
+  if(path==='/api/status'&&data.panel){window.panelProfileUi?.sync(data);configurePanel(data.panel);}
   return data;
 }
 
@@ -40,7 +42,8 @@ function loadSettings() {
     return {...DEFAULTS,...saved,notes:[...active.notes],mappingProfiles:profiles,activeMappingProfileId:activeId};
   } catch (_) { return {...DEFAULTS,notes:[...DEFAULT_NOTES],mappingProfiles:[{id:'mapping-default',name:'標準プロファイル',notes:[...DEFAULT_NOTES]},{id:'mapping-mario',name:'mario',notes:[...MARIO_NOTES]}],activeMappingProfileId:'mapping-default'}; }
 }
-function validNotes(notes){return Array.isArray(notes)&&notes.length===8&&notes.every(note=>typeof note==='string');}
+function validNotes(notes){return Array.isArray(notes)&&notes.length>=1&&notes.length<=12&&notes.every(note=>typeof note==='string');}
+function notesForCount(notes){return Array.from({length:panelClassCount},(_,index)=>notes[index]||DEFAULT_NOTES[index]);}
 function activeProfile(){return settings.mappingProfiles.find(profile=>profile.id===settings.activeMappingProfileId)||settings.mappingProfiles[0];}
 function syncActiveProfile(){const profile=activeProfile();if(profile)profile.notes=[...settings.notes];}
 function saveSettings() { syncActiveProfile();localStorage.setItem(STORAGE_KEY, JSON.stringify(settings)); }
@@ -111,7 +114,7 @@ function outputValue(id,value){const el=$(id);if(el)el.value=value;}
 function renderSettings(){
   $('instrumentSelect').value=settings.instrument;
   for(const id of ['masterVolume','transpose','brightness','attack','decay','sustain','release','echoMix','echoDelay','echoFeedback','velocity','retriggerGuardMs']) $(id).value=settings[id];
-  settings.notes.forEach((note,index)=>{$(`areaNote${index}`).value=note;});
+  settings.notes.slice(0,panelClassCount).forEach((note,index)=>{if($(`areaNote${index}`))$(`areaNote${index}`).value=note;});
   renderProfileControls();updateLabels(); updateGridNotes(); if(audio)audio.update();
 }
 function renderProfileControls(){
@@ -132,11 +135,11 @@ function updateLabels(){
 }
 function updateGridNotes(){document.querySelectorAll('#hitGrid [data-class]').forEach(cell=>cell.querySelector('span').textContent=settings.notes[Number(cell.dataset.class)]);}
 function setupControls(){
-  const options=noteOptions().map(note=>`<option value="${note}">${note}</option>`).join('');for(let i=0;i<8;i++)$(`areaNote${i}`).innerHTML=options;
+  const options=noteOptions().map(note=>`<option value="${note}">${note}</option>`).join('');for(let i=0;i<panelClassCount;i++)$(`areaNote${i}`).innerHTML=options;
   $('instrumentSelect').onchange=e=>{settings.instrument=e.target.value;saveSettings();};
   for(const id of ['masterVolume','transpose','brightness','attack','decay','sustain','release','echoMix','echoDelay','echoFeedback','velocity','retriggerGuardMs']) $(id).oninput=e=>{settings[id]=id==='transpose'?Number.parseInt(e.target.value,10):Number(e.target.value);updateLabels();saveSettings();if(audio)audio.update();};
   $('retriggerGuardMs').onchange=()=>api('/api/inference/retrigger',{milliseconds:Number(settings.retriggerGuardMs)}).catch(error=>$('error').textContent=error.message);
-  for(let i=0;i<8;i++)$(`areaNote${i}`).onchange=e=>{settings.notes[i]=e.target.value;updateGridNotes();saveSettings();};
+  for(let i=0;i<panelClassCount;i++)$(`areaNote${i}`).onchange=e=>{settings.notes[i]=e.target.value;updateGridNotes();saveSettings();};
   const selectProfile=e=>{syncActiveProfile();settings.activeMappingProfileId=e.target.value;settings.notes=[...activeProfile().notes];renderSettings();saveSettings();};
   $('mappingProfileSelect').onchange=selectProfile;
   $('mappingProfileEditSelect').onchange=selectProfile;
@@ -149,6 +152,21 @@ function setupControls(){
   $('soundSettingsOpen').onclick=()=>$('soundSettingsDialog').showModal();
   $('mappingSettingsOpen').onclick=()=>$('mappingSettingsDialog').showModal();
   renderSettings();
+}
+
+function configurePanel(panel){
+  const count=Number(panel.class_count)||8;
+  if(count===panelClassCount&&$('hitGrid').children.length===count){window.panelProfileUi?.applyPanel(panel);return;}
+  panelClassCount=count;
+  settings.mappingProfiles.forEach(profile=>profile.notes=notesForCount(profile.notes));
+  settings.notes=notesForCount(settings.notes);
+  $('hitGrid').innerHTML=Array.from({length:count},(_,i)=>`<button type="button" data-class="${i}"><b>エリア${i+1}</b><span>${settings.notes[i]}</span></button>`).join('');
+  const mapping=document.querySelector('.mapping-grid');
+  mapping.innerHTML=Array.from({length:count},(_,i)=>`<label>エリア${i+1}<select id="areaNote${i}"></select></label>`).join('');
+  const options=noteOptions().map(note=>`<option value="${note}">${note}</option>`).join('');
+  for(let i=0;i<count;i++){$(`areaNote${i}`).innerHTML=options;$(`areaNote${i}`).value=settings.notes[i];$(`areaNote${i}`).onchange=e=>{settings.notes[i]=e.target.value;updateGridNotes();saveSettings();};}
+  document.querySelectorAll('#hitGrid [data-class]').forEach(cell=>cell.onclick=async()=>{await ensureAudio();playArea(Number(cell.dataset.class),.8,true);});
+  window.panelProfileUi?.applyPanel(panel);renderScores();saveSettings();
 }
 
 function cameraErrorMessage(error){
@@ -203,7 +221,7 @@ async function setupCamera(){
   if(navigator.mediaDevices?.addEventListener)navigator.mediaDevices.addEventListener('devicechange',()=>refreshCameras().catch(()=>{}));
   window.addEventListener('pagehide',releaseCamera);
 }
-function renderScores(outputs=[]){$('scoreBars').innerHTML=Array.from({length:8},(_,i)=>{const raw=Number(outputs[i]||0),height=Math.max(3,Math.min(100,raw*100));return `<div class="score-bar"><i style="height:${height}%"></i><span>${i+1}</span></div>`;}).join('');}
+function renderScores(outputs=[]){$('scoreBars').innerHTML=Array.from({length:panelClassCount},(_,i)=>{const raw=Number(outputs[i]||0),height=Math.max(3,Math.min(100,raw*100));return `<div class="score-bar"><i style="height:${height}%"></i><span>${i+1}</span></div>`;}).join('');}
 function displayArea(area){
   const note=settings.notes[area]||DEFAULT_NOTES[area],bits=area.toString(2).padStart(3,'0');
   $('lastNote').textContent=`A${area+1} ${note} · ${bits}`;

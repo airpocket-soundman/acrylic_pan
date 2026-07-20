@@ -18,12 +18,12 @@
 #include "mcu.h"
 #include "smpl_common_led.h"
 
-/* Ten no-impact captures on the target board observed adjacent Z differences
-   up to 1351 LSB (99.99 percentile about 1298 LSB).  Keep margin above that
-   static-noise envelope while retaining sensitivity to a real acrylic hit. */
-#define DEFAULT_JERK_THRESHOLD  (1000U)
+/* The 5 mm panel produces a gentler leading edge than the 3 mm panel.  Survey
+   data showed 22.7% of valid hits between 1000 and 1100 LSB, so use a lower
+   candidate threshold and let the stronger confirmation gate reject noise. */
+#define DEFAULT_JERK_THRESHOLD  (700U)
 #define DEFAULT_LEVEL_THRESHOLD (200U)
-#define DEFAULT_CONFIRM_THRESHOLD (2000U)
+#define DEFAULT_CONFIRM_THRESHOLD (3000U)
 #define DEFAULT_CONFIRM_SAMPLES   (16U)
 #define APAN_CPU_CLOCK_HZ        (48000000UL)
 #define APAN_SYSTICK_RELOAD      (0x00FFFFFFUL)
@@ -51,6 +51,7 @@ static uint8_t warmup_blocks;
 static uint8_t ui_status;
 static uint8_t operating_mode;
 static bool inference_telemetry_pending;
+static bool inference_rearm_pending;
 static uint8_t inference_class_id;
 static float inference_outputs[APAN_INFERENCE_OUTPUT_COUNT];
 static uint32_t inference_sequence;
@@ -178,6 +179,10 @@ static void inference_transmit_complete(uint32_t count, uint16_t error_status)
     inference_telemetry_pending = false;
     ApanCaptureReleaseEvent(&capture);
     collector_stopped = true;
+    /* Live inference must not depend on the PC receiving telemetry and
+       sending another START.  Defer SensorStart to the main loop because
+       this callback runs in the UART completion context. */
+    inference_rearm_pending = (operating_mode == APAN_MODE_INFERENCE);
     Uart1StartReadByte(receive_byte);
 }
 
@@ -366,7 +371,7 @@ static void send_inference_result(void)
 {
     const ApanEvent *event = ApanCaptureGetEvent(&capture);
     float output[APAN_INFERENCE_OUTPUT_COUNT];
-    uint8_t payload[36];
+    uint8_t payload[4U + (APAN_INFERENCE_OUTPUT_COUNT * 4U)];
     uint8_t class_id;
     uint8_t index;
     size_t encoded_size;
@@ -412,7 +417,7 @@ static void send_inference_result(void)
         lcd_inference_us = elapsed_systick_us(inference_start, inference_end);
         lcd_result_pending = true;
         display_area_on_leds(class_id);
-        /* Send the 36-byte class result before the 1 kB waveform.  At
+        /* Send the compact class result before the 1 kB waveform.  At
            115200 bit/s this makes the instrument react after roughly one
            5 ms result frame instead of waiting about 95 ms for telemetry. */
         inference_class_id = class_id;
@@ -437,7 +442,7 @@ static void send_inference_result(void)
         {
             encoded_size = ApanProtocolEncodeFrame(
                 APAN_MESSAGE_AI_RESULT, 0U, inference_sequence, 0U,
-                payload, 36U, transmit_buffer, sizeof(transmit_buffer));
+                payload, sizeof(payload), transmit_buffer, sizeof(transmit_buffer));
             if (encoded_size > 0U)
             {
                 transmit_busy = true;
@@ -449,7 +454,7 @@ static void send_inference_result(void)
             collector_stopped = true;
             return;
         }
-        write_protocol(APAN_MESSAGE_AI_RESULT, inference_sequence, payload, 36U);
+        write_protocol(APAN_MESSAGE_AI_RESULT, inference_sequence, payload, sizeof(payload));
         return;
     }
     ApanCaptureReleaseEvent(&capture);
@@ -535,6 +540,13 @@ void ApanCollectorAppProcess(void)
     uint8_t request_type;
     uint8_t payload[36];
 
+    if (inference_rearm_pending)
+    {
+        inference_rearm_pending = false;
+        ApanCaptureReset(&capture);
+        collector_stopped = false;
+        SensorStart();
+    }
     if (instrument_transmit_done)
     {
         instrument_transmit_done = false;
@@ -701,15 +713,24 @@ void ApanCollectorAppProcess(void)
             break;
         }
         case COMMAND_SET_MODE:
-            if (!collector_stopped || force_capture || ApanCaptureEventReady(&capture) ||
-                (pending_mode > APAN_MODE_INSTRUMENT))
+            if (pending_mode > APAN_MODE_INSTRUMENT)
             {
                 payload[0] = request_type;
-                payload[1] = (pending_mode > APAN_MODE_INSTRUMENT) ? 2U : 1U;
+                payload[1] = 2U;
                 write_protocol(APAN_MESSAGE_NACK, request_sequence, payload, 2U);
             }
             else
             {
+                /* A mode request is an explicit boundary.  Stop and discard
+                   any partial capture so an auto-rearmed inference loop can
+                   switch directly to instrument/collection mode. */
+                SensorStop();
+                ApanCaptureReset(&capture);
+                force_capture = false;
+                inference_telemetry_pending = false;
+                inference_rearm_pending = false;
+                instrument_transmit_done = false;
+                collector_stopped = true;
                 operating_mode = pending_mode;
                 (void)ApanCaptureSetTargetSamples(
                     &capture,

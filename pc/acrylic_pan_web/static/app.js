@@ -54,6 +54,8 @@ function updateActionState(data) {
 async function status() {
   try {
     const data = await api('/api/status');
+    window.panelProfileUi?.sync(data);
+    ensureAreaGrid(data.panel);
     const stats = data.stats;
     $('connection').textContent = data.connected ? `接続中 ${data.port}` : '未接続';
     $('connection').classList.toggle('online', data.connected);
@@ -152,7 +154,7 @@ function drawCollection(collection) {
     } else {
       const header = `<div class="position-row position-header"><b>ラベル</b>${points.map(point =>
         `<b>${pointLabels[point.point_name] || point.point_name}</b>`).join('')}<b>合計</b></div>`;
-      const rows = Array.from({length: 8}, (_, classId) => {
+      const rows = Array.from({length: collection.panel.class_count}, (_, classId) => {
         const cells = points.map(point => {
           const item = byKey.get(`${classId}:${point.point_id}`);
           const count = item ? item.count : 0;
@@ -191,6 +193,28 @@ function drawCollection(collection) {
   $('collectionUndo').disabled = !collection.active || collection.completed_samples <= 0;
   $('collectionRepetitions').disabled = collection.active;
   $('collectionPattern').disabled = collection.active;
+}
+
+function ensureAreaGrid(panel) {
+  if (!panel) return;
+  const grid = $('collectionGrid') || $('hitGrid');
+  if (!grid || grid.classList.contains('instrument-grid')) return;
+  const selector = grid.id === 'collectionGrid' ? '.collection-cell' : '[data-class]';
+  const current = grid.querySelectorAll(selector);
+  if (current.length === panel.class_count) return;
+  current.forEach(element => element.remove());
+  const fragment = document.createDocumentFragment();
+  for (let area = 0; area < panel.class_count; area++) {
+    const cell = document.createElement('div');
+    if (grid.id === 'collectionGrid') {
+      cell.className = 'collection-cell'; cell.dataset.area = area;
+      cell.innerHTML = `<b>エリア${area + 1}</b><span>0 / 0</span>`;
+    } else {
+      cell.dataset.class = area; cell.textContent = `エリア${area + 1}`;
+    }
+    fragment.appendChild(cell);
+  }
+  grid.insertBefore(fragment, grid.firstChild);
 }
 
 let pointsSignature = null;
@@ -244,7 +268,8 @@ function renderPoints(points, panel, activeIndex, interactive) {
 async function previewPoints(force) {
   const pattern = $('collectionPattern').value;
   if (force || pattern !== previewPattern || !previewTargets) {
-    previewTargets = await api(`/api/collection/targets?pattern=${encodeURIComponent(pattern)}`);
+    const profile = $('panelProfile')?.value || window.panelProfileUi?.currentId || '';
+    previewTargets = await api(`/api/collection/targets?pattern=${encodeURIComponent(pattern)}&panel_profile_id=${encodeURIComponent(profile)}`);
     previewPattern = pattern;
     pointsSignature = null;
   }
@@ -526,7 +551,8 @@ if ($('collectionStart')) $('collectionStart').onclick = async () => {
     await api('/api/collection/start', {
       repetitions,
       output_root: $('output').value,
-      position_pattern: $('collectionPattern').value
+      position_pattern: $('collectionPattern').value,
+      panel_profile_id: $('panelProfile')?.value
     });
     await status();
   } catch (error) { $('error').textContent = error.message; }

@@ -24,7 +24,7 @@ int main(int argc, char **argv)
     size_t command_size;
     FILE *output;
     ApanCapture threshold_capture;
-    ApanCaptureConfig production_threshold = { 1000U, 200U, 2000U, 16U };
+    ApanCaptureConfig production_threshold = { 700U, 200U, 3000U, 16U };
     int16_t gravity_history[APAN_PRETRIGGER_SAMPLES];
 
     CHECK(argc == 2);
@@ -111,21 +111,21 @@ int main(int argc, char **argv)
     CHECK(command.payload_size == 0U);
 
     /* At 32 g, static Z gravity is about 1024 LSB and satisfies the raw level
-       gate. A 1000-LSB crossing is only a candidate: it must be followed by
-       2000 LSB of baseline-relative displacement within 16 samples. */
+       gate. A 700-LSB crossing is only a candidate: it must be followed by
+       3000 LSB of baseline-relative displacement within 16 samples. */
     for (i = 0U; i < APAN_PRETRIGGER_SAMPLES; i++)
     {
         gravity_history[i] = 1000;
     }
     ApanCaptureInit(&threshold_capture, &production_threshold);
     ApanCaptureFeed(&threshold_capture, gravity_history, APAN_PRETRIGGER_SAMPLES);
-    gravity_history[0] = 1999;
+    gravity_history[0] = 1699;
     ApanCaptureFeed(&threshold_capture, gravity_history, 1U);
     CHECK(!threshold_capture.collecting);
     gravity_history[0] = 1000;
     ApanCaptureFeed(&threshold_capture, gravity_history, 1U);
     CHECK(!threshold_capture.collecting);
-    gravity_history[0] = 2000;
+    gravity_history[0] = 1700;
     ApanCaptureFeed(&threshold_capture, gravity_history, 1U);
     CHECK(threshold_capture.collecting);
     CHECK(threshold_capture.event.trigger_index == APAN_PRETRIGGER_SAMPLES);
@@ -143,7 +143,7 @@ int main(int argc, char **argv)
         gravity_history[i] = 1000;
     }
     ApanCaptureFeed(&threshold_capture, gravity_history, APAN_PRETRIGGER_SAMPLES);
-    gravity_history[0] = 2000;
+    gravity_history[0] = 1700;
     ApanCaptureFeed(&threshold_capture, gravity_history, 1U);
     gravity_history[0] = 4000;
     ApanCaptureFeed(&threshold_capture, gravity_history, 1U);

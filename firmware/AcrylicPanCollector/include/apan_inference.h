@@ -6,7 +6,7 @@
 
 #include "apan_capture.h"
 
-#define APAN_INFERENCE_OUTPUT_COUNT (8U)
+#define APAN_INFERENCE_OUTPUT_COUNT (12U)
 
 void ApanInferenceInitialize(void);
 bool ApanInferencePredict(const ApanEvent *event,

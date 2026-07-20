@@ -7,9 +7,10 @@
   <link rel="stylesheet" href="/style.css?v=20260718-4">
   <link rel="stylesheet" href="/controls.css?v=20260718-1">
   <link rel="stylesheet" href="/tabs.css?v=20260718-4">
+  <link rel="stylesheet" href="/panel-profile.css?v=20260720-1">
 </head>
 <body><main>
-  <header><div><h1>Acrylic Pan 8エリア分類</h1><p>実測振動から、たたかれたエリアを表示します</p></div><span id="connection" class="badge">未接続</span></header>
+  <header><div><h1>Acrylic Pan <span data-panel-class-count>8</span>エリア分類</h1><p>実測振動から、たたかれたエリアを表示します</p></div><span id="connection" class="badge">未接続</span></header>
   <nav class="app-tabs" role="tablist" aria-label="動作モード">
     <a role="tab" aria-selected="false" href="/collector.html">学習データ採取</a>
     <a role="tab" aria-selected="true" class="active" href="/">推論結果</a>
@@ -17,6 +18,7 @@
     <a role="tab" aria-selected="false" href="/instrument.html">楽器</a>
   </nav>
   <section class="controls card">
+    <label>板仕様 <select id="panelProfile"></select></label>
     <label>COMポート <select id="port"></select></label><button id="refresh">更新</button>
     <button id="connect">接続</button><button id="disconnect" disabled>切断</button>
     <button id="ping" disabled>ボード確認</button><button id="inferenceStart" disabled>推論開始</button>
@@ -35,4 +37,4 @@
   <section class="card plot"><h2>判定に使用した振動波形</h2><canvas id="wave" width="1100" height="280"></canvas></section>
   <section class="card plot"><h2>振動波形のFFT</h2><canvas id="fft" width="1100" height="280"></canvas></section>
   <footer id="eventInfo">打撃を検出すると、判定エリア、振動波形、FFTを更新します。</footer>
-</main><script src="/app.js?v=20260718-4"></script></body></html>
+</main><script src="/panel-profile.js?v=20260720-1"></script><script src="/app.js?v=20260720-1"></script></body></html>

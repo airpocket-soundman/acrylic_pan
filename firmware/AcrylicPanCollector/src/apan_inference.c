@@ -5,7 +5,7 @@
 
 #define ODL_DISABLE_RAND_GENERATOR_ALPHA
 #include "solistAi.h"
-#include "apan_8class_model.h"
+#include "apan_12class_model.h"
 #include "smpl_common.h"
 #include "wdt.h"
 

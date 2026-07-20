@@ -8,6 +8,7 @@ from pc.acrylic_pan_monitor.protocol import (
     EventAssembler,
     EVENT_CHUNK_HEADER,
     AI_RESULT_PAYLOAD,
+    AI_RESULT_12_PAYLOAD,
     Frame,
     FrameStreamDecoder,
     MessageType,
@@ -65,6 +66,17 @@ class ProtocolTests(unittest.TestCase):
         self.assertEqual(len(result.outputs), 8)
         self.assertAlmostEqual(result.outputs[3], 0.9, places=6)
 
+    def test_ai_result_decodes_twelve_float_outputs(self):
+        outputs = tuple(float(index) / 10 for index in range(12))
+        frame = Frame(
+            MessageType.AI_RESULT, 18,
+            AI_RESULT_12_PAYLOAD.pack(0xFF, 11, 0, *outputs),
+        )
+        result = decode_ai_result(frame)
+        self.assertEqual(result.predicted_class, 11)
+        self.assertEqual(len(result.outputs), 12)
+        self.assertAlmostEqual(result.outputs[11], 1.1, places=6)
+
     def test_inference_event_contains_class_and_source_waveform(self):
         samples = (-20, 0, 120, -80, 10)
         outputs = (0.1, 0.2, 0.8, 0.0, -0.1, 0.1, 0.2, 0.3)
@@ -79,6 +91,19 @@ class ProtocolTests(unittest.TestCase):
         self.assertEqual(combined.result.sequence, 99)
         self.assertEqual(combined.event.samples, samples)
         self.assertEqual(combined.event.trigger_index, 2)
+
+    def test_inference_event_accepts_twelve_class_scores(self):
+        samples = (-20, 0, 120, -80, 10)
+        outputs = tuple(float(index) / 10 for index in range(12))
+        event_header = struct.pack("<IHHHH", 25_600, len(samples), 2, 120, 0)
+        payload = AI_RESULT_12_PAYLOAD.pack(0xFF, 11, 0, *outputs)
+        frame = Frame(
+            MessageType.INFERENCE_EVENT, 100,
+            event_header + payload + struct.pack("<5h", *samples),
+        )
+        combined = decode_inference_event(frame)
+        self.assertEqual(combined.result.predicted_class, 11)
+        self.assertEqual(len(combined.result.outputs), 12)
 
     def test_long_event_reassembles_out_of_order_once(self):
         source = tuple(range(2048))

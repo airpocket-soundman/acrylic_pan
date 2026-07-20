@@ -8,10 +8,11 @@
   <link rel="stylesheet" href="/controls.css?v=20260718-1">
   <link rel="stylesheet" href="/tabs.css?v=20260718-4">
   <link rel="stylesheet" href="/instrument.css?v=20260718-8">
+  <link rel="stylesheet" href="/panel-profile.css?v=20260720-1">
 </head>
 <body><main>
   <header>
-    <div><h1>Acrylic Pan Instrument</h1><p>8エリア推論を音階へ変換して、ブラウザからリアルタイムに発音します。</p></div>
+    <div><h1>Acrylic Pan Instrument</h1><p><span data-panel-class-count>8</span>エリア推論を音階へ変換して、ブラウザからリアルタイムに発音します。</p></div>
     <span id="connection" class="badge">未接続</span>
   </header>
   <nav class="app-tabs" role="tablist" aria-label="動作モード">
@@ -22,6 +23,7 @@
   </nav>
 
   <section class="controls card">
+    <label>板仕様 <select id="panelProfile"></select></label>
     <label>COMポート <select id="port"></select></label>
     <button id="refresh">更新</button>
     <button id="connect">接続</button>
@@ -139,5 +141,5 @@
       <div class="dialog-footer"><button value="cancel">閉じる</button></div>
     </form>
   </dialog>
-</main><script src="/instrument.js?v=20260718-17"></script></body>
+</main><script src="/panel-profile.js?v=20260720-1"></script><script src="/instrument.js?v=20260720-1"></script></body>
 </html>

@@ -1,0 +1,9 @@
+.hit-grid,.collection-grid{
+  grid-template-columns:repeat(var(--panel-columns,4),1fr);
+  grid-template-rows:repeat(var(--panel-rows,2),1fr);
+  aspect-ratio:var(--panel-aspect,2/1);
+}
+.position-panel{aspect-ratio:var(--panel-aspect,2/1)}
+.score-bars{grid-template-columns:repeat(var(--panel-class-count,8),1fr)}
+.mapping-grid{grid-template-columns:repeat(var(--panel-columns,4),minmax(90px,1fr))}
+@media(max-width:600px){.instrument-grid{grid-template-columns:repeat(2,1fr);aspect-ratio:auto}}

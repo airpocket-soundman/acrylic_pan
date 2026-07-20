@@ -12,13 +12,14 @@ The original capture-only source snapshot is preserved under
 retains all capture commands and adds a fixed eight-class inference test.
 
 `AI_SELFTEST` (`0x14`) accepts one test-case byte from 0 through 7.
-`AI_RESULT` (`0x21`) returns `<BBH8f`: case number, CPU-side argmax class,
+`AI_RESULT` (`0x21`) returns `<BBH8f` for the fixed self-test and `<BBH12f`
+for live 12-area inference: case number, CPU-side argmax class,
 reserved zero, and all eight raw Solist-AI output scores. The embedded model is
 128 inputs, 32 hidden nodes, and 8 outputs with hard sigmoid/MSE. Its alpha was
 captured from the official Solist-AI Simulator seed-1 model; alpha, beta, and
 the eight qualification inputs are all stored as bfloat16.
 
-Live inference first sends a compact `AI_RESULT` (`0x21`, case `0xFF`) so an
+Live inference first sends a compact 12-score `AI_RESULT` (`0x21`, case `0xFF`) so an
 instrument client receives the class and eight scores without waiting for the
 waveform. `INFERENCE_EVENT` (`0x22`) follows with the event metadata, the same
 predicted class and scores, and the exact 512 raw Z-axis samples used by the
@@ -65,7 +66,8 @@ The completed COM3 qualification result is documented in
 - sensor is stopped only after the complete event exists
 - APAN version 1 `EVENT_CHUNK`, CRC32 and COBS framing at 115,200 bit/s;
   a 2,048-sample collection is sent as four independently checked 512-sample chunks
-- default raw-count thresholds: jerk 1000, absolute level 200. A physically
+- default raw-count thresholds: jerk 700, absolute level 200, confirmation 3000
+  within 16 samples. A physically
   scaled jerk value of 500 caused a stationary false trigger because raw-count
   noise did not fall in proportion to sensitivity. A 1000-LSB threshold keeps
   margin above the observed 760-LSB maximum stationary adjacent difference;

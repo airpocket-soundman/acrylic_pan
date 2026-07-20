@@ -7,7 +7,7 @@
 #define EVENT_HEADER_SIZE (12U)
 #define CRC_SIZE          (4U)
 #define EVENT_PAYLOAD_SIZE (EVENT_HEADER_SIZE + (APAN_EVENT_SAMPLES * 2U))
-#define AI_RESULT_SIZE (36U)
+#define AI_RESULT_SIZE (4U + (APAN_INFERENCE_OUTPUT_COUNT * 4U))
 #define EVENT_CHUNK_HEADER_SIZE (20U)
 #define EVENT_CHUNK_SAMPLES (512U)
 #define INFERENCE_PAYLOAD_SIZE (EVENT_HEADER_SIZE + AI_RESULT_SIZE + (APAN_EVENT_SAMPLES * 2U))
@@ -230,7 +230,7 @@ size_t ApanProtocolEncodeFrame(uint8_t message_type, uint16_t flags,
 
 size_t ApanProtocolEncodeInferenceEvent(const ApanEvent *event,
                                         uint8_t class_id,
-                                        const float outputs[8],
+                                        const float outputs[APAN_INFERENCE_OUTPUT_COUNT],
                                         uint32_t sequence,
                                         uint32_t timestamp_us,
                                         uint8_t *encoded,
@@ -253,7 +253,7 @@ size_t ApanProtocolEncodeInferenceEvent(const ApanEvent *event,
     payload[13] = class_id;
     payload[14] = 0U;
     payload[15] = 0U;
-    for (i = 0U; i < 8U; i++)
+    for (i = 0U; i < APAN_INFERENCE_OUTPUT_COUNT; i++)
     {
         union { float value; uint32_t bits; } packed;
         uint16_t offset = (uint16_t)(16U + (i * 4U));

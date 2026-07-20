@@ -15,6 +15,7 @@ FRAME_HEADER = struct.Struct("<4sBBHIIH")
 CRC = struct.Struct("<I")
 EVENT_HEADER = struct.Struct("<IHHHH")
 AI_RESULT_PAYLOAD = struct.Struct("<BBH8f")
+AI_RESULT_12_PAYLOAD = struct.Struct("<BBH12f")
 EVENT_CHUNK_HEADER = struct.Struct("<IHHIHHHH")
 MAX_PAYLOAD_SIZE = 4096
 
@@ -224,9 +225,14 @@ def decode_ai_result(frame: Frame) -> AiResult:
     """
     if frame.message_type != MessageType.AI_RESULT:
         raise ProtocolError("frame is not AI_RESULT")
-    if len(frame.payload) != AI_RESULT_PAYLOAD.size:
+    formats = {
+        AI_RESULT_PAYLOAD.size: AI_RESULT_PAYLOAD,
+        AI_RESULT_12_PAYLOAD.size: AI_RESULT_12_PAYLOAD,
+    }
+    payload_format = formats.get(len(frame.payload))
+    if payload_format is None:
         raise ProtocolError("AI result payload length mismatch")
-    case_id, predicted_class, reserved, *outputs = AI_RESULT_PAYLOAD.unpack(frame.payload)
+    case_id, predicted_class, reserved, *outputs = payload_format.unpack(frame.payload)
     if reserved != 0:
         raise ProtocolError("unsupported AI result payload version")
     if predicted_class >= len(outputs):
@@ -251,9 +257,18 @@ def decode_inference_event(frame: Frame) -> InferenceEvent:
     sample_rate_hz, count, trigger_index, peak_abs, event_reserved = EVENT_HEADER.unpack(
         event_header
     )
+    sample_size = count * 2
+    ai_size = len(frame.payload) - EVENT_HEADER.size - sample_size
+    formats = {
+        AI_RESULT_PAYLOAD.size: AI_RESULT_PAYLOAD,
+        AI_RESULT_12_PAYLOAD.size: AI_RESULT_12_PAYLOAD,
+    }
+    payload_format = formats.get(ai_size)
+    if payload_format is None:
+        raise ProtocolError("unsupported inference output count")
     ai_start = EVENT_HEADER.size
-    ai_end = ai_start + AI_RESULT_PAYLOAD.size
-    case_id, predicted_class, ai_reserved, *outputs = AI_RESULT_PAYLOAD.unpack(
+    ai_end = ai_start + ai_size
+    case_id, predicted_class, ai_reserved, *outputs = payload_format.unpack(
         frame.payload[ai_start:ai_end]
     )
     sample_bytes = frame.payload[ai_end:]

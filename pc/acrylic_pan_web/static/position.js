@@ -2,6 +2,7 @@ const $ = id => document.getElementById(id);
 let lastSequence = null;
 let loopRunning = true;
 let cameraStream = null;
+let activePanel = {id:'400x200x3', width_mm:400, height_mm:200, columns:4, rows:2, class_count:8};
 const CAMERA_STORAGE_KEY = 'acrylicPanCameraDevice';
 
 async function api(path, body) {
@@ -46,8 +47,26 @@ function updateControls(data) {
 }
 
 async function refreshStatus() {
-  try { updateControls(await api('/api/status')); }
+  try { const data = await api('/api/status'); activePanel = data.panel; window.panelProfileUi?.sync(data); applyPanelGeometry(); if($('areaProbabilities').children.length!==activePanel.class_count)renderProbabilities(Array(activePanel.class_count).fill(1/activePanel.class_count)); updateControls(data); }
   catch (error) { $('error').textContent = error.message; }
+}
+
+function applyPanelGeometry() {
+  const canvas = $('positionHeatmap');
+  canvas.height = Math.round(canvas.width * activePanel.height_mm / activePanel.width_mm);
+  const grid = document.querySelector('.panel-grid');
+  if (grid) grid.style.backgroundImage =
+    `repeating-linear-gradient(90deg,transparent 0,transparent calc(${100 / activePanel.columns}% - 1px),#ffffff42 calc(${100 / activePanel.columns}% - 1px),#ffffff42 ${100 / activePanel.columns}%),` +
+    `repeating-linear-gradient(0deg,transparent 0,transparent calc(${100 / activePanel.rows}% - 1px),#ffffff42 calc(${100 / activePanel.rows}% - 1px),#ffffff42 ${100 / activePanel.rows}%)`;
+  const clamp = activePanel.clamp;
+  const marker = document.querySelector('.clamp-marker');
+  if (marker && clamp) {
+    marker.style.left = `${clamp.x_min / activePanel.width_mm * 100}%`;
+    marker.style.top = `${clamp.y_min / activePanel.height_mm * 100}%`;
+    marker.style.width = `${(clamp.x_max - clamp.x_min) / activePanel.width_mm * 100}%`;
+    marker.style.height = `${(clamp.y_max - clamp.y_min) / activePanel.height_mm * 100}%`;
+  }
+  document.querySelector('.position-axis span:last-child').textContent = `${activePanel.width_mm} mm`;
 }
 
 function heatColor(value) {
@@ -79,7 +98,7 @@ function gaussian(x, y, cx, cy, sx, sy, rho) {
 function drawHeatmap(position) {
   const canvas = $('positionHeatmap');
   const context = canvas.getContext('2d');
-  const width = 160, height = 80;
+  const width = 160, height = Math.round(width * activePanel.height_mm / activePanel.width_mm);
   const image = context.createImageData(width, height);
   const sigmaX = Number(position.sigma_x_mm) || 0;
   const sigmaY = Number(position.sigma_y_mm) || 0;
@@ -87,9 +106,9 @@ function drawHeatmap(position) {
   const density = new Float32Array(width * height);
   let peak = 0;
   for (let py = 0; py < height; py++) {
-    const y = (py + 0.5) * 200 / height;
+    const y = (py + 0.5) * activePanel.height_mm / height;
     for (let px = 0; px < width; px++) {
-      const x = (px + 0.5) * 400 / width;
+      const x = (px + 0.5) * activePanel.width_mm / width;
       const value = hasDistribution
         ? gaussian(x, y, position.x_mm, position.y_mm, sigmaX, sigmaY, position.rho_xy)
         : 0;
@@ -122,12 +141,12 @@ function renderProbabilities(values) {
 function renderPosition(position) {
   if (!position || !Number.isFinite(position.x_mm) || !Number.isFinite(position.y_mm)) return;
   drawHeatmap(position);
-  const x = Math.max(0, Math.min(400, Number(position.x_mm)));
-  const y = Math.max(0, Math.min(200, Number(position.y_mm)));
+  const x = Math.max(0, Math.min(activePanel.width_mm, Number(position.x_mm)));
+  const y = Math.max(0, Math.min(activePanel.height_mm, Number(position.y_mm)));
   const marker = $('positionMarker');
   marker.hidden = false;
-  marker.style.left = `${x / 4}%`;
-  marker.style.top = `${y / 2}%`;
+  marker.style.left = `${x / activePanel.width_mm * 100}%`;
+  marker.style.top = `${y / activePanel.height_mm * 100}%`;
   marker.querySelector('span').textContent = `X ${x.toFixed(1)} / Y ${y.toFixed(1)}`;
   $('coordinateReadout').textContent = `X ${x.toFixed(1)} / Y ${y.toFixed(1)} mm`;
   $('metricCoordinate').textContent = `${x.toFixed(1)}, ${y.toFixed(1)} mm`;
@@ -142,7 +161,7 @@ function renderPosition(position) {
     ? `σx ${Number(position.sigma_x_mm).toFixed(1)} / σy ${Number(position.sigma_y_mm).toFixed(1)} / ρ ${Number(position.rho_xy).toFixed(2)}` : '—';
   $('metricMethod').textContent = position.model_available ? 'XY回帰＋校正ガウス' : 'エリア分類（座標モデルなし）';
   $('scopeNote').textContent = position.scope || '8中心点教師からの補間推定です。';
-  renderProbabilities(position.class_probabilities || Array(8).fill(1 / 8));
+  renderProbabilities(position.class_probabilities || Array(activePanel.class_count).fill(1 / activePanel.class_count));
 }
 
 async function inferenceLoop() {
@@ -163,10 +182,10 @@ async function inferenceLoop() {
 
 function renderDemo() {
   renderPosition({
-    x_mm: 212.0, y_mm: 118.0, sigma_x_mm: 18.2, sigma_y_mm: 8.4, rho_xy: 0.38,
+    x_mm: activePanel.width_mm * .53, y_mm: activePanel.height_mm * .59, sigma_x_mm: 18.2, sigma_y_mm: 8.4, rho_xy: 0.38,
     confidence: 0.90, confidence_level: 0.90, empirical_coverage: 0.90,
     confidence_ellipse_90: {semi_major_mm: 40.1, semi_minor_mm: 16.5, angle_deg: 11.2},
-    class_probabilities: [0.01,0.04,0.08,0.01,0.03,0.27,0.53,0.03], model_available: true,
+    class_probabilities: Array.from({length:activePanel.class_count},(_,i)=>i===Math.min(6,activePanel.class_count-1)?.53:.47/(activePanel.class_count-1)), model_available: true,
     scope: '表示デモです。XY推定座標を中心に、検証誤差で校正した二次元ガウスを表示しています。'
   });
 }
@@ -280,7 +299,7 @@ document.querySelectorAll('.app-tabs a').forEach(link => link.addEventListener('
   } catch (error) { $('error').textContent = error.message; }
 }));
 
-renderProbabilities(Array(8).fill(1 / 8));
+renderProbabilities(Array(activePanel.class_count).fill(1 / activePanel.class_count));
 ports().catch(error => $('error').textContent = error.message);
 refreshStatus();
 setInterval(refreshStatus, 500);

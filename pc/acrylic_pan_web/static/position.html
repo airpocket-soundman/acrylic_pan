@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="/controls.css?v=20260718-1">
   <link rel="stylesheet" href="/tabs.css?v=20260719-1">
   <link rel="stylesheet" href="/position.css?v=20260719-4">
+  <link rel="stylesheet" href="/panel-profile.css?v=20260720-1">
 </head>
 <body><main>
   <header><div><h1>Acrylic Pan 位置推定</h1><p>PCニューラルネットワークのXY推定座標と校正済み不確実性をリアルタイム表示します</p></div><span id="connection" class="badge">未接続</span></header>
@@ -18,6 +19,7 @@
     <a role="tab" aria-selected="false" href="/instrument.html">楽器</a>
   </nav>
   <section class="controls card">
+    <label>板仕様 <select id="panelProfile"></select></label>
     <label>COMポート <select id="port"></select></label><button id="refresh">更新</button>
     <button id="connect">接続</button><button id="disconnect" disabled>切断</button>
     <button id="positionStart" disabled>位置推定開始</button><button id="positionStop" disabled>停止</button>
@@ -42,7 +44,7 @@
       </div>
       <aside class="position-side">
         <div class="card metric-card"><span class="kicker">ESTIMATE</span><div class="metric-row"><span>推定座標</span><strong id="metricCoordinate">—</strong></div><div class="metric-row"><span>信頼水準</span><strong id="metricConfidence">—</strong></div><div class="metric-row"><span>90%誤差楕円</span><strong id="metricRegion">—</strong></div><div class="metric-row"><span>分布形状</span><strong id="metricSigma">—</strong></div><div class="metric-row"><span>処理方式</span><strong id="metricMethod">—</strong></div></div>
-        <div class="card"><span class="kicker">AREA PROBABILITY</span><h2>8エリア確率</h2><div id="areaProbabilities" class="area-probabilities"></div></div>
+        <div class="card"><span class="kicker">AREA PROBABILITY</span><h2><span data-panel-class-count>8</span>エリア確率</h2><div id="areaProbabilities" class="area-probabilities"></div></div>
         <div class="card interpolation-note"><strong>表示の意味</strong><p>白い十字がXY回帰の推定座標です。色分布はLOSO検証の実測誤差で90%被覆に校正した二次元ガウスで、モデル間の予測差も不確実性として加えています。</p></div>
       </aside>
     </div>
@@ -61,5 +63,5 @@
       </div>
     </aside>
   </section>
-</main><script src="/position.js?v=20260719-5"></script></body>
+</main><script src="/panel-profile.js?v=20260720-1"></script><script src="/position.js?v=20260720-1"></script></body>
 </html>

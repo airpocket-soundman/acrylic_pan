@@ -5,6 +5,7 @@
 #include <stdint.h>
 
 #include "apan_capture.h"
+#include "apan_inference.h"
 
 #define APAN_PROTOCOL_VERSION (1U)
 #define APAN_MESSAGE_HELLO      (0x01U)
@@ -21,7 +22,7 @@
 #define APAN_MESSAGE_EVENT_CHUNK (0x23U)
 #define APAN_MESSAGE_ACK        (0x70U)
 #define APAN_MESSAGE_NACK       (0x71U)
-#define APAN_ENCODED_FRAME_CAPACITY (1110U)
+#define APAN_ENCODED_FRAME_CAPACITY (1120U)
 #define APAN_COMMAND_PAYLOAD_CAPACITY (16U)
 #define APAN_COMMAND_ENCODED_CAPACITY (64U)
 #define APAN_MODE_COLLECT   (0U)
@@ -63,7 +64,7 @@ size_t ApanProtocolEncodeEvent(const ApanEvent *event,
 /* One atomic live result: event metadata, class/scores, then 512 raw samples. */
 size_t ApanProtocolEncodeInferenceEvent(const ApanEvent *event,
                                         uint8_t class_id,
-                                        const float outputs[8],
+                                        const float outputs[APAN_INFERENCE_OUTPUT_COUNT],
                                         uint32_t sequence,
                                         uint32_t timestamp_us,
                                         uint8_t *encoded,

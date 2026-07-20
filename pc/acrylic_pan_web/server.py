@@ -41,13 +41,40 @@ from pc.acrylic_pan_web.position_model import DEFAULT_MODEL_PATH, PositionEstima
 
 
 STATIC_DIR = Path(__file__).with_name("static")
-PANEL_WIDTH_MM = 400.0
-PANEL_HEIGHT_MM = 200.0
-AREA_WIDTH_MM = PANEL_WIDTH_MM / 4
-AREA_HEIGHT_MM = PANEL_HEIGHT_MM / 2
+@dataclass(frozen=True)
+class PanelProfile:
+    profile_id: str
+    label: str
+    width_mm: float
+    height_mm: float
+    thickness_mm: float
+    columns: int
+    rows: int
+
+    @property
+    def class_count(self) -> int:
+        return self.columns * self.rows
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.profile_id,
+            "label": self.label,
+            "width_mm": self.width_mm,
+            "height_mm": self.height_mm,
+            "thickness_mm": self.thickness_mm,
+            "columns": self.columns,
+            "rows": self.rows,
+            "class_count": self.class_count,
+            "area_width_mm": self.width_mm / self.columns,
+            "area_height_mm": self.height_mm / self.rows,
+            "clamp": dict(CLAMP_FOOTPRINT_MM),
+        }
 DUMMY_MODEL_SAMPLE_RATE_HZ = 25_600
 SENSOR_RANGE_G = 32
 SENSOR_COUNTS_PER_G = 1024
+COLLECTION_SAMPLE_RATE_HZ = 25_600
+COLLECTION_SAMPLE_COUNT = 2_048
+COLLECTION_TRIGGER_INDEX = 64
 
 # docs/design.md section 3 defines two acquisition series over the same panel:
 #   A: the eight area centres          -> "center"
@@ -74,14 +101,27 @@ CLAMP_POINT_MOVES: dict[tuple[float, float], tuple[float, float]] = {
     (275.0, 25.0): (275.0, 35.0),
 }
 
+PANEL_PROFILES: dict[str, PanelProfile] = {
+    "400x200x3": PanelProfile(
+        "400x200x3", "400 × 200 × 3 mm（8クラス）", 400.0, 200.0, 3.0, 4, 2
+    ),
+    "400x300x5": PanelProfile(
+        "400x300x5", "400 × 300 × 5 mm（12クラス）", 400.0, 300.0, 5.0, 4, 3
+    ),
+}
+DEFAULT_PANEL_PROFILE_ID = "400x200x3"
 
-def panel_info() -> dict[str, Any]:
+
+def get_panel_profile(profile_id: str = DEFAULT_PANEL_PROFILE_ID) -> PanelProfile:
+    try:
+        return PANEL_PROFILES[profile_id]
+    except KeyError as error:
+        raise ValueError(f"unknown panel_profile_id: {profile_id}") from error
+
+
+def panel_info(profile: PanelProfile | None = None) -> dict[str, Any]:
     """Panel geometry for the GUI, so no dimension is duplicated in JavaScript."""
-    return {
-        "width_mm": PANEL_WIDTH_MM,
-        "height_mm": PANEL_HEIGHT_MM,
-        "clamp": dict(CLAMP_FOOTPRINT_MM),
-    }
+    return (profile or get_panel_profile()).as_dict()
 
 
 def event_payload(event: EventData, source: str) -> dict[str, Any]:
@@ -156,16 +196,19 @@ class CollectionTarget:
         }
 
 
-def build_collection_targets(pattern: str) -> tuple[CollectionTarget, ...]:
+def build_collection_targets(
+    pattern: str, profile: PanelProfile | None = None
+) -> tuple[CollectionTarget, ...]:
     try:
         positions = POSITION_PATTERNS[pattern]
     except KeyError as error:
         raise ValueError("position_pattern must be center or corners") from error
+    profile = profile or get_panel_profile()
     targets: list[CollectionTarget] = []
-    for class_id in range(8):
-        column, row = class_id % 4, class_id // 4
-        center_x = (column + 0.5) * AREA_WIDTH_MM
-        center_y = (row + 0.5) * AREA_HEIGHT_MM
+    for class_id in range(profile.class_count):
+        column, row = class_id % profile.columns, class_id // profile.columns
+        center_x = (column + 0.5) * profile.width_mm / profile.columns
+        center_y = (row + 0.5) * profile.height_mm / profile.rows
         for point_id, (name, offset_x, offset_y) in enumerate(positions):
             x, y = center_x + offset_x, center_y + offset_y
             moved = CLAMP_POINT_MOVES.get((x, y))
@@ -202,6 +245,7 @@ class CollectionState:
     target_counts: list[int] = field(default_factory=lambda: [0] * 8)
     order: tuple[int, ...] = tuple(range(8))
     selected_index: int | None = None
+    panel_profile_id: str = DEFAULT_PANEL_PROFILE_ID
 
     @property
     def total_samples(self) -> int:
@@ -236,6 +280,7 @@ class CollectionState:
         return target.class_id if target is not None else None
 
     def as_dict(self) -> dict[str, Any]:
+        profile = get_panel_profile(self.panel_profile_id)
         target_index = self.current_target_index
         target = self.current_target
         current = target.class_id if target is not None else None
@@ -272,7 +317,8 @@ class CollectionState:
             "position_pattern": self.position_pattern,
             "points_per_class": len(POSITION_PATTERNS[self.position_pattern]),
             "samples_per_class": len(POSITION_PATTERNS[self.position_pattern]) * self.repetitions,
-            "panel": panel_info(),
+            "panel_profile_id": self.panel_profile_id,
+            "panel": panel_info(profile),
             "targets": [item.as_dict() for item in self.targets],
             "order": list(self.order),
         }
@@ -298,7 +344,8 @@ class AcquisitionController:
         self.latest_ai: dict[str, Any] | None = None
         self.golden_path = Path(golden_path).resolve()
         self.position_estimator = PositionEstimator(position_model_path)
-        self.collection = CollectionState()
+        self.panel_profile_id = DEFAULT_PANEL_PROFILE_ID
+        self.collection = self._empty_collection()
         self.identity: str | None = None
         self.last_error: str | None = None
         self.last_control: dict[str, Any] | None = None
@@ -315,6 +362,31 @@ class AcquisitionController:
         self.link = SerialLink(self._queue.put, self._queue.put)
         self._worker = threading.Thread(target=self._consume, name="apan-web-consumer", daemon=True)
         self._worker.start()
+
+    @property
+    def panel_profile(self) -> PanelProfile:
+        return get_panel_profile(self.panel_profile_id)
+
+    def _empty_collection(self) -> CollectionState:
+        profile = get_panel_profile(self.panel_profile_id)
+        targets = build_collection_targets("center", profile)
+        return CollectionState(
+            per_class_counts=[0] * profile.class_count,
+            targets=targets,
+            target_counts=[0] * len(targets),
+            order=tuple(range(profile.class_count)),
+            panel_profile_id=profile.profile_id,
+        )
+
+    def set_panel_profile(self, profile_id: str) -> dict[str, Any]:
+        profile = get_panel_profile(profile_id)
+        with self._lock:
+            if self.collection.active:
+                raise ValueError("採取中は板仕様を変更できません。採取を停止してください。")
+            self.panel_profile_id = profile.profile_id
+            self.collection = self._empty_collection()
+            self.class_id = None
+        return self.status()
 
     def connect(self, port: str, baudrate: int = 115_200) -> None:
         self.link.connect(port, baudrate)
@@ -469,6 +541,7 @@ class AcquisitionController:
         repetitions: int,
         output_root: str | Path | None = None,
         position_pattern: str = "center",
+        panel_profile_id: str | None = None,
     ) -> dict[str, Any]:
         if not 1 <= repetitions <= 1000:
             raise ValueError("repetitions must be between 1 and 1000")
@@ -485,20 +558,24 @@ class AcquisitionController:
         # wait for an ACK they cannot provide.
         if self.device_mode in ("inference", "instrument"):
             self.set_mode("collection")
-        targets = build_collection_targets(position_pattern)
+        profile = get_panel_profile(panel_profile_id or self.panel_profile_id)
         with self._lock:
             if self.collection.active:
                 raise ValueError("collection is already active")
+            self.panel_profile_id = profile.profile_id
+            targets = build_collection_targets(position_pattern, profile)
             self.new_session(output_root, class_id=None, metadata={
-                "mode": "guided_8area_points",
+                "mode": "guided_area_points",
+                "panel_profile_id": profile.profile_id,
+                "panel": panel_info(profile),
                 "collection_plan": {
-                    "area_count": 8,
+                    "area_count": profile.class_count,
                     "repetitions": repetitions,
                     "position_pattern": position_pattern,
                     "points_per_class": len(POSITION_PATTERNS[position_pattern]),
                     "point_count": len(POSITION_PATTERNS[position_pattern]),
-                    "panel": panel_info(),
-                    "order": list(range(8)),
+                    "panel": panel_info(profile),
+                    "order": list(range(profile.class_count)),
                     "targets": [target.as_dict() for target in targets],
                     "total_samples": len(targets) * repetitions,
                 },
@@ -509,6 +586,9 @@ class AcquisitionController:
                 position_pattern=position_pattern,
                 targets=targets,
                 target_counts=[0] * len(targets),
+                per_class_counts=[0] * profile.class_count,
+                order=tuple(range(profile.class_count)),
+                panel_profile_id=profile.profile_id,
             )
             self.event_assembler.reset()
             self.assembly_retry_required = False
@@ -544,13 +624,19 @@ class AcquisitionController:
             self.collection.selected_index = target_index
             return self.collection.as_dict()
 
-    def preview_targets(self, pattern: str) -> dict[str, Any]:
+    def preview_targets(self, pattern: str, profile_id: str | None = None) -> dict[str, Any]:
         """Target geometry for a pattern, so the panel can be drawn before start."""
-        targets = build_collection_targets(pattern)
+        profile = get_panel_profile(profile_id or self.panel_profile_id)
+        targets = build_collection_targets(pattern, profile)
         return {
             "position_pattern": pattern,
             "points_per_class": len(POSITION_PATTERNS[pattern]),
-            "panel": panel_info(),
+            "panel_profile_id": profile.profile_id,
+            "panel": {
+                "width_mm": profile.width_mm,
+                "height_mm": profile.height_mm,
+                "clamp": dict(CLAMP_FOOTPRINT_MM),
+            },
             "targets": [
                 {**target.as_dict(), "target_index": index, "count": 0, "complete": False}
                 for index, target in enumerate(targets)
@@ -632,19 +718,25 @@ class AcquisitionController:
         metadata: dict[str, Any] | None = None,
     ) -> Path:
         with self._lock:
-            if class_id is not None and not 0 <= class_id < 8:
-                raise ValueError("class_id must be between 0 and 7")
+            if class_id is not None and not 0 <= class_id < self.panel_profile.class_count:
+                raise ValueError(
+                    f"class_id must be between 0 and {self.panel_profile.class_count - 1}"
+                )
             if self.recorder is not None:
                 self.recorder.close()
             if output_root is not None:
                 self.output_root = Path(output_root).expanduser().resolve()
             self.class_id = class_id
-            self.recorder = Recorder(self.output_root)
+            self.recorder = Recorder(
+                self.output_root, max_class_id=self.panel_profile.class_count - 1
+            )
             session_metadata: dict[str, Any] = {
                 "application": "acrylic_pan_web",
                 "serial_port": self.port,
                 "baudrate": self.baudrate,
                 "device_identity": self.identity,
+                "panel_profile_id": self.panel_profile_id,
+                "panel": panel_info(self.panel_profile),
                 "sensor_configuration": {
                     "device": "KX134-1211",
                     "axis": "Z",
@@ -727,7 +819,7 @@ class AcquisitionController:
                 # to delete the final real session in the library.
                 self.recorder.close()
                 self.recorder = None
-                self.collection = CollectionState()
+                self.collection = self._empty_collection()
             return library.delete_session(session_id)
 
     def _is_recorder_session(self, directory: Path) -> bool:
@@ -756,12 +848,18 @@ class AcquisitionController:
                 "inference": {
                     "active": self.inference_active,
                     "mode": self.device_mode,
-                    "position_model_available": self.position_estimator.available,
+                    "position_model_available": (
+                        self.position_estimator.available
+                        and self.panel_profile_id == DEFAULT_PANEL_PROFILE_ID
+                    ),
                     "latest_sequence": (
                         self.latest_ai.get("sequence") if self.latest_ai else None
                     ),
                 },
                 "golden_path": str(self.golden_path),
+                "panel_profile_id": self.panel_profile_id,
+                "panel": panel_info(self.panel_profile),
+                "panel_profiles": [profile.as_dict() for profile in PANEL_PROFILES.values()],
                 "collection": self.collection.as_dict(),
                 "assembly": {
                     "inflight": self.event_assembler.inflight,
@@ -820,6 +918,36 @@ class AcquisitionController:
                        save_allowed: bool = True) -> dict[str, Any]:
         payload = event_payload(event, source)
         rearm = False
+        with self._lock:
+            guided_collection = self.collection.active and source == "serial"
+        # The obsolete collector-baseline firmware has a distinctive 512/128
+        # capture contract.  Reject that exact live signature; unit/demo events
+        # intentionally remain smaller while retaining the current trigger.
+        contract_mismatch = guided_collection and (
+            event.sample_rate_hz == COLLECTION_SAMPLE_RATE_HZ
+            and len(event.samples) == 512
+            and event.trigger_index == 128
+        )
+        if contract_mismatch:
+            with self._lock:
+                if count_as_received:
+                    self.stats.observe_event(event.sequence)
+                self.latest = payload
+                self.collection.active = False
+                self.collection.finished = False
+                self.last_error = (
+                    "採取を停止しました。接続中のボードは旧収録仕様 "
+                    f"({len(event.samples)}点・トリガ位置{event.trigger_index}) です。"
+                    f"学習データ採取には現行ファームウェア "
+                    f"({COLLECTION_SAMPLE_COUNT}点・トリガ位置{COLLECTION_TRIGGER_INDEX}) "
+                    "を書き込んでください。このイベントは保存していません。"
+                )
+            if self.link.connected:
+                try:
+                    self.send_command("stop")
+                except Exception:
+                    pass
+            return payload
         with self._lock:
             if count_as_received:
                 self.stats.observe_event(event.sequence)
@@ -999,7 +1127,8 @@ class AcquisitionController:
                     }
                     try:
                         payload["position"] = self.position_estimator.predict(
-                            combined.event, result.outputs, result.predicted_class
+                            combined.event, result.outputs, result.predicted_class,
+                            panel_info(self.panel_profile),
                         )
                     except Exception as position_error:
                         payload["position"] = {
@@ -1075,9 +1204,11 @@ class ApiHandler(BaseHTTPRequestHandler):
         if path == "/api/collection":
             return self._json(self.controller.collection_status())
         if path == "/api/collection/targets":
-            pattern = (parse_qs(parsed.query).get("pattern") or ["center"])[0]
+            query = parse_qs(parsed.query)
+            pattern = (query.get("pattern") or ["center"])[0]
+            profile_id = (query.get("panel_profile_id") or [None])[0]
             try:
-                return self._json(self.controller.preview_targets(pattern))
+                return self._json(self.controller.preview_targets(pattern, profile_id))
             except ValueError as error:
                 return self._json({"error": str(error)}, HTTPStatus.BAD_REQUEST)
         if path.startswith("/api/library/"):
@@ -1134,11 +1265,14 @@ class ApiHandler(BaseHTTPRequestHandler):
                 return self._json(self.controller.set_retrigger_guard(int(body["milliseconds"])))
             if path == "/api/inference/stop":
                 return self._json(self.controller.stop_inference())
+            if path == "/api/panel":
+                return self._json(self.controller.set_panel_profile(str(body["panel_profile_id"])))
             if path == "/api/collection/start":
                 return self._json(self.controller.start_collection(
                     int(body.get("repetitions", 10)),
                     body.get("output_root"),
                     str(body.get("position_pattern", "center")),
+                    body.get("panel_profile_id"),
                 ))
             if path == "/api/collection/stop":
                 return self._json(self.controller.stop_collection())
@@ -1195,6 +1329,8 @@ class ApiHandler(BaseHTTPRequestHandler):
             "/position.css": "position.css",
             "/instrument.js": "instrument.js",
             "/position.js": "position.js",
+            "/panel-profile.js": "panel-profile.js",
+            "/panel-profile.css": "panel-profile.css",
             "/app.js": "app.js",
             "/style.css": "style.css",
             "/tabs.css": "tabs.css",

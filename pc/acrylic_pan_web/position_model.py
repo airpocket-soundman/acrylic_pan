@@ -20,10 +20,12 @@ AREA_CENTRES_MM = np.asarray(
 DEFAULT_MODEL_PATH = Path(__file__).resolve().parents[2] / "artifacts/pc_position_runtime/position_ensemble.joblib"
 
 
-def class_probabilities(outputs: tuple[float, ...] | list[float]) -> np.ndarray:
+def class_probabilities(
+    outputs: tuple[float, ...] | list[float], class_count: int = 8
+) -> np.ndarray:
     scores = np.asarray(outputs, dtype=np.float64)
-    if scores.shape != (8,) or not np.isfinite(scores).all():
-        return np.full(8, 1.0 / 8.0)
+    if scores.shape != (class_count,) or not np.isfinite(scores).all():
+        return np.full(class_count, 1.0 / class_count)
     # Solist outputs are scores rather than calibrated logits.  A moderate
     # temperature preserves secondary spatial hypotheses for the heat map.
     temperature = 0.18
@@ -49,10 +51,22 @@ class PositionEstimator:
         return load_bundle(str(self.model_path)) is not None
 
     def predict(self, event: EventData, outputs: tuple[float, ...] | list[float],
-                predicted_class: int) -> dict[str, Any]:
-        probabilities = class_probabilities(outputs)
-        entropy = float(-np.sum(probabilities * np.log(np.maximum(probabilities, 1e-12))) / np.log(8.0))
-        bundle = load_bundle(str(self.model_path))
+                predicted_class: int, panel: dict[str, Any] | None = None) -> dict[str, Any]:
+        panel = panel or {
+            "id": "400x200x3", "width_mm": 400.0, "height_mm": 200.0,
+            "columns": 4, "rows": 2, "class_count": 8,
+        }
+        class_count = int(panel["class_count"])
+        panel_size = np.asarray((panel["width_mm"], panel["height_mm"]), dtype=np.float64)
+        centres = np.asarray([
+            ((column + .5) * panel["width_mm"] / panel["columns"],
+             (row + .5) * panel["height_mm"] / panel["rows"])
+            for row in range(int(panel["rows"]))
+            for column in range(int(panel["columns"]))
+        ])
+        probabilities = class_probabilities(outputs, class_count)
+        entropy = float(-np.sum(probabilities * np.log(np.maximum(probabilities, 1e-12))) / np.log(class_count))
+        bundle = load_bundle(str(self.model_path)) if panel.get("id") == "400x200x3" else None
         model_positions: np.ndarray | None = None
         if bundle is not None:
             contract = bundle["contract"]
@@ -64,19 +78,22 @@ class PositionEstimator:
                 feature = extract_live_features(np.asarray(event.samples, dtype=np.float64))[None, :]
                 scaled = bundle["scaler"].transform(feature)
                 model_positions = np.stack([
-                    np.clip(model.predict(scaled)[0], 0.0, 1.0) * PANEL_SIZE_MM
+                    np.clip(model.predict(scaled)[0], 0.0, 1.0) * panel_size
                     for model in bundle["models"]
                 ])
 
         if model_positions is None:
-            centre = AREA_CENTRES_MM[int(np.clip(predicted_class, 0, 7))]
+            centre = centres[int(np.clip(predicted_class, 0, class_count - 1))]
             spread = np.asarray((0.0, 0.0))
             covariance = None
             confidence_level = 0.0
             empirical_coverage = 0.0
             ellipse_axes = np.asarray((0.0, 0.0))
             ellipse_angle = 0.0
-            method = "area_probability_fallback"
+            method = (
+                "area_probability_fallback" if class_count == len(outputs)
+                else "panel_profile_model_unavailable"
+            )
         else:
             centre = model_positions.mean(axis=0)
             spread = model_positions.std(axis=0)

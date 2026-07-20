@@ -1,9 +1,9 @@
 <!doctype html>
 <html lang="ja">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Acrylic Pan Vibration Monitor</title><link rel="stylesheet" href="/style.css?v=20260718-4"><link rel="stylesheet" href="/controls.css?v=20260718-1"><link rel="stylesheet" href="/collector.css?v=20260718-4"><link rel="stylesheet" href="/tabs.css?v=20260718-4"></head>
+<title>Acrylic Pan Vibration Monitor</title><link rel="stylesheet" href="/style.css?v=20260718-4"><link rel="stylesheet" href="/controls.css?v=20260718-1"><link rel="stylesheet" href="/collector.css?v=20260718-4"><link rel="stylesheet" href="/tabs.css?v=20260718-4"><link rel="stylesheet" href="/panel-profile.css?v=20260720-1"></head>
 <body><main>
-  <header><div><h1>Acrylic Pan Vibration Monitor</h1><p>振動データの記録・FFT表示・8エリアガイド採取</p></div><span id="connection" class="badge">未接続</span></header>
+  <header><div><h1>Acrylic Pan Vibration Monitor</h1><p>振動データの記録・FFT表示・<span data-panel-class-count>8</span>エリアガイド採取</p></div><span id="connection" class="badge">未接続</span></header>
   <nav class="app-tabs" role="tablist" aria-label="動作モード">
     <a role="tab" aria-selected="true" class="active" href="/collector.html">学習データ採取</a>
     <a role="tab" aria-selected="false" href="/">推論結果</a>
@@ -11,6 +11,7 @@
     <a role="tab" aria-selected="false" href="/instrument.html">楽器</a>
   </nav>
   <section class="controls card">
+    <label>板仕様 <select id="panelProfile"></select></label>
     <label>COMポート <select id="port"></select></label><button id="refresh">更新</button>
     <button id="connect">接続</button><button id="disconnect" disabled>切断</button>
     <button id="ping" disabled>ボード確認</button><button id="capture" disabled>測定トリガー</button>
@@ -23,7 +24,7 @@
   <section id="stats" class="stats"></section><div id="controlStatus">「測定トリガー」を押すと、Z軸振動を25.6 kHz・2048点（80 ms）取得します。</div><div id="error" class="error"></div>
   <section class="card collection-panel">
     <div class="collection-toolbar">
-      <div><h2>8エリア ガイド付きデータ採取</h2><p>マーカー位置を叩いてください。受信後、自動的に次の測定を待ち受けます。</p></div>
+      <div><h2 data-panel-class-label="エリア ガイド付きデータ採取">8エリア ガイド付きデータ採取</h2><p>マーカー位置を叩いてください。受信後、自動的に次の測定を待ち受けます。</p></div>
       <label>位置パターン <select id="collectionPattern"><option value="center" selected>A: エリア中心 1点</option><option value="corners">B: 50 mm格子 四隅 4点</option></select></label>
       <label>各位置の回数 <input id="collectionRepetitions" type="number" min="1" max="1000" value="50"></label>
       <button id="collectionStart" disabled>採取開始</button>
@@ -72,4 +73,4 @@
   <section class="card plot"><h2>振動波形</h2><canvas id="wave" width="1100" height="280"></canvas></section>
   <section class="card plot"><h2>FFTスペクトル（DC除去・Hann窓）</h2><canvas id="fft" width="1100" height="280"></canvas></section>
   <footer id="eventInfo">イベントを待っています。</footer>
-</main><script src="/app.js?v=20260718-4"></script></body></html>
+</main><script src="/panel-profile.js?v=20260720-1"></script><script src="/app.js?v=20260720-1"></script></body></html>

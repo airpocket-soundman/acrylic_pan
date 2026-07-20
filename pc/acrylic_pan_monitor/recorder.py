@@ -72,8 +72,9 @@ class Recorder:
         "flags", "timestamp_us",
     )
 
-    def __init__(self, output_root: str | Path) -> None:
+    def __init__(self, output_root: str | Path, max_class_id: int = 7) -> None:
         self.output_root = Path(output_root)
+        self.max_class_id = max_class_id
         self.session_dir: Path | None = None
         self.session_id: str | None = None
         self._metadata: dict[str, Any] = {}
@@ -121,8 +122,8 @@ class Recorder:
     ) -> RecordedEvent:
         if not self.active or self.session_dir is None:
             raise RecordingError("recording session has not been started")
-        if class_id is not None and not 0 <= class_id < 8:
-            raise RecordingError("class_id must be between 0 and 7")
+        if class_id is not None and not 0 <= class_id <= self.max_class_id:
+            raise RecordingError(f"class_id must be between 0 and {self.max_class_id}")
 
         index = self._next_index + 1
         received_at = datetime.now(timezone.utc).isoformat()
