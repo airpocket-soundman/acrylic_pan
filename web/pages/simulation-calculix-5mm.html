@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>5 mm・300×400 CalculiX基準解析</title><link rel="stylesheet" href="../css/page.css"></head><body>
+<div class="eyebrow">SIMULATION 04G / CALCULIX REFERENCE</div>
+<h1>300 × 400 × 5 mm板を<br>二次ソリッド要素で検証する</h1>
+<p class="lead">300 × 400 mm板を横置き（解析座標 x=400、y=300 mm）し、板厚5 mmのPMMAをCalculiX 2.20のC3D20R要素で解析しました。2D板モデルと独自HEX8モデルに対する基準固有値を示します。</p>
+<div class="status"><strong>2026年8月2日 新規解析</strong>720 C3D20R要素、4,269節点で30固有モードを計算しました。先頭8モードは13.151～166.187 Hzです。</div>
+<div class="status warn"><strong>今回の範囲</strong>このページは新パネル形状の基準固有値解析です。12打点の高周波過渡解析は、実機の固定方法とセンサ取付位置を確定してから追加します。</div>
+<p><a href="../../index.html#simulation-calculix" target="_parent">現行400 × 200 × 3 mmのCalculiX解析へ戻る</a></p>
+
+<h2>局所細分化したC3D20Rメッシュ</h2>
+<figure class="wide-figure"><img src="../assets/simulation/5mm-400x300/calculix/calculix-graded-mesh.svg" alt="400×300×5 mm板のCalculiX C3D20Rメッシュ"><figcaption>720要素、4,269節点。固定境界、12打点、中央センサを節点へ一致させています。</figcaption></figure>
+<table class="spec"><tr><th>ソルバー</th><td>CalculiX CrunchiX 2.20</td><td>SPOOLES + ARPACK</td></tr><tr><th>要素</th><td>C3D20R</td><td>20節点二次六面体・低減積分</td></tr><tr><th>板厚</th><td>5 mm</td><td>z=-2.5、0、2.5 mmの2層</td></tr><tr><th>固定</th><td>x=200–300、y=0–20 mm</td><td>349節点のXYZ変位を拘束</td></tr><tr><th>センサ</th><td>(200, 150, 2.5) mm</td><td>上面中央</td></tr></table>
+
+<h2>CalculiX固有モード</h2><div class="mode-grid">
+<figure><img src="../assets/simulation/5mm-400x300/calculix/calculix-mode-1.svg" alt="5 mm CalculiX Mode 1"><figcaption>Mode 1 — 13.151 Hz</figcaption></figure><figure><img src="../assets/simulation/5mm-400x300/calculix/calculix-mode-2.svg" alt="5 mm CalculiX Mode 2"><figcaption>Mode 2 — 20.676 Hz</figcaption></figure><figure><img src="../assets/simulation/5mm-400x300/calculix/calculix-mode-3.svg" alt="5 mm CalculiX Mode 3"><figcaption>Mode 3 — 44.584 Hz</figcaption></figure><figure><img src="../assets/simulation/5mm-400x300/calculix/calculix-mode-4.svg" alt="5 mm CalculiX Mode 4"><figcaption>Mode 4 — 73.453 Hz</figcaption></figure><figure><img src="../assets/simulation/5mm-400x300/calculix/calculix-mode-5.svg" alt="5 mm CalculiX Mode 5"><figcaption>Mode 5 — 98.575 Hz</figcaption></figure><figure><img src="../assets/simulation/5mm-400x300/calculix/calculix-mode-6.svg" alt="5 mm CalculiX Mode 6"><figcaption>Mode 6 — 118.705 Hz</figcaption></figure><figure><img src="../assets/simulation/5mm-400x300/calculix/calculix-mode-7.svg" alt="5 mm CalculiX Mode 7"><figcaption>Mode 7 — 160.210 Hz</figcaption></figure><figure><img src="../assets/simulation/5mm-400x300/calculix/calculix-mode-8.svg" alt="5 mm CalculiX Mode 8"><figcaption>Mode 8 — 166.187 Hz</figcaption></figure></div>
+
+<h2>3手法の固有振動数比較</h2>
+<figure class="wide-figure"><img src="../assets/simulation/5mm-400x300/calculix/frequency-comparison.svg" alt="2D板、独自HEX8、CalculiXの固有振動数比較"><figcaption>同じ400 × 300 × 5 mm形状のモード次数比較です。モード形状のMAC対応付けは未実施のため、同じ次数が同一モード形状とは限りません。</figcaption></figure>
+<table class="spec"><tr><th>手法</th><td>Mode 1</td><td>Mode 2</td><td>Mode 3</td><td>Mode 4</td></tr><tr><th>2D板FDM</th><td>23.80</td><td>37.84</td><td>70.85</td><td>112.57 Hz</td></tr><tr><th>独自HEX8</th><td>18.236</td><td>27.973</td><td>63.620</td><td>111.046 Hz</td></tr><tr><th>CalculiX C3D20R</th><td><strong>13.151</strong></td><td><strong>20.676</strong></td><td><strong>44.584</strong></td><td><strong>73.453 Hz</strong></td></tr></table>
+<div class="status"><strong>読み取り</strong>CalculiX基準値は独自HEX8より低く、現行3 mm解析と同様に要素次数、整合質量、固定境界の表現差が表れています。実測FRFで材料定数と固定剛性を同定する前の設計比較値として扱います。</div>
+
+<h2>再現条件</h2><pre class="formula"><code>python calculix/generate_model.py \
+  --output web/assets/simulation/5mm-400x300/calculix \
+  --width-mm 400 --height-mm 300 --thickness-mm 5
+ccx acrylic_pan
+python calculix/postprocess_profile.py \
+  --output web/assets/simulation/5mm-400x300/calculix \
+  --reference web/assets/simulation/5mm-400x300</code></pre>
+</body></html>

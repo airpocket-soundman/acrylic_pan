@@ -8,6 +8,7 @@
 <p class="lead">400 × 200 × 3 mmのPMMA板を、100 × 20 mmの領域で挟み込み固定します。センサは中央の1個だけです。既存のKirchhoff板モデルに加え、板厚方向を2層に分けたHEX8ソリッドモデルをDockerで解析しました。</p>
 <div class="status warn"><strong>結果の位置づけ</strong>現段階は設計比較用です。3Dモデルも完全積分一次要素によるせん断ロッキング、完全固定の理想化、センサ・接着層質量の省略を含むため、固有振動数の絶対値は実測FRFで校正します。</div>
 <div class="status"><strong>2026年7月18日 3 mm条件で再実行済み</strong>旧2 mmモデルを実機板厚3 mmへ訂正し、1,024 HEX8要素の固有値解析、8打点の変形静止画・動画、中央センサ波形・FFTを再生成しました。先頭8モードは22.325～307.053 Hzです。</div>
+<div class="status"><strong>300 × 400 × 5 mm版を追加</strong>12エリア仕様の解析は <a href="../../index.html#simulation-solid-5mm" target="_parent">5 mm・3D FEM</a> で比較できます。</div>
 
 <h2>3次元ワーク・メッシュモデル</h2>
 <figure class="wide-figure"><img src="../assets/simulation/solid3d/solid3d-mesh.svg" alt="32×16×2要素の3次元ソリッドメッシュ。固定領域と中央センサを表示"><figcaption>32 × 16 × 2 = 1,024 HEX8要素。オレンジは板厚全体を拘束する x=200–300、y=0–20 mm領域、緑の菱形は中央センサです。</figcaption></figure>

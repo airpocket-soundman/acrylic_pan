@@ -1,4 +1,4 @@
-"""Preliminary modal analysis for the 400 x 200 x 3 mm acrylic panel.
+"""Preliminary modal analysis for an Acrylic Pan panel profile.
 
 The plate is represented by a finite-difference Kirchhoff plate model.  The
 asymmetric clamp sandwiches a 100 x 20 mm area of the acrylic, represented by
@@ -34,6 +34,26 @@ FIXED_Y = (0.000, 0.020)
 SENSOR = (0.200, 0.100)
 HITS = [(x, y) for y in (0.050, 0.150) for x in (0.050, 0.150, 0.250, 0.350)]
 NOTES = ("C4", "D4", "E4", "G4", "A4", "C5", "D5", "E5")
+
+
+def configure_panel(width_mm: float, height_mm: float, thickness_mm: float) -> None:
+    """Configure a 100 mm area grid while preserving the legacy defaults."""
+    global WIDTH, HEIGHT, THICKNESS, SENSOR, HITS, NOTES
+    WIDTH = width_mm / 1000.0
+    HEIGHT = height_mm / 1000.0
+    THICKNESS = thickness_mm / 1000.0
+    SENSOR = (WIDTH / 2.0, HEIGHT / 2.0)
+    x_centres = np.arange(50.0, width_mm, 100.0) / 1000.0
+    y_centres = np.arange(50.0, height_mm, 100.0) / 1000.0
+    HITS = [(float(x), float(y)) for y in y_centres for x in x_centres]
+    if (width_mm, height_mm) == (400.0, 200.0):
+        NOTES = ("C4", "D4", "E4", "G4", "A4", "C5", "D5", "E5")
+    else:
+        NOTES = tuple(f"Area {index:02d}" for index in range(1, len(HITS) + 1))
+
+
+def axis_ticks(length_m: float) -> list[int]:
+    return list(range(0, int(round(length_m * 1000)) + 1, 100))
 
 
 def build_laplacian(nx: int, ny: int, dx: float, dy: float) -> sparse.csr_matrix:
@@ -127,13 +147,15 @@ def save_mode_svg(path: Path, xs, ys, mode: np.ndarray, frequency: float, number
     levels = np.linspace(-1.0, 1.0, 17)
     contour = ax.contourf(xs * 1000, ys * 1000, field, levels=levels, cmap="RdBu_r", extend="both")
     ax.contour(xs * 1000, ys * 1000, field, levels=[0], colors="#18202b", linewidths=0.75)
-    ax.add_patch(Rectangle((200, 0), 100, 20, facecolor="#333333", alpha=0.35,
+    ax.add_patch(Rectangle((FIXED_X[0] * 1000, FIXED_Y[0] * 1000),
+                           (FIXED_X[1] - FIXED_X[0]) * 1000,
+                           (FIXED_Y[1] - FIXED_Y[0]) * 1000, facecolor="#333333", alpha=0.35,
                            edgecolor="#111827", linewidth=1.2, hatch="////"))
     ax.scatter([SENSOR[0] * 1000], [SENSOR[1] * 1000], marker="D", s=42, color="#f5b942", edgecolor="#111827", linewidth=0.7)
-    ax.set(xlim=(0, 400), ylim=(200, 0), xlabel="x [mm]", ylabel="y [mm]", title=f"Mode {number}   {frequency:.1f} Hz")
+    ax.set(xlim=(0, WIDTH * 1000), ylim=(HEIGHT * 1000, 0), xlabel="x [mm]", ylabel="y [mm]", title=f"Mode {number}   {frequency:.1f} Hz")
     ax.set_aspect("equal")
-    ax.set_xticks([0, 100, 200, 300, 400])
-    ax.set_yticks([0, 100, 200])
+    ax.set_xticks(axis_ticks(WIDTH))
+    ax.set_yticks(axis_ticks(HEIGHT))
     bar = fig.colorbar(contour, ax=ax, shrink=0.78, pad=0.03)
     bar.set_label("normalized deflection")
     fig.savefig(path, format="svg", metadata={"Date": None})
@@ -156,17 +178,19 @@ def save_hit_intensity_svg(path: Path, xs, ys, intensity, hit, note: str, peak_r
     fig, ax = plt.subplots(figsize=(6.4, 3.25), constrained_layout=True)
     levels = np.linspace(0.0, 1.0, 17)
     contour = ax.contourf(xs * 1000, ys * 1000, field, levels=levels, cmap="magma", extend="max")
-    ax.add_patch(Rectangle((200, 0), 100, 20, facecolor="#eeeeee", alpha=0.65,
+    ax.add_patch(Rectangle((FIXED_X[0] * 1000, FIXED_Y[0] * 1000),
+                           (FIXED_X[1] - FIXED_X[0]) * 1000,
+                           (FIXED_Y[1] - FIXED_Y[0]) * 1000, facecolor="#eeeeee", alpha=0.65,
                            edgecolor="#111827", linewidth=1.2, hatch="////"))
     ax.scatter([SENSOR[0] * 1000], [SENSOR[1] * 1000], marker="D", s=42,
                color="#34d399", edgecolor="#111827", linewidth=0.7, label="sensor")
     ax.scatter([hit[0] * 1000], [hit[1] * 1000], marker="*", s=115,
                color="#60a5fa", edgecolor="#ffffff", linewidth=0.8, label="hit")
-    ax.set(xlim=(0, 400), ylim=(200, 0), xlabel="x [mm]", ylabel="y [mm]",
+    ax.set(xlim=(0, WIDTH * 1000), ylim=(HEIGHT * 1000, 0), xlabel="x [mm]", ylabel="y [mm]",
            title=f"{note} hit ({hit[0] * 1000:.0f}, {hit[1] * 1000:.0f}) mm   peak={peak_relative:.2f}")
     ax.set_aspect("equal")
-    ax.set_xticks([0, 100, 200, 300, 400])
-    ax.set_yticks([0, 100, 200])
+    ax.set_xticks(axis_ticks(WIDTH))
+    ax.set_yticks(axis_ticks(HEIGHT))
     ax.legend(loc="lower right", fontsize=8, framealpha=0.9)
     bar = fig.colorbar(contour, ax=ax, shrink=0.78, pad=0.03)
     bar.set_label("normalized RMS acceleration")
@@ -178,10 +202,16 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--output", type=Path, default=Path("web/assets/simulation"))
     parser.add_argument("--modes", type=int, default=18)
+    parser.add_argument("--width-mm", type=float, default=400.0)
+    parser.add_argument("--height-mm", type=float, default=200.0)
+    parser.add_argument("--thickness-mm", type=float, default=3.0)
     args = parser.parse_args()
+    configure_panel(args.width_mm, args.height_mm, args.thickness_mm)
     args.output.mkdir(parents=True, exist_ok=True)
 
-    xs, ys, frequencies, display_modes, mass_modes = solve_modes(count=args.modes)
+    nx = int(round(args.width_mm / 5.0)) + 1
+    ny = int(round(args.height_mm / 5.0)) + 1
+    xs, ys, frequencies, display_modes, mass_modes = solve_modes(nx=nx, ny=ny, count=args.modes)
     signatures = modal_signatures(xs, ys, frequencies, mass_modes)
     raw_intensity_maps = [hit_intensity(xs, ys, frequencies, mass_modes, hit) for hit in HITS]
     common_peak = max(float(values.max()) for values in raw_intensity_maps)
@@ -190,14 +220,14 @@ def main() -> None:
         signature["spatial_rms_peak_relative"] = round(float(values.max()), 4)
     result = {
         "model": {
-            "width_mm": 400,
-            "height_mm": 200,
+            "width_mm": int(round(WIDTH * 1000)),
+            "height_mm": int(round(HEIGHT * 1000)),
             "thickness_mm": int(round(THICKNESS * 1000)),
             "youngs_modulus_gpa": 3.2,
             "poisson_ratio": POISSON,
             "density_kg_m3": DENSITY,
-            "fixture_x_mm": [200, 300],
-            "fixture_y_mm": [0, 20],
+            "fixture_x_mm": [int(FIXED_X[0] * 1000), int(FIXED_X[1] * 1000)],
+            "fixture_y_mm": [int(FIXED_Y[0] * 1000), int(FIXED_Y[1] * 1000)],
             "fixture_area_mm": [100, 20],
             "sensor_mm": [int(SENSOR[0] * 1000), int(SENSOR[1] * 1000)],
             "grid": [len(xs), len(ys)],
@@ -209,7 +239,7 @@ def main() -> None:
             "modes_used": int(len(frequencies)),
             "excitation": "unit point impulse",
             "combination": "root-sum-square over modal acceleration amplitudes",
-            "normalization": "common maximum across all 8 hit maps",
+            "normalization": f"common maximum across all {len(HITS)} hit maps",
         },
         "hits": signatures,
     }
@@ -236,7 +266,8 @@ def main() -> None:
     for index in range(min(8, len(frequencies))):
         save_mode_svg(args.output / f"mode-{index + 1}.svg", xs, ys, display_modes[:, index], frequencies[index], index + 1)
     for note, hit, values in zip(NOTES, HITS, intensity_maps):
-        save_hit_intensity_svg(args.output / f"hit-{note.lower()}.svg", xs, ys, values,
+        slug = note.lower().replace(" ", "-")
+        save_hit_intensity_svg(args.output / f"hit-{slug}.svg", xs, ys, values,
                                hit, note, float(values.max()))
     print(json.dumps({"output": str(args.output), "frequencies_hz": result["frequencies_hz"][:8]}))
 

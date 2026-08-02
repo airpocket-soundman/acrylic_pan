@@ -18,6 +18,23 @@ HITS = [("C4", 50, 50), ("D4", 150, 50), ("E4", 250, 50), ("G4", 350, 50),
         ("A4", 50, 150), ("C5", 150, 150), ("D5", 250, 150), ("E5", 350, 150)]
 
 
+def configure_panel(width_mm, height_mm):
+    global X_GRID, Y_GRID, HITS
+    if width_mm != 400:
+        raise ValueError("the current clamp definition requires --width-mm 400")
+    X_GRID = [0,25,50,75,100,125,150,175,190,200,210,225,250,275,290,300,310,325,350,375,400]
+    Y_GRID = sorted(set([0,5,10,15,20,30,50,75,90,100,110,125,150,175,200]
+                        + list(range(225, int(height_mm) + 1, 25))
+                        + [int(height_mm / 2)]))
+    centres = [(x, y) for y in range(50, int(height_mm), 100)
+               for x in range(50, int(width_mm), 100)]
+    if (width_mm, height_mm) == (400, 200):
+        labels = ("C4", "D4", "E4", "G4", "A4", "C5", "D5", "E5")
+    else:
+        labels = tuple(f"area{index:02d}" for index in range(1, len(centres) + 1))
+    HITS = [(label, x, y) for label, (x, y) in zip(labels, centres)]
+
+
 def thickness_z_grid(thickness_mm):
     half = thickness_mm / 2.0
     return [-half, 0.0, half]
@@ -63,14 +80,14 @@ def write_set(handle, name, node_numbers):
         handle.write(",".join(map(str, group)) + "\n")
 
 
-def save_mesh_figure(path, coordinates, elements, fixed, sensor):
+def save_mesh_figure(path, coordinates, elements, fixed, sensor, width_mm, height_mm):
     fig, ax = plt.subplots(figsize=(10, 5), constrained_layout=True)
-    for x in X_GRID: ax.plot([x,x], [0,200], color="#78909c", lw=0.45)
-    for y in Y_GRID: ax.plot([0,400], [y,y], color="#78909c", lw=0.45)
+    for x in X_GRID: ax.plot([x,x], [0,height_mm], color="#78909c", lw=0.45)
+    for y in Y_GRID: ax.plot([0,width_mm], [y,y], color="#78909c", lw=0.45)
     ax.fill_between([200,300], 0, 20, color="#e2633b", alpha=0.55, label="fixed volume")
     ax.scatter([sensor[0]], [sensor[1]], marker="D", s=55, color="#34d399", edgecolor="#111827", label="sensor")
     ax.scatter([h[1] for h in HITS], [h[2] for h in HITS], marker="*", s=75, color="#f5b942", edgecolor="#111827", label="hit points")
-    ax.set(xlim=(0,400), ylim=(200,0), xlabel="x [mm]", ylabel="y [mm]",
+    ax.set(xlim=(0,width_mm), ylim=(height_mm,0), xlabel="x [mm]", ylabel="y [mm]",
            title=f"CalculiX graded C3D20R mesh — {len(elements)} elements, {len(coordinates)} nodes")
     ax.set_aspect("equal"); ax.legend(loc="lower right")
     fig.savefig(path, format="svg", metadata={"Date": None}); plt.close(fig)
@@ -79,11 +96,14 @@ def save_mesh_figure(path, coordinates, elements, fixed, sensor):
 def main():
     parser = argparse.ArgumentParser(); parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--thickness-mm", type=float, default=DEFAULT_THICKNESS_MM)
+    parser.add_argument("--width-mm", type=int, default=400)
+    parser.add_argument("--height-mm", type=int, default=200)
     args = parser.parse_args(); args.output.mkdir(parents=True, exist_ok=True)
     if args.thickness_mm <= 0:
         parser.error("--thickness-mm must be positive")
+    configure_panel(args.width_mm, args.height_mm)
     z_grid = thickness_z_grid(args.thickness_mm)
-    sensor_xyz = (200, 100, z_grid[-1])
+    sensor_xyz = (args.width_mm / 2, args.height_mm / 2, z_grid[-1])
     nodes, coordinates, elements = build_mesh(z_grid=z_grid)
     fixed = [n for n,(x,y,z) in coordinates.items() if 200-1e-8 <= x <= 300+1e-8 and 0-1e-8 <= y <= 20+1e-8]
     top = [n for n,(x,y,z) in coordinates.items() if abs(z-z_grid[-1]) < 1e-8]
@@ -110,6 +130,7 @@ def main():
 
     metadata = {"solver":"CalculiX CrunchiX 2.20","element":"C3D20R","integration":"reduced",
                 "thickness_mm":args.thickness_mm,
+                "geometry_mm":[args.width_mm,args.height_mm,args.thickness_mm],
                 "mesh":{"elements":len(elements),"nodes":len(coordinates),"x_grid_mm":X_GRID,"y_grid_mm":Y_GRID,"z_grid_mm":z_grid},
                 "material":{"E_MPa":3200,"poisson":0.35,"density_tonne_mm3":1.18e-9},
                 "fixed":{"x_mm":[200,300],"y_mm":[0,20],"z_mm":[z_grid[0],z_grid[-1]],"nodes":len(fixed)},
@@ -118,7 +139,7 @@ def main():
                 "frequency_step":{"requested_modes":30,"range_hz":[0,1200],"storage":True}}
     (args.output/"model-metadata.json").write_text(json.dumps(metadata,ensure_ascii=False,indent=2),encoding="utf-8")
     (args.output/"mesh-nodes.json").write_text(json.dumps({str(k):v for k,v in coordinates.items()}),encoding="utf-8")
-    save_mesh_figure(args.output/"calculix-graded-mesh.svg",coordinates,elements,fixed,sensor_xyz)
+    save_mesh_figure(args.output/"calculix-graded-mesh.svg",coordinates,elements,fixed,sensor_xyz,args.width_mm,args.height_mm)
     base = inp.read_text(encoding="ascii").split("*STEP", 1)[0]
     for note, _x, _y in HITS:
         job = f"hit_{note.lower()}"

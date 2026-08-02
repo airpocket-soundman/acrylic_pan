@@ -28,6 +28,32 @@ HITS = [(x, y) for y in (0.050, 0.150) for x in (0.050, 0.150, 0.250, 0.350)]
 NOTES = ("C4", "D4", "E4", "G4", "A4", "C5", "D5", "E5")
 
 
+def configure_panel(width_mm: float, height_mm: float, thickness_mm: float) -> None:
+    """Configure geometry and a row-major 100 mm area-centre hit grid."""
+    global WIDTH, HEIGHT, THICKNESS, SENSOR, HITS, NOTES
+    WIDTH = width_mm / 1000.0
+    HEIGHT = height_mm / 1000.0
+    THICKNESS = thickness_mm / 1000.0
+    SENSOR = (WIDTH / 2.0, HEIGHT / 2.0)
+    x_centres = np.arange(50.0, width_mm, 100.0) / 1000.0
+    y_centres = np.arange(50.0, height_mm, 100.0) / 1000.0
+    HITS = [(float(x), float(y)) for y in y_centres for x in x_centres]
+    if (width_mm, height_mm) == (400.0, 200.0):
+        NOTES = ("C4", "D4", "E4", "G4", "A4", "C5", "D5", "E5")
+    else:
+        NOTES = tuple(f"Area {index:02d}" for index in range(1, len(HITS) + 1))
+
+
+def plot_grid() -> tuple[int, int]:
+    columns = int(round(WIDTH * 1000 / 100))
+    rows = int(round(HEIGHT * 1000 / 100))
+    return rows, columns
+
+
+def axis_ticks(length_m: float) -> list[int]:
+    return list(range(0, int(round(length_m * 1000)) + 1, 100))
+
+
 def elasticity_matrix() -> np.ndarray:
     lam = E * NU / ((1 + NU) * (1 - 2 * NU))
     mu = E / (2 * (1 + NU))
@@ -128,10 +154,10 @@ def save_mode(path: Path, xs, ys, zs, mode: np.ndarray, frequency: float, number
     bottom_z_mm = zs[0] * 1000
     surf = ax.plot_surface(xx, yy, top_z_mm + 14 * w, cmap="RdBu_r", vmin=-1, vmax=1,
                            linewidth=0.15, edgecolor=(0, 0, 0, 0.22), antialiased=True)
-    for y in (0, 200): ax.plot([0, 400], [y, y], [bottom_z_mm, bottom_z_mm], color="#374151", linewidth=1)
+    for y in (0, HEIGHT * 1000): ax.plot([0, WIDTH * 1000], [y, y], [bottom_z_mm, bottom_z_mm], color="#374151", linewidth=1)
     ax.set(xlabel="x [mm]", ylabel="y [mm]", zlabel="z (exaggerated) [mm]",
            title=f"3-D solid FEM — Mode {number}: {frequency:.1f} Hz")
-    ax.set_box_aspect((2, 1, 0.35)); ax.view_init(28, -62)
+    ax.set_box_aspect((WIDTH, HEIGHT, max(WIDTH, HEIGHT) * 0.18)); ax.view_init(28, -62)
     fig.colorbar(surf, ax=ax, shrink=0.62, pad=0.08, label="normalized z displacement")
     fig.savefig(path, format="svg", metadata={"Date": None}); plt.close(fig)
 
@@ -145,15 +171,16 @@ def save_mesh(path: Path, xs, ys, zs):
         ax.plot_wireframe(xx, yy, zz, rstride=1, cstride=1, color="#52717c", linewidth=0.25, alpha=0.72)
     bottom_z_mm, top_z_mm = zs[0] * 1000, zs[-1] * 1000
     for x in xs * 1000:
-        for y in (0, 200): ax.plot([x, x], [y, y], [bottom_z_mm, top_z_mm], color="#52717c", linewidth=0.35)
+        for y in (0, HEIGHT * 1000): ax.plot([x, x], [y, y], [bottom_z_mm, top_z_mm], color="#52717c", linewidth=0.35)
     for y in ys * 1000:
-        for x in (0, 400): ax.plot([x, x], [y, y], [bottom_z_mm, top_z_mm], color="#52717c", linewidth=0.35)
-    fx = np.linspace(200, 300, 9); fy = np.linspace(0, 20, 3); fxx, fyy = np.meshgrid(fx, fy)
+        for x in (0, WIDTH * 1000): ax.plot([x, x], [y, y], [bottom_z_mm, top_z_mm], color="#52717c", linewidth=0.35)
+    fx = np.linspace(FIXED_X[0] * 1000, FIXED_X[1] * 1000, 9)
+    fy = np.linspace(FIXED_Y[0] * 1000, FIXED_Y[1] * 1000, 3); fxx, fyy = np.meshgrid(fx, fy)
     for z in (bottom_z_mm, top_z_mm): ax.plot_surface(fxx, fyy, np.full_like(fxx, z), color="#e2633b", alpha=0.68, shade=False)
-    ax.scatter([200], [100], [top_z_mm], marker="D", s=45, c="#34d399", edgecolors="#111827", label="sensor")
+    ax.scatter([SENSOR[0] * 1000], [SENSOR[1] * 1000], [top_z_mm], marker="D", s=45, c="#34d399", edgecolors="#111827", label="sensor")
     ax.set(xlabel="x [mm]", ylabel="y [mm]", zlabel="z [mm]",
            title=f"3-D solid mesh — {len(xs)-1} × {len(ys)-1} × {len(zs)-1} HEX8 elements")
-    ax.set_box_aspect((2, 1, 0.18)); ax.set_zlim(-12, 12); ax.view_init(25, -62); ax.legend(loc="upper right")
+    ax.set_box_aspect((WIDTH, HEIGHT, max(WIDTH, HEIGHT) * 0.09)); ax.set_zlim(-12, 12); ax.view_init(25, -62); ax.legend(loc="upper right")
     fig.savefig(path, format="svg", metadata={"Date": None}); plt.close(fig)
 
 
@@ -172,14 +199,16 @@ def response_fields(xs, ys, zs, frequencies, modes, duration=0.06, frames=120):
 
 
 def save_animation(path: Path, times, fields):
-    fig, axes = plt.subplots(2, 4, figsize=(12.8, 6.5), constrained_layout=True); images = []
+    rows, columns = plot_grid()
+    fig, axes = plt.subplots(rows, columns, figsize=(12.8, 3.2 * rows), constrained_layout=True); images = []
+    axes = np.asarray(axes).reshape(rows, columns)
     for ax, note, hit, field in zip(axes.ravel(), NOTES, HITS, fields):
-        image = ax.imshow(field[0], extent=(0, 400, 200, 0), cmap="RdBu_r", vmin=-1, vmax=1,
+        image = ax.imshow(field[0], extent=(0, WIDTH * 1000, HEIGHT * 1000, 0), cmap="RdBu_r", vmin=-1, vmax=1,
                           interpolation="bilinear", aspect="equal")
         ax.scatter([hit[0] * 1000], [hit[1] * 1000], marker="*", s=70, c="#f5b942", edgecolors="#111827")
-        ax.scatter([200], [100], marker="D", s=28, c="#34d399", edgecolors="#111827")
+        ax.scatter([SENSOR[0] * 1000], [SENSOR[1] * 1000], marker="D", s=28, c="#34d399", edgecolors="#111827")
         ax.set_title(f"{note}  ({hit[0]*1000:.0f}, {hit[1]*1000:.0f}) mm")
-        ax.set_xticks([0, 200, 400]); ax.set_yticks([0, 100, 200]); images.append(image)
+        ax.set_xticks(axis_ticks(WIDTH)); ax.set_yticks(axis_ticks(HEIGHT)); images.append(image)
     stamp = fig.suptitle("3-D solid FEM impulse response — t = 0.00 ms (slow motion)")
     fig.colorbar(images[0], ax=axes, shrink=0.72, label="normalized z displacement (common scale)")
     def update(frame):
@@ -194,15 +223,17 @@ def save_animation(path: Path, times, fields):
 
 def save_hit_stills(path: Path, times, fields):
     """Save one representative maximum-response frame for every hit point."""
-    fig, axes = plt.subplots(2, 4, figsize=(12.8, 6.5), constrained_layout=True); images = []
+    rows, columns = plot_grid()
+    fig, axes = plt.subplots(rows, columns, figsize=(12.8, 3.2 * rows), constrained_layout=True); images = []
+    axes = np.asarray(axes).reshape(rows, columns)
     for ax, note, hit, field in zip(axes.ravel(), NOTES, HITS, fields):
         frame = int(np.argmax(np.sqrt(np.mean(field**2, axis=(1, 2)))))
-        image = ax.imshow(field[frame], extent=(0, 400, 200, 0), cmap="RdBu_r", vmin=-1, vmax=1,
+        image = ax.imshow(field[frame], extent=(0, WIDTH * 1000, HEIGHT * 1000, 0), cmap="RdBu_r", vmin=-1, vmax=1,
                           interpolation="bilinear", aspect="equal")
         ax.scatter([hit[0] * 1000], [hit[1] * 1000], marker="*", s=75, c="#f5b942", edgecolors="#111827")
-        ax.scatter([200], [100], marker="D", s=28, c="#34d399", edgecolors="#111827")
+        ax.scatter([SENSOR[0] * 1000], [SENSOR[1] * 1000], marker="D", s=28, c="#34d399", edgecolors="#111827")
         ax.set_title(f"{note} — t={times[frame]*1000:.2f} ms")
-        ax.set_xticks([0, 200, 400]); ax.set_yticks([0, 100, 200]); images.append(image)
+        ax.set_xticks(axis_ticks(WIDTH)); ax.set_yticks(axis_ticks(HEIGHT)); images.append(image)
     fig.suptitle("3-D solid FEM — representative deformation after each point impulse")
     fig.colorbar(images[0], ax=axes, shrink=0.72, label="normalized z displacement (common scale)")
     fig.savefig(path, format="svg", metadata={"Date": None}); plt.close(fig)
@@ -211,7 +242,11 @@ def save_hit_stills(path: Path, times, fields):
 def main():
     parser = argparse.ArgumentParser(); parser.add_argument("--output", type=Path, default=Path("web/assets/simulation/solid3d"))
     parser.add_argument("--elements", default="32,16,2"); parser.add_argument("--modes", type=int, default=16)
+    parser.add_argument("--width-mm", type=float, default=400.0)
+    parser.add_argument("--height-mm", type=float, default=200.0)
+    parser.add_argument("--thickness-mm", type=float, default=3.0)
     parser.add_argument("--skip-video", action="store_true"); args = parser.parse_args()
+    configure_panel(args.width_mm, args.height_mm, args.thickness_mm)
     ex, ey, ez = map(int, args.elements.split(",")); args.output.mkdir(parents=True, exist_ok=True)
     xs, ys, zs, frequencies, modes, fixed_nodes = solve_modes(ex, ey, ez, args.modes)
     sensor_node = nearest_top_node(*SENSOR, xs, ys, zs); omega = 2 * np.pi * frequencies; hits = []
@@ -225,8 +260,8 @@ def main():
               "mesh": {"elements": [ex, ey, ez], "nodes": len(xs)*len(ys)*len(zs),
                        "degrees_of_freedom": 3*len(xs)*len(ys)*len(zs), "fixed_nodes": len(fixed_nodes)},
               "material": {"E_GPa": E/1e9, "poisson": NU, "density_kg_m3": RHO},
-              "geometry_mm": [400, 200, THICKNESS*1000], "fixed_volume_mm": {"x": [200, 300], "y": [0, 20], "z": [zs[0]*1000, zs[-1]*1000]},
-              "sensor_mm": [200, 100, zs[-1]*1000], "frequencies_hz": np.round(frequencies, 3).tolist(), "hits": hits,
+              "geometry_mm": [WIDTH*1000, HEIGHT*1000, THICKNESS*1000], "fixed_volume_mm": {"x": [FIXED_X[0]*1000, FIXED_X[1]*1000], "y": [FIXED_Y[0]*1000, FIXED_Y[1]*1000], "z": [zs[0]*1000, zs[-1]*1000]},
+              "sensor_mm": [SENSOR[0]*1000, SENSOR[1]*1000, zs[-1]*1000], "frequencies_hz": np.round(frequencies, 3).tolist(), "hits": hits,
               "limitations": ["linear isotropic PMMA", "perfectly fixed clamp volume", "no sensor/adhesive mass", "small deformation"]}
     (args.output/"solid3d-results.json").write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
     hit_nodes = [nearest_top_node(*hit, xs, ys, zs) for hit in HITS]
@@ -246,9 +281,11 @@ def main():
     save_mesh(args.output/"solid3d-mesh.svg", xs, ys, zs)
     for i in range(min(6, args.modes)): save_mode(args.output/f"solid3d-mode-{i+1}.svg", xs, ys, zs, modes[:, i], frequencies[i], i+1)
     times, fields = response_fields(xs, ys, zs, frequencies, modes)
-    save_hit_stills(args.output/"solid3d-eight-hit-stills.svg", times, fields)
+    still_name = "solid3d-eight-hit-stills.svg" if len(HITS) == 8 else f"solid3d-{len(HITS)}-hit-stills.svg"
+    video_name = "solid3d-eight-hits.mp4" if len(HITS) == 8 else f"solid3d-{len(HITS)}-hits.mp4"
+    save_hit_stills(args.output/still_name, times, fields)
     if not args.skip_video:
-        save_animation(args.output/"solid3d-eight-hits.mp4", times, fields)
+        save_animation(args.output/video_name, times, fields)
     print(json.dumps({"mesh": result["mesh"], "frequencies_hz": result["frequencies_hz"][:8], "video": not args.skip_video}))
 
 

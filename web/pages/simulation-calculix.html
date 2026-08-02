@@ -18,6 +18,7 @@
   <tr><th>CalculiX XY回帰</th><td>中心8点＋四隅32点、境界プローブ10点</td><td>50打点応答と座標回帰比較を生成</td></tr>
 </table>
 <div class="status"><strong>3 mm高周波側の再計算値</strong>HPF候補0～1,000 Hzを比較し、FFT全点の最悪ペア・コサイン距離は500 Hzで0.2004、平均距離は0.2864でした（数値微分の高域減衰を補正済み）。FFTの真の周波数分解能は20 Hzです。最終カットオフは実測で決めます。</div>
+<div class="status"><strong>300 × 400 × 5 mm版を追加</strong>12エリア仕様の基準解析は <a href="../../index.html#simulation-calculix-5mm" target="_parent">5 mm・CalculiX</a> で比較できます。</div>
 <div class="status warn"><strong>CalculiX 2.20の実行警告</strong><code>*MODAL DYNAMIC, DIRECT</code>と<code>*MODAL DAMPING, MODAL=DIRECT</code>の追加パラメータは未認識として警告されましたが、全ジョブは<code>Job finished</code>で終了し、固有モードからの動的応答合成と出力生成は完了しています。警告原文は各run logに保存しています。</div>
 
 <h2>局所細分化した非一様メッシュ</h2>
