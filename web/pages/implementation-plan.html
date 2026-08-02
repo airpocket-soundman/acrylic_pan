@@ -8,10 +8,11 @@
 </head>
 <body>
   <div class="eyebrow">07 / Implementation roadmap</div>
-  <h1>波形を確実に取るところから、<br>8クラス・XY推定へ育てる。</h1>
+  <h1>波形を確実に取るところから、<br>12クラス・XY推定へ育てる。</h1>
   <p class="lead">最初の合格点は、衝撃の立ち上がりを欠落させずに1イベント分の振動波形を取得し、PCで時間波形とFFTを確認できることです。その同じ通信・収録基盤へ、ラベリング、学習、推論、演奏表示を順番に追加します。</p>
 
-  <div class="status"><strong>現在のマイルストーン — M1</strong>PCモニタの通信プロトコル、波形・FFT表示と保存処理を実装中。次にML63Q2557/KX134側のリングバッファ、衝撃検出、UART転送を接続します。</div>
+  <div class="status"><strong>現在のマイルストーン — 実測拡充と座標推論評価</strong>5 mm板向け12クラス推論まで実装済みです。次は独立セッションの測定データを増やし、PC推論で座標推論自体の上限を、デバイス推論で組み込み制約による差を切り分けます。</div>
+  <div class="status"><strong>次期タスクを整理しました</strong>測定データ追加、PC／デバイス両方での座標推論と限界の切り分け、必要に応じた測定点・学習データ追加、Arduino UNO Q移植を <a href="../../docs/future-tasks.md" target="_blank">今後のタスクメモ</a> にまとめています。</div>
 
   <h2>実装する順番</h2>
   <div class="timeline">

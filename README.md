@@ -82,5 +82,5 @@ ELM参照実装を置き、公式Simulatorへ渡す前に次元・精度・デ�
 5. PCでスチールパン音源とヒートマップを実装
 6. 必要に応じてPWM音源などへ移し、スタンドアロン化
 
-設計内容は [HTMLドキュメント](index.html) と [設計メモ](docs/design.md) を参照してください。ROHM提供資料は
+設計内容は [HTMLドキュメント](index.html)、[設計メモ](docs/design.md)、[今後のタスク](docs/future-tasks.md) を参照してください。ROHM提供資料は
 `doc/` に保存しています。
