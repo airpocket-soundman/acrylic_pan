@@ -1,0 +1,32 @@
+{
+  "evaluation_session": "20260821_221547_4c753402",
+  "sample_count": 600,
+  "class_counts": [50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50],
+  "models": [
+    {
+      "name": "current_2sessions",
+      "model_sha256": "32a7c5aa9dfc98e1f656410b7fa59384e9918e164557942fc1d1df31e782726c",
+      "training_sessions": [
+        "20260720_215533_aa9943ae",
+        "20260720_220935_bd12a70b"
+      ],
+      "correct": 583,
+      "accuracy": 0.9716666666666667,
+      "per_class_recall": [0.92, 0.98, 1.0, 1.0, 0.96, 1.0, 1.0, 1.0, 0.82, 1.0, 1.0, 0.98]
+    },
+    {
+      "name": "candidate_3sessions_20260821",
+      "model_sha256": "ec7b42e134be0f721ddb0cafdb097a8920de7673713a7a865aefb4a0617d6cad",
+      "training_sessions": [
+        "20260720_215533_aa9943ae",
+        "20260720_220935_bd12a70b",
+        "20260821_215225_8f38a3e4"
+      ],
+      "correct": 591,
+      "accuracy": 0.985,
+      "per_class_recall": [1.0, 0.98, 1.0, 1.0, 0.98, 0.98, 0.92, 1.0, 0.96, 1.0, 1.0, 1.0]
+    }
+  ],
+  "accuracy_delta_points": 1.3333333333333304,
+  "additional_correct": 8
+}
