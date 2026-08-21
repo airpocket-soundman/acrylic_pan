@@ -71,29 +71,49 @@ def extract_hybrid_features(samples: np.ndarray) -> np.ndarray:
 def load_hybrid_dataset(source: Path, class_count: int = CLASS_COUNT,
                         session_ids: tuple[str, ...] = ()):
     """Load validated Recorder sessions, replacing FFT-only features."""
-    dataset = load_recorded_sessions(source, class_count=class_count)
-    selected = np.ones(len(dataset.labels), dtype=bool)
     if session_ids:
-        selected = np.isin(dataset.session_ids, np.asarray(session_ids))
-        missing = sorted(set(session_ids) - set(dataset.session_ids[selected].tolist()))
+        if len(set(session_ids)) != len(session_ids):
+            raise ValueError("requested session IDs must be unique")
+        # Load explicitly selected session directories one at a time.  This
+        # keeps an unrelated session that is still being recorded from
+        # entering validation or changing a reproducible training run.
+        selected_datasets = []
+        missing = []
+        for session_id in session_ids:
+            session_dir = source / session_id
+            if not (session_dir / "session.json").is_file():
+                missing.append(session_id)
+                continue
+            selected_dataset = load_recorded_sessions(session_dir, class_count=class_count)
+            actual_ids = set(selected_dataset.session_ids.tolist())
+            if actual_ids != {session_id}:
+                raise ValueError(
+                    f"{session_dir}: requested session {session_id} but found {sorted(actual_ids)}"
+                )
+            selected_datasets.append(selected_dataset)
         if missing:
-            raise ValueError(f"requested sessions were not found: {missing}")
-    labels = dataset.labels[selected]
+            raise ValueError(f"requested sessions were not found: {sorted(missing)}")
+        first = selected_datasets[0]
+        dataset = type(first)(
+            np.concatenate([item.features for item in selected_datasets]),
+            np.concatenate([item.labels for item in selected_datasets]),
+            np.concatenate([item.session_ids for item in selected_datasets]),
+            tuple(path for item in selected_datasets for path in item.event_paths),
+        )
+    else:
+        dataset = load_recorded_sessions(source, class_count=class_count)
+    labels = dataset.labels
     if set(labels.tolist()) != set(range(class_count)):
         raise ValueError(f"selected dataset must contain every class 0..{class_count - 1}")
-    paths = tuple(path for path, keep in zip(dataset.event_paths, selected) if keep)
-    selected_dataset = type(dataset)(
-        dataset.features[selected], labels, dataset.session_ids[selected], paths
-    )
     features = []
-    for path in selected_dataset.event_paths:
+    for path in dataset.event_paths:
         with np.load(path, allow_pickle=False) as event:
             samples = np.asarray(event["samples"])
             trigger = int(np.asarray(event["trigger_index"]).reshape(-1)[0])
             if trigger != TRIGGER_INDEX:
                 raise ValueError(f"{path}: trigger_index {trigger} is not {TRIGGER_INDEX}")
             features.append(extract_hybrid_features(samples))
-    return selected_dataset, np.stack(features)
+    return dataset, np.stack(features)
 
 
 def fit_beta(features: np.ndarray, labels: np.ndarray, alpha: np.ndarray,
@@ -114,10 +134,16 @@ def confusion_matrix(expected: np.ndarray, predicted: np.ndarray,
 
 
 def evaluate_fold(features: np.ndarray, labels: np.ndarray, session_ids: np.ndarray,
-                  train_session: str, test_session: str, alpha: np.ndarray,
+                  train_sessions: str | tuple[str, ...], test_session: str, alpha: np.ndarray,
                   ridge: float = RIDGE, class_count: int = CLASS_COUNT
                   ) -> tuple[dict[str, Any], FeatureScaler, np.ndarray]:
-    train = session_ids == train_session
+    if isinstance(train_sessions, str):
+        train_session_names = (train_sessions,)
+    else:
+        train_session_names = tuple(train_sessions)
+    if not train_session_names:
+        raise ValueError("at least one training session is required")
+    train = np.isin(session_ids, np.asarray(train_session_names))
     test = session_ids == test_session
     scaler = FeatureScaler.fit(features[train])
     train_x = scaler.transform(features[train])
@@ -128,7 +154,9 @@ def evaluate_fold(features: np.ndarray, labels: np.ndarray, session_ids: np.ndar
     matrix = confusion_matrix(labels[test], predicted, class_count)
     recalls = np.diag(matrix) / np.maximum(matrix.sum(axis=1), 1)
     result = {
-        "train_session": train_session,
+        "train_sessions": list(train_session_names),
+        # Keep the original field for consumers of the two-session v1 report.
+        "train_session": train_session_names[0] if len(train_session_names) == 1 else None,
         "test_session": test_session,
         "train_count": int(train.sum()),
         "test_count": int(test.sum()),
@@ -213,15 +241,21 @@ def generate(source: Path, output_dir: Path, header: Path,
 
     output_dir.mkdir(parents=True, exist_ok=True)
     folds = []
-    for fold_index, (train_session, test_session) in enumerate(
-        ((sessions[0], sessions[1]), (sessions[1], sessions[0])), start=1
-    ):
+    if len(sessions) == 2:
+        # Preserve the v1 fold numbering used by existing reports and CSVs.
+        fold_definitions = [((sessions[0],), sessions[1]), ((sessions[1],), sessions[0])]
+    else:
+        fold_definitions = [
+            (tuple(session for session in sessions if session != test_session), test_session)
+            for test_session in sessions
+        ]
+    for fold_index, (train_sessions, test_session) in enumerate(fold_definitions, start=1):
         result, scaler, _ = evaluate_fold(
             features, dataset.labels, dataset.session_ids,
-            train_session, test_session, alpha, ridge, class_count,
+            train_sessions, test_session, alpha, ridge, class_count,
         )
         folds.append(result)
-        train = dataset.session_ids == train_session
+        train = np.isin(dataset.session_ids, np.asarray(train_sessions))
         test = dataset.session_ids == test_session
         np.savez(output_dir / f"fold{fold_index}_scaler.npz", mean=scaler.mean, scale=scaler.scale)
         export_solist_csv(
@@ -331,7 +365,7 @@ def main() -> None:
     print(f"samples={report['sample_count']}; class_counts={report['class_counts']}")
     for fold in report["session_folds"]:
         print(
-            f"{fold['train_session']} -> {fold['test_session']}: "
+            f"{','.join(fold['train_sessions'])} -> {fold['test_session']}: "
             f"accuracy={fold['accuracy']:.4f}"
         )
     print(f"mean_session_accuracy={report['mean_session_accuracy']:.4f}")

@@ -35,6 +35,7 @@ from sim.real_model_pipeline import (
     INPUT_COUNT as REAL_INPUT_COUNT,
     TIME_FEATURE_COUNT,
     TRIGGER_INDEX,
+    evaluate_fold,
     extract_hybrid_features,
     fit_beta,
     time_sample_indices,
@@ -168,6 +169,21 @@ class SolistPipelineTests(unittest.TestCase):
         beta = fit_beta(features, labels, alpha)
         self.assertEqual(beta.shape, (32, 8))
         self.assertTrue(np.isfinite(beta).all())
+
+    def test_real_model_fold_accepts_multiple_training_sessions(self):
+        rng = np.random.default_rng(21)
+        features = rng.normal(size=(18, REAL_INPUT_COUNT)).astype(np.float32)
+        labels = np.tile(np.arange(2), 9)
+        session_ids = np.repeat(np.asarray(["run-a", "run-b", "run-c"]), 6)
+        alpha = rng.normal(scale=0.05, size=(REAL_INPUT_COUNT, 32)).astype(np.float32)
+        result, _, beta = evaluate_fold(
+            features, labels, session_ids, ("run-a", "run-b"), "run-c",
+            alpha, class_count=2,
+        )
+        self.assertEqual(result["train_sessions"], ["run-a", "run-b"])
+        self.assertIsNone(result["train_session"])
+        self.assertEqual((result["train_count"], result["test_count"]), (12, 6))
+        self.assertEqual(beta.shape, (32, 2))
 
     def test_synthetic_eight_class_elm(self):
         features, labels = make_synthetic_events(samples_per_class=12, seed=7)
