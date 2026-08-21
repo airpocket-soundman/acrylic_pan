@@ -27,8 +27,45 @@ LEXIDE GUIやJavaは不要です。privateプロジェクトをCLIでビルド�
 
 ## PC Webモニタ
 
+### このPCで使用するPython
+
+実機Web UIはPythonのローカルHTTPサーバーとpyserialを使用します。GitHub Pagesだけでは
+UARTへ接続できません。このPCで動作確認済みの環境は次のとおりです。
+
+| 項目 | 値 |
+|---|---|
+| Python | `C:\ProgramData\anaconda3\python.exe`（Python 3.12.7） |
+| scikit-learn | 1.5.1 |
+| joblib | 1.4.2 |
+| UART | COM3、115200 bps、8-N-1 |
+
+`run-monitor.ps1` は、`-Python` を省略するとPATH上の `python` を使います。このPCでは
+`C:\Python313\python.exe` が先に見つかりますが、そこにはWeb UIに必要なjoblib、pyserial、
+scikit-learnが揃っていません。以前の環境が消えたように見える場合は、まず実際に選択された
+Pythonを確認してください。
+
 ```powershell
-.\scripts\run-monitor.ps1
+where.exe python
+python -c "import sys; print(sys.executable)"
+C:\ProgramData\anaconda3\python.exe -c "import joblib, numpy, serial, sklearn; print(sklearn.__version__)"
+```
+
+### 楽器UIを直接起動
+
+```powershell
+.\scripts\run-monitor.ps1 `
+  -Python C:\ProgramData\anaconda3\python.exe `
+  -Page instrument.html
+```
+
+ブラウザで `http://127.0.0.1:8765/instrument.html` を開き、板仕様とCOM3を選択して
+「接続」→「演奏開始」の順に操作します。推論値を受信すると対応エリアを強調し、Web Audioで
+割り当てた音を再生します。
+
+全機能の入口を開く場合は次を使用します。
+
+```powershell
+.\scripts\run-monitor.ps1 -Python C:\ProgramData\anaconda3\python.exe
 ```
 
 ブラウザで `http://127.0.0.1:8765/` を開き、COM3へ接続します。
@@ -42,6 +79,23 @@ LEXIDE GUIやJavaは不要です。privateプロジェクトをCLIでビルド�
 - 「静止波形を取得」: `CAPTURE` でZ軸25.6 kHz・2,048点（80 ms）を取得
 - 波形とDC除去・Hann窓FFTを表示
 - NPZ、`manifest.csv`、`manifest.jsonl`へ自動保存
+
+### 起動できない場合
+
+| 症状 | 原因 | 対処 |
+|---|---|---|
+| `ERR_CONNECTION_REFUSED` | 8765番ポートでローカルサーバーが起動していない | 上記コマンドをPowerShellで実行し、そのウィンドウを閉じずに再読み込みする |
+| `ModuleNotFoundError: joblib` など | PATH上の別Pythonを使用している | `-Python C:\ProgramData\anaconda3\python.exe` を明示する |
+| `scikit-learn==1.5.1` のビルドに失敗 | Python 3.13には固定版のWindows wheelがない | 動作確認済みのAnaconda Python 3.12を使用する |
+| ページは開くが「未接続」 | COMポートへまだ接続していない | ボードを接続し、COM3を選んで「接続」を押す |
+| COM3が一覧にない | ボード未接続、番号変更、または他アプリが使用中 | 「更新」を押し、デバイスマネージャーでUARTのCOM番号を確認する |
+
+サーバーは起動したPowerShellで `Ctrl+C` を押すと停止します。別のプロセスが8765番ポートを
+使用していないか確認する場合は、次を実行します。
+
+```powershell
+Get-NetTCPConnection -LocalPort 8765 -State Listen
+```
 
 主なHTTP API:
 

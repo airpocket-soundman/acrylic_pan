@@ -1,6 +1,6 @@
 # DT-EBML63Q2557 開発環境
 
-確認日: 2026-07-16
+確認日: 2026-08-21
 
 ## 推奨構成
 
@@ -15,7 +15,7 @@
 | AI | Solist-AI Sim 教師あり版 SLV1.00.04 | 学習、bfloat16確認、モデルの.h出力 |
 | デバッガ | SEGGER J-Link PLUS、J-Link Software 7.62以降 | SWDデバッグと内蔵Flash書込み |
 | USB通信 | FTDI FT2232H VCP/D2XXドライバ | UARTチャンネルB、SPIチャンネルA |
-| PC収録 | Python 3 + pyserial + numpy | 打撃波形の受信、ラベル、品質管理、保存 |
+| PC収録・実機Web UI | Anaconda Python 3.12.7 + pyserial + numpy + scikit-learn | 打撃波形の受信、推論表示、ブラウザ発音、ラベル、品質管理、保存 |
 
 LEXIDE-Ω V2.2.0のインストーラは `LexideInstaller_20260317.exe`、標準インストール先は
 `C:\LAPIS\LEXIDE`。ML63Q2500グループ用ArmデバイスパックはLEXIDE-Ωの
@@ -34,13 +34,23 @@ CMSIS-Pack Managerから追加する。LEXIDE本体だけではML63Q2557の機�
 | J-Link Software | 本体未導入。古いWindowsドライバ登録だけ存在 |
 | FT2232H | 現在ボード未接続のためVCP/D2XX認識は未確認 |
 | Docker | Desktop Linux Engine 28.0.4、解析コンテナ実行済み |
-| Python | numpy/scipy/matplotlibによる解析実行済み |
+| Python | `C:\ProgramData\anaconda3\python.exe`（3.12.7）でWeb UIを動作確認。scikit-learn 1.5.1、joblib 1.4.2、pyserial 3.5導入済み |
 
 公式Simulatorは
 `C:\Program Files\ROHM\SolistAI_Sim_SLV10004sp\application\SolistAI_Sim_SLV10004.exe`
 にあります。`scripts/launch-solist-ai-sim.ps1 -CheckOnly`でSimulatorとRuntimeを検査できます。
 IchiPing側から移植した8クラス用の設定とCSV生成方法は
 [`solist-ai-simulator.md`](solist-ai-simulator.md)を参照してください。
+
+実機Web UIの起動ではPATH上の `python` に依存せず、次のように動作確認済み環境を明示します。
+現在PATHで先に選ばれる `C:\Python313\python.exe` は別環境であり、必要ライブラリが揃って
+いません。詳細は [`collector-quickstart.md`](collector-quickstart.md)を参照してください。
+
+```powershell
+.\scripts\run-monitor.ps1 `
+  -Python C:\ProgramData\anaconda3\python.exe `
+  -Page instrument.html
+```
 
 ## 導入順序
 

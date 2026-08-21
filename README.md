@@ -7,6 +7,33 @@ DT-EBML63Q2557 に接続した KX134-1211 加速度センサ1個をパネル中�
 打撃位置による振動モード強度の違いを測定します。Solist-AI は4 × 2領域の
 空間スコアを出力し、音階、確率ヒートマップ、期待座標 `(x, y)` へ変換します。
 
+## 実機Web UIを起動する
+
+実機のUARTから打点推論値を受信してブラウザで発音する画面は、GitHub Pagesではなく
+PC上のPythonサーバーで動作します。このPCでは、必要なライブラリが導入済みの
+Anaconda Pythonを明示して起動します。
+
+```powershell
+.\scripts\run-monitor.ps1 `
+  -Python C:\ProgramData\anaconda3\python.exe `
+  -Page instrument.html
+```
+
+起動後に [http://127.0.0.1:8765/instrument.html](http://127.0.0.1:8765/instrument.html) を開き、
+板仕様とCOMポートを選んで「接続」→「演奏開始」の順に操作します。
+
+| 用途 | ローカルURL |
+|---|---|
+| 推論結果 | `http://127.0.0.1:8765/` |
+| 学習データ採取 | `http://127.0.0.1:8765/collector.html` |
+| 位置推定 | `http://127.0.0.1:8765/position.html` |
+| 推論結果から発音する楽器UI | `http://127.0.0.1:8765/instrument.html` |
+
+`run-monitor.ps1` の既定値はPATH上の `python` です。現在のPATHでは
+`C:\Python313\python.exe` が選ばれ、必要な依存関係が揃わないため、そのままでは起動できません。
+Python環境の確認方法、エラー対処、COMポートの詳細は
+[収録システム・実機Web UIクイックスタート](docs/collector-quickstart.md)を参照してください。
+
 ## 目標
 
 - 第一目標: 4 × 2（8領域）の安定識別
