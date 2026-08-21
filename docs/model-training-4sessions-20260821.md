@@ -9,9 +9,9 @@
 このセッションを学習へ入れる前の完全未学習評価では、現行2セッションモデルの97.17%に対し、
 前回の3セッション候補モデルは98.50%となり、**+1.33ポイント、正解数+8件**の改善を確認した。
 
-その後、4セッション全2,345件で新しい候補モデルを学習した。4-fold LOSO平均は95.12%で、
-3セッション候補の3-fold LOSO平均92.31%から+2.80ポイントとなった。現行ファームウェアの
-モデルは上書きしていない。
+その後、4セッション全2,345件で新しいモデルを学習した。4-fold LOSO平均は95.12%で、
+3セッション候補の3-fold LOSO平均92.31%から+2.80ポイントとなった。このモデルは
+2026-08-21に現行ファームウェアへ反映し、実機へ書き込み済みである。
 
 ## 完全未学習セッションでの比較
 
@@ -26,7 +26,7 @@
 クラス6が92%で最小となり、それ以外は96%以上だった。この結果から、前回追加した600件には
 独立セッションへの汎化を改善する効果があったと判断する。
 
-## 4セッション候補
+## 4セッションモデル
 
 | セッション | 件数 |
 |---|---:|
@@ -61,10 +61,25 @@ Bfloat16境界再現という条件は現行モデルから変更していない
 - `artifacts/real_model_300x400x5_12class_4sessions_20260821/apan_12class_model_candidate.h`
 - `artifacts/real_model_300x400x5_12class_4sessions_20260821/unseen_evaluation.json`
 
-候補ヘッダーは比較用成果物ディレクトリに保存し、
-`firmware/AcrylicPanCollector/generated/apan_12class_model.h`は変更していない。
-4セッション最終候補を実機へ反映する場合は、別途ファームウェアのビルド、書込み、golden case、
-実打撃確認を行う。
+候補ヘッダーを`firmware/AcrylicPanCollector/generated/apan_12class_model.h`へ反映し、
+実機用の現行モデルとした。学習成果物`model.npz`のSHA-256は
+`c9ef1b8ebbebe08ace72a39275d1c45582ec051cbe8d8c43a594a28d0ac0496a`である。
+
+## 実機デプロイ（2026-08-21）
+
+- LEXIDEプロジェクト:
+  `C:\Users\yamas\lexide\workspace_omega_v2\AcrylicPanCollector_xy_staged`
+- 書き込みイメージ:
+  `Debug\AIVibrationInference.hex`
+- HEX SHA-256:
+  `56b80c41c96db4a9e66f8cf0086b045e1e20fdd1dacfd7453800b3a58614973f`
+- 書き込み器: MCU-Link CMSIS-DAP V3.172、シリアル`14OZPOHJLAY5E`
+- OpenOCDによるerase、program、全バイトverify、resetが正常終了
+- PC側Bfloat16参照実装でgolden case 12 / 12一致
+- 書き込み後、FTDI COM3・115200 bpsで`AcrylicPanCollector`へ接続
+- `instrument`モードへの切替ACKを受信し、推論開始状態を確認
+
+実打撃による音・クラス出力の主観確認は、この自動デプロイ記録とは別に行う。
 
 ## 再学習コマンド
 
