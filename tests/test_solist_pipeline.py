@@ -40,6 +40,7 @@ from sim.real_model_pipeline import (
     fit_beta,
     time_sample_indices,
 )
+from sim.shared_holdout_evaluation import select_stratified_holdout
 
 
 class SolistPipelineTests(unittest.TestCase):
@@ -184,6 +185,25 @@ class SolistPipelineTests(unittest.TestCase):
         self.assertIsNone(result["train_session"])
         self.assertEqual((result["train_count"], result["test_count"]), (12, 6))
         self.assertEqual(beta.shape, (32, 2))
+
+    def test_shared_holdout_is_deterministic_and_stratified(self):
+        sessions = ("run-a", "run-b")
+        labels = np.tile(np.repeat(np.arange(3), 4), 2)
+        session_ids = np.repeat(np.asarray(sessions), 12)
+        paths = tuple(Path(f"event-{index:03d}.npz") for index in range(24))
+        first = select_stratified_holdout(
+            labels, session_ids, paths, sessions, class_count=3, per_class=2, seed=7,
+        )
+        second = select_stratified_holdout(
+            labels, session_ids, paths, sessions, class_count=3, per_class=2, seed=7,
+        )
+        np.testing.assert_array_equal(first, second)
+        self.assertEqual(int(first.sum()), 12)
+        for session_id in sessions:
+            for class_id in range(3):
+                self.assertEqual(int(np.sum(
+                    first & (session_ids == session_id) & (labels == class_id)
+                )), 2)
 
     def test_synthetic_eight_class_elm(self):
         features, labels = make_synthetic_events(samples_per_class=12, seed=7)
