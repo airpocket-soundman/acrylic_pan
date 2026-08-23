@@ -61,6 +61,21 @@ class RecorderTests(unittest.TestCase):
             saved = recorder.record_event(make_demo_event(2), class_id=1)
             self.assertEqual(saved.index, 1)
 
+    def test_resumes_incomplete_session_at_next_index(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            first = Recorder(temporary)
+            session = first.begin_session({"mode": "test"})
+            first.record_event(make_demo_event(1), class_id=0)
+
+            resumed = Recorder(temporary)
+            resumed.resume_session(session)
+            saved = resumed.record_event(make_demo_event(2), class_id=1)
+
+            self.assertEqual(saved.index, 2)
+            metadata = json.loads((session / "session.json").read_text(encoding="utf-8"))
+            self.assertEqual(metadata["event_count"], 2)
+            self.assertIsNone(metadata["closed_at"])
+
     def test_rejects_class_outside_eight_area_model(self):
         with tempfile.TemporaryDirectory() as temporary:
             recorder = Recorder(temporary)

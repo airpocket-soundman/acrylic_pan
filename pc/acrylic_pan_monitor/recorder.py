@@ -113,6 +113,40 @@ class Recorder:
         (self.session_dir / "manifest.jsonl").touch()
         return self.session_dir
 
+    def resume_session(self, session_dir: str | Path) -> Path:
+        """Reopen an incomplete session without renumbering its saved events."""
+        if self.active:
+            raise RecordingError("another recording session is already active")
+        directory = Path(session_dir).resolve()
+        try:
+            directory.relative_to(self.output_root.resolve())
+        except ValueError as error:
+            raise RecordingError("session is outside the recording output directory") from error
+        metadata_path = directory / "session.json"
+        manifest_path = directory / "manifest.jsonl"
+        events_dir = directory / "events"
+        if not metadata_path.is_file() or not manifest_path.is_file() or not events_dir.is_dir():
+            raise RecordingError("session files are incomplete")
+        metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+        rows = [
+            json.loads(line)
+            for line in manifest_path.read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ]
+        missing = [row["file"] for row in rows if not (directory / row["file"]).is_file()]
+        if missing:
+            raise RecordingError(f"session event file is missing: {missing[0]}")
+        self.session_dir = directory
+        self.session_id = str(metadata.get("session_id") or directory.name)
+        self._metadata = metadata
+        self._event_count = len(rows)
+        self._next_index = max((int(row["index"]) for row in rows), default=0)
+        self._metadata["event_count"] = self._event_count
+        self._metadata["closed_at"] = None
+        self._closed = False
+        self._write_session_metadata()
+        return directory
+
     def record_event(
         self,
         event: EventData,

@@ -610,6 +610,77 @@ class AcquisitionController:
             self.send_command("stop")
         return self.collection_status()
 
+    def resume_collection(self, session_id: str) -> dict[str, Any]:
+        """Resume an interrupted guided collection from its saved manifest."""
+        if not self.link.connected:
+            raise OSError("serial port is not connected")
+        if self.inference_active:
+            raise ValueError("推論中はデータ採取を再開できません")
+        directory = Library(self.output_root).session_dir(session_id)
+        metadata = json.loads((directory / "session.json").read_text(encoding="utf-8"))
+        user_metadata = metadata.get("user_metadata") or {}
+        plan = user_metadata.get("collection_plan") or {}
+        if user_metadata.get("mode") != "guided_area_points" or not plan:
+            raise ValueError("ガイド採取セッションではありません。")
+        profile_id = str(user_metadata.get("panel_profile_id") or plan.get("panel", {}).get("id"))
+        profile = get_panel_profile(profile_id)
+        repetitions = int(plan["repetitions"])
+        pattern = str(plan["position_pattern"])
+        targets = build_collection_targets(pattern, profile)
+        target_counts = [0] * len(targets)
+        per_class_counts = [0] * profile.class_count
+        rows = [
+            json.loads(line)
+            for line in (directory / "manifest.jsonl").read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ]
+        for row in rows:
+            annotations = row.get("annotations") or {}
+            if not annotations.get("collection"):
+                raise ValueError("ガイド採取以外のデータが混在しています。")
+            target_index = int(annotations["target_index"])
+            class_id = int(annotations["target_class_id"])
+            if not 0 <= target_index < len(targets) or targets[target_index].class_id != class_id:
+                raise ValueError("保存データの打点情報が採取計画と一致しません。")
+            target_counts[target_index] += 1
+            per_class_counts[class_id] += 1
+        if any(count > repetitions for count in target_counts):
+            raise ValueError("保存件数が採取計画を超えています。")
+        if sum(target_counts) >= len(targets) * repetitions:
+            raise ValueError("このセッションは既に完了しています。")
+        if self.device_mode in ("inference", "instrument"):
+            self.set_mode("collection")
+        with self._lock:
+            if self.collection.active:
+                raise ValueError("collection is already active")
+            if self.recorder is not None:
+                self.recorder.close()
+            self.panel_profile_id = profile.profile_id
+            self.class_id = None
+            self.recorder = Recorder(self.output_root, max_class_id=profile.class_count - 1)
+            self.recorder.resume_session(directory)
+            self.collection = CollectionState(
+                active=True,
+                repetitions=repetitions,
+                completed_samples=sum(target_counts),
+                position_pattern=pattern,
+                targets=targets,
+                target_counts=target_counts,
+                per_class_counts=per_class_counts,
+                order=tuple(range(profile.class_count)),
+                selected_index=next(i for i, count in enumerate(target_counts) if count < repetitions),
+                panel_profile_id=profile.profile_id,
+            )
+            self.event_assembler.reset()
+            self.assembly_retry_required = False
+        try:
+            self.send_command("start")
+        except Exception:
+            with self._lock:
+                self.collection.active = False
+            raise
+        return self.collection_status()
+
     def select_target(self, target_index: int) -> dict[str, Any]:
         """Jump to any incomplete point, ignoring the default fill order."""
         with self._lock:
@@ -1275,6 +1346,8 @@ class ApiHandler(BaseHTTPRequestHandler):
                 ))
             if path == "/api/collection/stop":
                 return self._json(self.controller.stop_collection())
+            if path == "/api/collection/resume":
+                return self._json(self.controller.resume_collection(str(body["session_id"])))
             if path == "/api/collection/undo":
                 return self._json(self.controller.undo_last_collection_event(
                     int(body["expected_completed_samples"])

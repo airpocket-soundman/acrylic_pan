@@ -128,8 +128,10 @@ class PositionEstimator:
         density_entropy = 0.0
         density_peak_probability = 0.0
         if density_probability is not None and density_support is not None:
-            centre = density_probability @ density_support
-            residual = density_support - centre
+            expected_coordinate = density_probability @ density_support
+            map_coordinate = density_support[int(np.argmax(density_probability))]
+            centre = map_coordinate
+            residual = density_support - expected_coordinate
             covariance = np.einsum("n,ni,nj->ij", density_probability, residual, residual)
             covariance = (covariance + covariance.T) / 2.0
             eigenvalues, eigenvectors = np.linalg.eigh(covariance)
@@ -160,6 +162,8 @@ class PositionEstimator:
             method = "pc_mlp_60class_probability_map"
         elif model_positions is None:
             centre = centres[int(np.clip(predicted_class, 0, class_count - 1))]
+            expected_coordinate = centre
+            map_coordinate = centre
             spread = np.asarray((0.0, 0.0))
             covariance = None
             confidence_level = 0.0
@@ -172,6 +176,8 @@ class PositionEstimator:
             )
         else:
             centre = model_positions.mean(axis=0)
+            expected_coordinate = centre
+            map_coordinate = centre
             spread = model_positions.std(axis=0)
             validation = bundle.get("validation", {})
             uncertainty = bundle.get("uncertainty", {})
@@ -226,6 +232,10 @@ class PositionEstimator:
         return {
             "x_mm": float(centre[0]),
             "y_mm": float(centre[1]),
+            "expected_x_mm": float(expected_coordinate[0]),
+            "expected_y_mm": float(expected_coordinate[1]),
+            "map_x_mm": float(map_coordinate[0]),
+            "map_y_mm": float(map_coordinate[1]),
             "sigma_x_mm": float(sigma[0]),
             "sigma_y_mm": float(sigma[1]),
             "rho_xy": correlation,

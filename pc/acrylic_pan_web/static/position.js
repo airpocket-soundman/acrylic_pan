@@ -53,7 +53,8 @@ async function refreshStatus() {
 
 function applyPanelGeometry() {
   const canvas = $('positionHeatmap');
-  canvas.height = Math.round(canvas.width * activePanel.height_mm / activePanel.width_mm);
+  const canvasHeight = Math.round(canvas.width * activePanel.height_mm / activePanel.width_mm);
+  if (canvas.height !== canvasHeight) canvas.height = canvasHeight;
   $('positionPanel').setAttribute('aria-label', `${activePanel.width_mm} × ${activePanel.height_mm} mm アクリル板上の条件付き座標確率分布`);
   const grid = document.querySelector('.panel-grid');
   if (grid) grid.style.backgroundImage =
@@ -88,39 +89,63 @@ function heatColor(value) {
 }
 
 function drawHeatmap(position) {
+  const canvas = $('positionHeatmap');
+  const context = canvas.getContext('2d');
   const layer = $('positionProbabilityCells');
   const map = position.probability_map || {};
   const support = Array.isArray(map.support_xy_mm) ? map.support_xy_mm : [];
   const probability = Array.isArray(map.probabilities) ? map.probabilities : [];
   const hasDistribution = support.length > 0 && support.length === probability.length;
-  if (!hasDistribution) { layer.replaceChildren(); return; }
-  const peak = Math.max(...probability.map(value => Math.max(0, Number(value) || 0)), 1e-12);
-  const cells = [];
-  for (let row = 0; row < 12; row++) {
-    for (let column = 0; column < 16; column++) {
-      const x = (column + .5) * activePanel.width_mm / 16;
-      const y = (row + .5) * activePanel.height_mm / 12;
-      let nearest = 0, nearestDistance = Infinity;
+  if (!hasDistribution) {
+    context.clearRect(0, 0, canvas.width, canvas.height);
+    layer.removeAttribute('title');
+    return;
+  }
+  const rasterWidth = 40;
+  const rasterHeight = Math.max(1, Math.round(
+    rasterWidth * activePanel.height_mm / activePanel.width_mm
+  ));
+  const raster = document.createElement('canvas');
+  raster.width = rasterWidth;
+  raster.height = rasterHeight;
+  const rasterContext = raster.getContext('2d');
+  const image = rasterContext.createImageData(rasterWidth, rasterHeight);
+  const sigmaMm = 27;
+  const inverseTwoSigmaSquared = 1 / (2 * sigmaMm * sigmaMm);
+  const values = new Float32Array(rasterWidth * rasterHeight);
+  let peak = 1e-12;
+  for (let row = 0; row < rasterHeight; row++) {
+    const y = (row + .5) * activePanel.height_mm / rasterHeight;
+    for (let column = 0; column < rasterWidth; column++) {
+      const x = (column + .5) * activePanel.width_mm / rasterWidth;
+      let density = 0;
       for (let index = 0; index < support.length; index++) {
         const dx = x - Number(support[index][0]);
         const dy = y - Number(support[index][1]);
-        const distance = dx * dx + dy * dy;
-        if (distance < nearestDistance) { nearest = index; nearestDistance = distance; }
+        const weight = Math.exp(-(dx * dx + dy * dy) * inverseTwoSigmaSquared);
+        density += Math.max(0, Number(probability[index]) || 0) * weight;
       }
-      const value = Math.max(0, Number(probability[nearest]) || 0);
-      const normalized = Math.pow(value / peak, 0.52);
-      const [r, g, b] = heatColor(normalized);
-      const cell = document.createElement('div');
-      cell.className = 'probability-cell';
-      cell.style.left = `${column * 100 / 16}%`;
-      cell.style.top = `${row * 100 / 12}%`;
-      cell.style.backgroundColor = `rgb(${r} ${g} ${b})`;
-      cell.title = `X ${Number(support[nearest][0]).toFixed(0)} / Y ${Number(support[nearest][1]).toFixed(0)} mm: ${(value * 100).toFixed(2)}%`;
-      cell.setAttribute('aria-label', cell.title);
-      cells.push(cell);
+      const offset = row * rasterWidth + column;
+      values[offset] = density;
+      peak = Math.max(peak, density);
     }
   }
-  layer.replaceChildren(...cells);
+  for (let index = 0; index < values.length; index++) {
+    const normalized = Math.pow(values[index] / peak, 0.52);
+    const quantized = Math.round(normalized * 9) / 9;
+    const [red, green, blue] = heatColor(quantized);
+    const offset = index * 4;
+    image.data[offset] = red;
+    image.data[offset + 1] = green;
+    image.data[offset + 2] = blue;
+    image.data[offset + 3] = 255;
+  }
+  rasterContext.putImageData(image, 0, 0);
+  context.clearRect(0, 0, canvas.width, canvas.height);
+  context.imageSmoothingEnabled = false;
+  context.drawImage(raster, 0, 0, canvas.width, canvas.height);
+  const maximumIndex = probability.indexOf(Math.max(...probability));
+  layer.title = `最大確率: X ${Number(support[maximumIndex][0]).toFixed(0)} / Y ${Number(support[maximumIndex][1]).toFixed(0)} mm、${(probability[maximumIndex] * 100).toFixed(2)}%`;
 }
 
 function renderProbabilities(values) {
@@ -138,9 +163,12 @@ function renderPosition(position) {
   marker.hidden = false;
   marker.style.left = `${x / activePanel.width_mm * 100}%`;
   marker.style.top = `${y / activePanel.height_mm * 100}%`;
-  marker.querySelector('span').textContent = `X ${x.toFixed(1)} / Y ${y.toFixed(1)}`;
-  $('coordinateReadout').textContent = `X ${x.toFixed(1)} / Y ${y.toFixed(1)} mm`;
+  marker.querySelector('span').textContent = `最尤 X ${x.toFixed(1)} / Y ${y.toFixed(1)}`;
+  $('coordinateReadout').textContent = `最尤 X ${x.toFixed(1)} / Y ${y.toFixed(1)} mm`;
   $('metricCoordinate').textContent = `${x.toFixed(1)}, ${y.toFixed(1)} mm`;
+  const expectedX = Number.isFinite(Number(position.expected_x_mm)) ? Number(position.expected_x_mm) : x;
+  const expectedY = Number.isFinite(Number(position.expected_y_mm)) ? Number(position.expected_y_mm) : y;
+  $('metricExpectedCoordinate').textContent = `${expectedX.toFixed(1)}, ${expectedY.toFixed(1)} mm`;
   const level = Number(position.confidence_level || 0);
   const map = position.probability_map || {};
   const credibleCells = Array.isArray(map.credible_90_indices) ? map.credible_90_indices.length : 0;
@@ -186,16 +214,22 @@ function renderDemo() {
     .35*Math.exp(-((x-activePanel.width_mm*.72)**2+(y-activePanel.height_mm*.32)**2)/1800));
   const total = raw.reduce((sum, value) => sum + value, 0);
   const probability = raw.map(value => value / total);
+  const expectedX = probability.reduce((sum, value, index) => sum + value * support[index][0], 0);
+  const expectedY = probability.reduce((sum, value, index) => sum + value * support[index][1], 0);
+  const maximumIndex = probability.indexOf(Math.max(...probability));
   const order = probability.map((value,index)=>({value,index})).sort((a,b)=>b.value-a.value);
   let cumulative = 0; const credible = [];
   for (const item of order) { credible.push(item.index); cumulative += item.value; if(cumulative >= .9) break; }
   renderPosition({
-    x_mm: activePanel.width_mm * .58, y_mm: activePanel.height_mm * .55, sigma_x_mm: 48.2, sigma_y_mm: 41.4, rho_xy: 0.18,
+    x_mm: support[maximumIndex][0], y_mm: support[maximumIndex][1],
+    expected_x_mm: expectedX, expected_y_mm: expectedY,
+    map_x_mm: support[maximumIndex][0], map_y_mm: support[maximumIndex][1],
+    sigma_x_mm: 48.2, sigma_y_mm: 41.4, rho_xy: 0.18,
     confidence: 0.90, confidence_level: 0.90, empirical_coverage: 0.90,
     probability_map: {support_xy_mm:support, probabilities:probability, credible_90_indices:credible, normalization:'sum_1'},
     distribution_peak_probability: Math.max(...probability), distribution_entropy: .61,
     class_probabilities: Array.from({length:activePanel.class_count},(_,i)=>i===Math.min(6,activePanel.class_count-1)?.53:.47/(activePanel.class_count-1)), model_available: true,
-    scope: '表示デモです。各色は60測定座標へモデルが直接割り当てた確率を表します。'
+    scope: '表示デモです。60測定座標の確率を表示用に細密補間しています。数値計算には補間前の確率を使います。'
   });
 }
 

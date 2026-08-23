@@ -46,7 +46,7 @@ class PositionWebTests(unittest.TestCase):
         css = self.read_text("/position.css")
         for element in (
             "positionHeatmap", "positionProbabilityCells", "positionMarker", "coordinateReadout",
-            "areaProbabilities", "metricRegion", "positionStart", "positionDemo",
+            "areaProbabilities", "metricRegion", "metricExpectedCoordinate", "positionStart", "positionDemo",
         ):
             self.assertIn(f'id="{element}"', page)
         self.assertIn("drawHeatmap", script)
@@ -56,7 +56,11 @@ class PositionWebTests(unittest.TestCase):
         self.assertIn("credible_90_indices", script)
         self.assertNotIn("function gaussian", script)
         self.assertIn(".position-marker", css)
-        self.assertIn(".probability-cell", css)
+        self.assertIn("image-rendering:pixelated", css)
+        self.assertIn("rasterWidth = 40", script)
+        self.assertIn("imageSmoothingEnabled = false", script)
+        self.assertIn("Math.round(normalized * 9) / 9", script)
+        self.assertIn("if (canvas.height !== canvasHeight)", script)
         self.assertIn("条件付き確率", page)
 
     def test_all_operating_pages_link_to_position_tab(self):
@@ -153,6 +157,13 @@ class PositionWebTests(unittest.TestCase):
         self.assertEqual(len(probability_map["support_xy_mm"]), 60)
         self.assertAlmostEqual(sum(probability_map["probabilities"]), 1.0)
         self.assertEqual(int(np.argmax(probability_map["probabilities"])), 17)
+        np.testing.assert_allclose(
+            [result["x_mm"], result["y_mm"]], support[17], rtol=0, atol=1e-9
+        )
+        np.testing.assert_allclose(
+            [result["expected_x_mm"], result["expected_y_mm"]],
+            np.asarray(probability_map["probabilities"]) @ support,
+        )
         self.assertGreater(len(probability_map["credible_90_indices"]), 0)
         self.assertEqual(result["method"], "pc_mlp_60class_probability_map")
 
