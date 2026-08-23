@@ -19,7 +19,6 @@ import warnings
 import joblib
 import numpy as np
 from sklearn.exceptions import ConvergenceWarning
-from sklearn.model_selection import GroupKFold
 from sklearn.neural_network import MLPRegressor
 from sklearn.preprocessing import StandardScaler
 
@@ -40,8 +39,16 @@ CENTRE_SESSION_IDS = (
     "20260821_215225_8f38a3e4",
     "20260821_221547_4c753402",
 )
-GRID_SESSION_ID = "20260823_081435_223491a5"
-DEFAULT_SESSION_IDS = (*CENTRE_SESSION_IDS, GRID_SESSION_ID)
+GRID_SESSION_IDS = (
+    "20260823_081435_223491a5",
+    "20260823_084554_6d26bd22",
+)
+EXTERNAL_EVAL_SESSION_IDS = (
+    "20260823_082825_9374f169",
+    "20260823_083716_e0336d95",
+)
+GRID_SESSION_ID = GRID_SESSION_IDS[0]  # Compatibility name for the first grid set.
+DEFAULT_SESSION_IDS = (*CENTRE_SESSION_IDS, *GRID_SESSION_IDS)
 DEFAULT_SEEDS = (1, 7, 21)
 HIDDEN_LAYERS = (384, 192, 96)
 
@@ -226,59 +233,117 @@ def _uncertainty(expected: np.ndarray, predicted: np.ndarray) -> dict:
     }
 
 
-def run(sessions_root: Path, output_dir: Path, seeds: tuple[int, ...] = DEFAULT_SEEDS) -> dict:
+def _bundle_predict(bundle: dict, features: np.ndarray) -> np.ndarray:
+    scaled = bundle["scaler"].transform(features)
+    predictions = np.stack([
+        np.clip(model.predict(scaled), 0.0, 1.0) * (PANEL_WIDTH_MM, PANEL_HEIGHT_MM)
+        for model in bundle["models"]
+    ])
+    return predictions.mean(axis=0)
+
+
+def evaluate_external_sessions(sessions_root: Path, baseline_model_path: Path,
+                               candidate_model_path: Path) -> dict:
+    dataset = load_position_dataset(sessions_root, EXTERNAL_EVAL_SESSION_IDS)
+    features = np.stack([extract_grid_features(row) for row in dataset.samples])
+    baseline = joblib.load(baseline_model_path)
+    candidate = joblib.load(candidate_model_path)
+    baseline_prediction = _bundle_predict(baseline, features)
+    candidate_prediction = _bundle_predict(candidate, features)
+    baseline_metrics = regression_metrics(dataset.xy_mm, baseline_prediction)
+    candidate_metrics = regression_metrics(dataset.xy_mm, candidate_prediction)
+    per_session = []
+    for session_id in EXTERNAL_EVAL_SESSION_IDS:
+        selected = dataset.session_ids == session_id
+        per_session.append({
+            "session_id": session_id,
+            "sample_count": int(selected.sum()),
+            "baseline": regression_metrics(dataset.xy_mm[selected], baseline_prediction[selected]),
+            "candidate": regression_metrics(dataset.xy_mm[selected], candidate_prediction[selected]),
+        })
+    return {
+        "session_ids": list(EXTERNAL_EVAL_SESSION_IDS),
+        "sample_count": int(len(dataset.samples)),
+        "dataset_sha256": dataset.dataset_sha256,
+        "training_overlap": False,
+        "baseline_model": str(baseline_model_path),
+        "candidate_model": str(candidate_model_path),
+        "baseline": baseline_metrics,
+        "candidate": candidate_metrics,
+        "mean_distance_improvement_mm": float(
+            baseline_metrics["mean_distance_mm"] - candidate_metrics["mean_distance_mm"]
+        ),
+        "mean_distance_improvement_percent": float(
+            100.0 * (baseline_metrics["mean_distance_mm"] - candidate_metrics["mean_distance_mm"])
+            / baseline_metrics["mean_distance_mm"]
+        ),
+        "per_session": per_session,
+    }
+
+
+def run(sessions_root: Path, output_dir: Path, seeds: tuple[int, ...] = DEFAULT_SEEDS,
+        baseline_model_path: Path | None = None) -> dict:
     if not seeds or len(set(seeds)) != len(seeds):
         raise ValueError("seeds must be non-empty and unique")
     dataset = load_position_dataset(sessions_root)
     features = np.stack([extract_grid_features(row) for row in dataset.samples])
     warnings.filterwarnings("ignore", category=ConvergenceWarning)
 
-    # The grid exists in one acquisition session.  Holding out complete
-    # repetition numbers keeps every coordinate represented in both sides
-    # without letting repeated strikes of a target cross the fold boundary.
-    grid = dataset.session_ids == GRID_SESSION_ID
+    grid = np.isin(dataset.session_ids, GRID_SESSION_IDS)
     centre = ~grid
-    grid_indices = np.flatnonzero(grid)
-    grid_prediction = np.empty((int(grid.sum()), 2), dtype=np.float64)
-    grid_folds = []
-    splitter = GroupKFold(n_splits=5)
-    for fold, (grid_train_local, grid_test_local) in enumerate(
-        splitter.split(grid_indices, groups=dataset.repetitions[grid]), start=1
-    ):
-        train = centre.copy()
-        train[grid_indices[grid_train_local]] = True
-        test_indices = grid_indices[grid_test_local]
-        test = np.zeros(len(dataset.samples), dtype=bool)
-        test[test_indices] = True
-        predicted, iterations = _fit_predict(features, dataset.xy_mm, train, test, seeds[0])
-        grid_prediction[grid_test_local] = predicted
-        grid_folds.append({
-            "fold": fold,
-            "held_out_repetitions": sorted(set(dataset.repetitions[test].astype(int).tolist())),
-            "train_count": int(train.sum()),
-            "test_count": int(test.sum()),
-            "iterations": iterations,
-            **regression_metrics(dataset.xy_mm[test], predicted),
-        })
-    grid_metrics = regression_metrics(dataset.xy_mm[grid], grid_prediction)
+    old_grid = dataset.session_ids == GRID_SESSION_IDS[0]
+    new_grid = dataset.session_ids == GRID_SESSION_IDS[1]
 
-    centre_prediction = np.empty((int(centre.sum()), 2), dtype=np.float64)
-    centre_indices = np.flatnonzero(centre)
-    centre_folds = []
-    for session_id in CENTRE_SESSION_IDS:
-        test = dataset.session_ids == session_id
-        train = ~test
-        predicted, iterations = _fit_predict(features, dataset.xy_mm, train, test, seeds[0])
-        centre_prediction[np.searchsorted(centre_indices, np.flatnonzero(test))] = predicted
-        centre_folds.append({
-            "test_session": session_id,
-            "train_count": int(train.sum()),
-            "test_count": int(test.sum()),
-            "iterations": iterations,
-            **regression_metrics(dataset.xy_mm[test], predicted),
-        })
-    centre_metrics = regression_metrics(dataset.xy_mm[centre], centre_prediction)
-    uncertainty = _uncertainty(dataset.xy_mm[grid], grid_prediction)
+    previous_model_unseen = None
+    if baseline_model_path is not None and Path(baseline_model_path).is_file():
+        previous_bundle = joblib.load(baseline_model_path)
+        previous_prediction = _bundle_predict(previous_bundle, features[new_grid])
+        previous_model_unseen = {
+            "model": str(baseline_model_path),
+            "test_session": GRID_SESSION_IDS[1],
+            "test_count": int(new_grid.sum()),
+            **regression_metrics(dataset.xy_mm[new_grid], previous_prediction),
+        }
+
+    # Repetitions 9 and 10 are a common coordinate-balanced test set.  The
+    # one-grid condition sees no training event from the new session, while
+    # the two-grid condition sees repetitions 1..8 from both sessions.
+    common_test = grid & np.isin(dataset.repetitions, (9, 10))
+    one_grid_train = centre | (old_grid & ~common_test)
+    two_grid_train = ~common_test
+    one_grid_prediction, one_grid_iterations = _fit_predict(
+        features, dataset.xy_mm, one_grid_train, common_test, seeds[0]
+    )
+    two_grid_prediction, two_grid_iterations = _fit_predict(
+        features, dataset.xy_mm, two_grid_train, common_test, seeds[0]
+    )
+    one_grid_metrics = regression_metrics(dataset.xy_mm[common_test], one_grid_prediction)
+    two_grid_metrics = regression_metrics(dataset.xy_mm[common_test], two_grid_prediction)
+    common_comparison = {
+        "held_out_repetitions": [9, 10],
+        "test_sessions": list(GRID_SESSION_IDS),
+        "test_count": int(common_test.sum()),
+        "one_grid": {
+            "training_grid_sessions": [GRID_SESSION_IDS[0]],
+            "train_count": int(one_grid_train.sum()),
+            "iterations": one_grid_iterations,
+            **one_grid_metrics,
+        },
+        "two_grids": {
+            "training_grid_sessions": list(GRID_SESSION_IDS),
+            "train_count": int(two_grid_train.sum()),
+            "iterations": two_grid_iterations,
+            **two_grid_metrics,
+        },
+        "mean_distance_improvement_mm": float(
+            one_grid_metrics["mean_distance_mm"] - two_grid_metrics["mean_distance_mm"]
+        ),
+        "mean_distance_improvement_percent": float(
+            100.0 * (one_grid_metrics["mean_distance_mm"] - two_grid_metrics["mean_distance_mm"])
+            / one_grid_metrics["mean_distance_mm"]
+        ),
+    }
+    uncertainty = _uncertainty(dataset.xy_mm[common_test], two_grid_prediction)
 
     scaler = StandardScaler().fit(features)
     scaled = scaler.transform(features)
@@ -294,8 +359,9 @@ def run(sessions_root: Path, output_dir: Path, seeds: tuple[int, ...] = DEFAULT_
     output_dir.mkdir(parents=True, exist_ok=True)
     bundle_path = output_dir / "position_ensemble.joblib"
     scope = (
-        "400×300×5 mmの12中心点と、50 mm格子相当の四隅48点で学習したPC専用XYモデルです。"
-        "四隅評価は同一収録セッション内で反復番号を分離しており、別日セッションへの汎化は未検証です。"
+        "400×300×5 mmの12中心点と、50 mm格子相当の四隅48点を2セッションで学習した"
+        "PC専用XYモデルです。評価は反復9・10を両セッションから除外した共通holdoutです。"
+        "第三の完全未学習セッションへの汎化は未検証です。"
     )
     bundle = {
         "scaler": scaler,
@@ -309,29 +375,41 @@ def run(sessions_root: Path, output_dir: Path, seeds: tuple[int, ...] = DEFAULT_
             "panel_width_mm": PANEL_WIDTH_MM,
             "panel_height_mm": PANEL_HEIGHT_MM,
         },
-        "validation": grid_metrics,
+        "validation": two_grid_metrics,
         "uncertainty": uncertainty,
         "method": "pc_large_mlp_xy_grid_calibrated_gaussian",
         "scope": scope,
     }
     joblib.dump(bundle, bundle_path, compress=3)
+    external_evaluation = None
+    if baseline_model_path is not None and Path(baseline_model_path).is_file() and all(
+        (Path(sessions_root) / session_id / "session.json").is_file()
+        for session_id in EXTERNAL_EVAL_SESSION_IDS
+    ):
+        external_evaluation = evaluate_external_sessions(
+            sessions_root, Path(baseline_model_path), bundle_path
+        )
     report = {
-        "experiment": "pc_position_400x300x5_grid_v1",
+        "experiment": "pc_position_400x300x5_grid_v2",
         "dataset_sha256": dataset.dataset_sha256,
         "session_ids": list(DEFAULT_SESSION_IDS),
         "sample_count": int(len(dataset.samples)),
         "centre_sample_count": int(centre.sum()),
         "grid_sample_count": int(grid.sum()),
+        "grid_session_ids": list(GRID_SESSION_IDS),
+        "grid_session_counts": {
+            session_id: int(np.sum(dataset.session_ids == session_id))
+            for session_id in GRID_SESSION_IDS
+        },
         "unique_coordinates": int(len(np.unique(dataset.xy_mm, axis=0))),
         "feature_count": int(features.shape[1]),
         "architecture": [int(features.shape[1]), *HIDDEN_LAYERS, 2],
         "trainable_parameters_per_model": _parameter_count(features.shape[1]),
         "runtime_seeds": list(seeds),
         "final_iterations": final_iterations,
-        "grid_grouped_validation": grid_metrics,
-        "grid_folds": grid_folds,
-        "centre_loso_validation": centre_metrics,
-        "centre_folds": centre_folds,
+        "previous_model_unseen_new_session": previous_model_unseen,
+        "common_holdout_comparison": common_comparison,
+        "external_unused_sessions_comparison": external_evaluation,
         "uncertainty": uncertainty,
         "contract": bundle["contract"],
         "scope": scope,
@@ -342,10 +420,11 @@ def run(sessions_root: Path, output_dir: Path, seeds: tuple[int, ...] = DEFAULT_
     )
     np.savez_compressed(
         output_dir / "validation_predictions.npz",
-        grid_expected_xy_mm=dataset.xy_mm[grid],
-        grid_predicted_xy_mm=grid_prediction,
-        centre_expected_xy_mm=dataset.xy_mm[centre],
-        centre_predicted_xy_mm=centre_prediction,
+        common_expected_xy_mm=dataset.xy_mm[common_test],
+        one_grid_predicted_xy_mm=one_grid_prediction,
+        two_grid_predicted_xy_mm=two_grid_prediction,
+        common_session_ids=dataset.session_ids[common_test],
+        common_repetitions=dataset.repetitions[common_test],
     )
     return report
 
@@ -358,13 +437,16 @@ def main() -> None:
         default=Path("artifacts/pc_position_runtime_400x300x5"),
     )
     parser.add_argument("--seeds", type=int, nargs="+", default=list(DEFAULT_SEEDS))
+    parser.add_argument("--baseline-model", type=Path)
     args = parser.parse_args()
-    report = run(args.sessions, args.output_dir, tuple(args.seeds))
-    grid = report["grid_grouped_validation"]
-    centre = report["centre_loso_validation"]
+    report = run(
+        args.sessions, args.output_dir, tuple(args.seeds), args.baseline_model
+    )
+    comparison = report["common_holdout_comparison"]
     print(f"samples={report['sample_count']}; unique_coordinates={report['unique_coordinates']}")
-    print(f"grid grouped mean distance={grid['mean_distance_mm']:.2f} mm")
-    print(f"centre LOSO mean distance={centre['mean_distance_mm']:.2f} mm")
+    print(f"one-grid common holdout={comparison['one_grid']['mean_distance_mm']:.2f} mm")
+    print(f"two-grid common holdout={comparison['two_grids']['mean_distance_mm']:.2f} mm")
+    print(f"improvement={comparison['mean_distance_improvement_percent']:.1f}%")
     print(f"model={report['model']}")
 
 
