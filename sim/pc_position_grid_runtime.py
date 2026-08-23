@@ -275,6 +275,26 @@ def density_metrics(expected_xy: np.ndarray, labels: np.ndarray,
     }
 
 
+def _balanced_density_indices(labels: np.ndarray, selected: np.ndarray,
+                              seed: int) -> np.ndarray:
+    rng = np.random.default_rng(seed)
+    classes = np.unique(labels)
+    per_class = [np.flatnonzero(selected & (labels == class_id)) for class_id in classes]
+    if any(len(indices) == 0 for indices in per_class):
+        raise ValueError("density split must contain every coordinate class")
+    target_count = max(len(indices) for indices in per_class)
+    balanced = []
+    for indices in per_class:
+        repeats, remainder = divmod(target_count, len(indices))
+        expanded = np.tile(indices, repeats)
+        if remainder:
+            expanded = np.concatenate((expanded, rng.choice(indices, remainder, replace=False)))
+        balanced.append(expanded)
+    result = np.concatenate(balanced)
+    rng.shuffle(result)
+    return result
+
+
 def _parameter_count(input_count: int, output_count: int = 2) -> int:
     sizes = (input_count, *HIDDEN_LAYERS, output_count)
     return int(sum((left + 1) * right for left, right in zip(sizes[:-1], sizes[1:])))
@@ -427,27 +447,30 @@ def run(sessions_root: Path, output_dir: Path, seeds: tuple[int, ...] = DEFAULT_
     }
     uncertainty = _uncertainty(dataset.xy_mm[common_test], four_grid_prediction)
 
-    density_support_xy = np.unique(dataset.xy_mm[grid], axis=0)
-    if len(density_support_xy) != 48:
-        raise ValueError(f"expected 48 measured density cells, got {len(density_support_xy)}")
+    density_support_xy = np.unique(dataset.xy_mm, axis=0)
+    if len(density_support_xy) != 60:
+        raise ValueError(f"expected 60 measured density classes, got {len(density_support_xy)}")
     density_lookup = {
         (float(coordinate[0]), float(coordinate[1])): index
         for index, coordinate in enumerate(density_support_xy)
     }
     density_labels = np.asarray([
         density_lookup[(float(coordinate[0]), float(coordinate[1]))]
-        for coordinate in dataset.xy_mm[grid]
+        for coordinate in dataset.xy_mm
     ], dtype=np.int64)
-    density_train = ~np.isin(dataset.repetitions[grid], (9, 10))
+    # Every session uses guided repetition numbers. Holding out each fifth
+    # repetition gives a coordinate-balanced 20% split across centre and grid data.
+    density_train = dataset.repetitions % 5 != 0
     density_test = ~density_train
-    density_scaler = StandardScaler().fit(features[centre | (grid & ~common_test)])
+    density_train_indices = _balanced_density_indices(density_labels, density_train, seeds[0])
+    density_scaler = StandardScaler().fit(features[density_train_indices])
     density_validation_model = _density_model(seeds[0])
     density_validation_model.fit(
-        density_scaler.transform(features[grid][density_train]),
-        density_labels[density_train],
+        density_scaler.transform(features[density_train_indices]),
+        density_labels[density_train_indices],
     )
     raw_density_probability = density_validation_model.predict_proba(
-        density_scaler.transform(features[grid][density_test])
+        density_scaler.transform(features[density_test])
     )
     density_temperature = _calibrate_temperature(
         raw_density_probability, density_labels[density_test]
@@ -456,17 +479,32 @@ def run(sessions_root: Path, output_dir: Path, seeds: tuple[int, ...] = DEFAULT_
         raw_density_probability, density_temperature
     )
     density_validation = {
-        "held_out_repetitions": [9, 10],
+        "held_out_repetition_rule": "repetition_modulo_5_equals_0",
         "test_count": int(density_test.sum()),
+        "balanced_train_count": int(len(density_train_indices)),
         "support_cell_count": int(len(density_support_xy)),
         "temperature": density_temperature,
         "iterations": int(density_validation_model.n_iter_),
         **density_metrics(
-            dataset.xy_mm[grid][density_test],
+            dataset.xy_mm[density_test],
             density_labels[density_test],
             density_probability,
             density_support_xy,
         ),
+        "per_position_group": {
+            "centre_12": density_metrics(
+                dataset.xy_mm[density_test & centre],
+                density_labels[density_test & centre],
+                density_probability[centre[density_test]],
+                density_support_xy,
+            ),
+            "grid_48": density_metrics(
+                dataset.xy_mm[density_test & grid],
+                density_labels[density_test & grid],
+                density_probability[grid[density_test]],
+                density_support_xy,
+            ),
+        },
     }
 
     scaler = StandardScaler().fit(features)
@@ -482,25 +520,29 @@ def run(sessions_root: Path, output_dir: Path, seeds: tuple[int, ...] = DEFAULT_
 
     density_models = []
     density_iterations = []
-    grid_scaled = scaler.transform(features[grid])
+    density_all = np.ones(len(density_labels), dtype=bool)
+    density_final_indices = _balanced_density_indices(density_labels, density_all, seeds[0])
+    density_final_scaler = StandardScaler().fit(features[density_final_indices])
+    density_scaled = density_final_scaler.transform(features[density_final_indices])
     for seed in seeds:
         model = _density_model(seed)
-        model.fit(grid_scaled, density_labels)
+        model.fit(density_scaled, density_labels[density_final_indices])
         density_models.append(model)
         density_iterations.append(int(model.n_iter_))
 
     output_dir.mkdir(parents=True, exist_ok=True)
     bundle_path = output_dir / "position_ensemble.joblib"
     scope = (
-        "400×300×5 mmの50 mm格子相当48セルについて、各セルの条件付き確率を直接出力する"
-        "PC専用確率マップモデルです。座標は48セル分布の期待値として算出します。"
-        "評価は反復9・10を4セッションから除外した共通holdoutです。"
+        "400×300×5 mmの12中心＋四隅48点の計60座標について、各座標の条件付き確率を"
+        "直接出力するPC専用確率マップモデルです。座標は60クラス分布の期待値として算出します。"
+        "評価は全8セッションで反復番号が5の倍数のイベントを除外した共通holdoutです。"
         "四隅セッションをすべて学習へ使用したため、完全未学習の外部セッションは残っていません。"
     )
     bundle = {
         "scaler": scaler,
         "models": models,
         "density_models": density_models,
+        "density_scaler": density_final_scaler,
         "density_support_xy_mm": density_support_xy.astype(float),
         "density_temperature": density_temperature,
         "density_validation": density_validation,
@@ -515,7 +557,7 @@ def run(sessions_root: Path, output_dir: Path, seeds: tuple[int, ...] = DEFAULT_
         },
         "validation": four_grid_metrics,
         "uncertainty": uncertainty,
-        "method": "pc_mlp_48cell_probability_map",
+        "method": "pc_mlp_60class_probability_map",
         "scope": scope,
     }
     joblib.dump(bundle, bundle_path, compress=3)
@@ -558,6 +600,7 @@ def run(sessions_root: Path, output_dir: Path, seeds: tuple[int, ...] = DEFAULT_
         "runtime_seeds": list(seeds),
         "final_iterations": final_iterations,
         "density_iterations": density_iterations,
+        "density_balanced_final_count": int(len(density_final_indices)),
         "density_validation": density_validation,
         "previous_model_unseen_new_session": previous_model_unseen,
         "common_holdout_comparison": common_comparison,

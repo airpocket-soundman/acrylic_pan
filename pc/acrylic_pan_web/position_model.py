@@ -107,9 +107,14 @@ class PositionEstimator:
                 density_support_candidate = np.asarray(
                     bundle.get("density_support_xy_mm", []), dtype=np.float64
                 )
-                if density_models and density_support_candidate.shape == (48, 2):
+                if (
+                    density_models
+                    and density_support_candidate.ndim == 2
+                    and density_support_candidate.shape[1] == 2
+                ):
+                    density_scaled = bundle.get("density_scaler", bundle["scaler"]).transform(feature)
                     member_probability = np.stack([
-                        model.predict_proba(scaled)[0] for model in density_models
+                        model.predict_proba(density_scaled)[0] for model in density_models
                     ])
                     probability = np.mean(member_probability, axis=0)
                     temperature = max(float(bundle.get("density_temperature", 1.0)), 1e-6)
@@ -152,7 +157,7 @@ class PositionEstimator:
             major_vector = eigenvectors[:, major_index]
             ellipse_angle = float(np.degrees(np.arctan2(major_vector[1], major_vector[0])))
             spread = np.sqrt(np.diag(covariance))
-            method = "pc_mlp_48cell_probability_map"
+            method = "pc_mlp_60class_probability_map"
         elif model_positions is None:
             centre = centres[int(np.clip(predicted_class, 0, class_count - 1))]
             spread = np.asarray((0.0, 0.0))

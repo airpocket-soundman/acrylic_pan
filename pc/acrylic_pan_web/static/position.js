@@ -95,21 +95,31 @@ function drawHeatmap(position) {
   const hasDistribution = support.length > 0 && support.length === probability.length;
   if (!hasDistribution) { layer.replaceChildren(); return; }
   const peak = Math.max(...probability.map(value => Math.max(0, Number(value) || 0)), 1e-12);
-  const cells = support.map(([x, y], index) => {
-    const value = Math.max(0, Number(probability[index]) || 0);
-    const normalized = Math.pow(value / peak, 0.52);
-    const [r, g, b] = heatColor(normalized);
-    const column = Math.max(0, Math.min(7, Math.round((Number(x) - 25) / 50)));
-    const row = Math.max(0, Math.min(5, Math.round((Number(y) - 25) / 50)));
-    const cell = document.createElement('div');
-    cell.className = 'probability-cell';
-    cell.style.left = `${column * 12.5}%`;
-    cell.style.top = `${row * 100 / 6}%`;
-    cell.style.backgroundColor = `rgb(${r} ${g} ${b})`;
-    cell.title = `X ${Number(x).toFixed(0)} / Y ${Number(y).toFixed(0)} mm: ${(value * 100).toFixed(2)}%`;
-    cell.setAttribute('aria-label', cell.title);
-    return cell;
-  });
+  const cells = [];
+  for (let row = 0; row < 12; row++) {
+    for (let column = 0; column < 16; column++) {
+      const x = (column + .5) * activePanel.width_mm / 16;
+      const y = (row + .5) * activePanel.height_mm / 12;
+      let nearest = 0, nearestDistance = Infinity;
+      for (let index = 0; index < support.length; index++) {
+        const dx = x - Number(support[index][0]);
+        const dy = y - Number(support[index][1]);
+        const distance = dx * dx + dy * dy;
+        if (distance < nearestDistance) { nearest = index; nearestDistance = distance; }
+      }
+      const value = Math.max(0, Number(probability[nearest]) || 0);
+      const normalized = Math.pow(value / peak, 0.52);
+      const [r, g, b] = heatColor(normalized);
+      const cell = document.createElement('div');
+      cell.className = 'probability-cell';
+      cell.style.left = `${column * 100 / 16}%`;
+      cell.style.top = `${row * 100 / 12}%`;
+      cell.style.backgroundColor = `rgb(${r} ${g} ${b})`;
+      cell.title = `X ${Number(support[nearest][0]).toFixed(0)} / Y ${Number(support[nearest][1]).toFixed(0)} mm: ${(value * 100).toFixed(2)}%`;
+      cell.setAttribute('aria-label', cell.title);
+      cells.push(cell);
+    }
+  }
   layer.replaceChildren(...cells);
 }
 
@@ -142,7 +152,7 @@ function renderPosition(position) {
     ? `${(level * 100).toFixed(0)}%信用領域 ${credibleCells}セル` : '—';
   $('metricSigma').textContent = position.model_available
     ? `σx ${Number(position.sigma_x_mm).toFixed(1)} / σy ${Number(position.sigma_y_mm).toFixed(1)} / H ${entropy.toFixed(2)}` : '—';
-  $('metricMethod').textContent = map.probabilities ? '48セル条件付き確率モデル' : 'エリア分類（確率マップなし）';
+  $('metricMethod').textContent = map.probabilities ? '60座標条件付き確率モデル' : 'エリア分類（確率マップなし）';
   $('scopeNote').textContent = position.scope || '選択したパネル用PCモデルによる座標推定です。';
   renderProbabilities(position.class_probabilities || Array(activePanel.class_count).fill(1 / activePanel.class_count));
 }
@@ -168,6 +178,9 @@ function renderDemo() {
   for (let y = 25; y < activePanel.height_mm; y += 50) {
     for (let x = 25; x < activePanel.width_mm; x += 50) support.push([x, y]);
   }
+  for (let y = 50; y < activePanel.height_mm; y += 100) {
+    for (let x = 50; x < activePanel.width_mm; x += 100) support.push([x, y]);
+  }
   const raw = support.map(([x, y]) =>
     Math.exp(-((x-activePanel.width_mm*.53)**2+(y-activePanel.height_mm*.59)**2)/2400) +
     .35*Math.exp(-((x-activePanel.width_mm*.72)**2+(y-activePanel.height_mm*.32)**2)/1800));
@@ -182,7 +195,7 @@ function renderDemo() {
     probability_map: {support_xy_mm:support, probabilities:probability, credible_90_indices:credible, normalization:'sum_1'},
     distribution_peak_probability: Math.max(...probability), distribution_entropy: .61,
     class_probabilities: Array.from({length:activePanel.class_count},(_,i)=>i===Math.min(6,activePanel.class_count-1)?.53:.47/(activePanel.class_count-1)), model_available: true,
-    scope: '表示デモです。各色は48空間セルへモデルが直接割り当てた確率を表します。'
+    scope: '表示デモです。各色は60測定座標へモデルが直接割り当てた確率を表します。'
   });
 }
 

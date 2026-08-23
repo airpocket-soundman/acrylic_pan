@@ -106,7 +106,7 @@ class PositionWebTests(unittest.TestCase):
         self.assertGreater(position["confidence_ellipse_90"]["semi_major_mm"], 0.0)
         self.assertEqual(position["method"], "pc_mlp_xy_calibrated_gaussian")
 
-    def test_density_bundle_returns_normalized_48_cell_probability_map(self):
+    def test_density_bundle_returns_normalized_60_class_probability_map(self):
         class Scaler:
             def transform(self, values):
                 return values
@@ -117,12 +117,14 @@ class PositionWebTests(unittest.TestCase):
 
         class DensityModel:
             def predict_proba(self, values):
-                probability = np.full((1, 48), 0.1 / 47)
+                probability = np.full((1, 60), 0.1 / 59)
                 probability[0, 17] = 0.9
                 return probability
 
         support = np.asarray([
             (x, y) for x in range(25, 400, 50) for y in range(25, 300, 50)
+        ] + [
+            (x, y) for x in range(50, 400, 100) for y in range(50, 300, 100)
         ], dtype=np.float64)
         bundle = {
             "contract": {
@@ -148,11 +150,11 @@ class PositionWebTests(unittest.TestCase):
         with patch("pc.acrylic_pan_web.position_model.load_bundle", return_value=bundle):
             result = PositionEstimator().predict(event, [0.0] * 12, 0, panel)
         probability_map = result["probability_map"]
-        self.assertEqual(len(probability_map["support_xy_mm"]), 48)
+        self.assertEqual(len(probability_map["support_xy_mm"]), 60)
         self.assertAlmostEqual(sum(probability_map["probabilities"]), 1.0)
         self.assertEqual(int(np.argmax(probability_map["probabilities"])), 17)
         self.assertGreater(len(probability_map["credible_90_indices"]), 0)
-        self.assertEqual(result["method"], "pc_mlp_48cell_probability_map")
+        self.assertEqual(result["method"], "pc_mlp_60class_probability_map")
 
 
 if __name__ == "__main__":
