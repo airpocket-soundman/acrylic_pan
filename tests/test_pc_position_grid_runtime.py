@@ -26,8 +26,9 @@ class PcPositionGridRuntimeTests(unittest.TestCase):
 
     def test_declared_dataset_includes_new_grid_session(self):
         self.assertIn(GRID_SESSION_ID, DEFAULT_SESSION_IDS)
-        self.assertEqual(len(GRID_SESSION_IDS), 2)
-        self.assertEqual(len(DEFAULT_SESSION_IDS), 6)
+        self.assertEqual(len(GRID_SESSION_IDS), 3)
+        self.assertEqual(len(DEFAULT_SESSION_IDS), 7)
+        self.assertEqual(len(EXTERNAL_EVAL_SESSION_IDS), 1)
         self.assertTrue(set(EXTERNAL_EVAL_SESSION_IDS).isdisjoint(DEFAULT_SESSION_IDS))
 
     def test_local_measured_dataset_contract_when_available(self):
@@ -35,9 +36,9 @@ class PcPositionGridRuntimeTests(unittest.TestCase):
         if not all((root / session / "session.json").is_file() for session in DEFAULT_SESSION_IDS):
             self.skipTest("local measured sessions are not checked into Git")
         dataset = load_position_dataset(root)
-        self.assertEqual(len(dataset.samples), 3305)
+        self.assertEqual(len(dataset.samples), 3785)
         self.assertEqual(int(np.sum(dataset.session_ids == GRID_SESSION_ID)), 480)
-        self.assertEqual(int(np.sum(np.isin(dataset.session_ids, GRID_SESSION_IDS))), 960)
+        self.assertEqual(int(np.sum(np.isin(dataset.session_ids, GRID_SESSION_IDS))), 1440)
         self.assertEqual(len(np.unique(dataset.xy_mm, axis=0)), 60)
 
 
