@@ -82,6 +82,8 @@ class PositionEstimator:
         selected_model_path = self.model_paths.get(str(panel.get("id")))
         bundle = load_bundle(str(selected_model_path)) if selected_model_path is not None else None
         model_positions: np.ndarray | None = None
+        density_probability: np.ndarray | None = None
+        density_support: np.ndarray | None = None
         if bundle is not None:
             contract = bundle["contract"]
             if (
@@ -101,7 +103,57 @@ class PositionEstimator:
                     for model in bundle["models"]
                 ])
 
-        if model_positions is None:
+                density_models = bundle.get("density_models", [])
+                density_support_candidate = np.asarray(
+                    bundle.get("density_support_xy_mm", []), dtype=np.float64
+                )
+                if density_models and density_support_candidate.shape == (48, 2):
+                    member_probability = np.stack([
+                        model.predict_proba(scaled)[0] for model in density_models
+                    ])
+                    probability = np.mean(member_probability, axis=0)
+                    temperature = max(float(bundle.get("density_temperature", 1.0)), 1e-6)
+                    logits = np.log(np.clip(probability, 1e-12, 1.0)) / temperature
+                    logits -= logits.max()
+                    density_probability = np.exp(logits)
+                    density_probability /= density_probability.sum()
+                    density_support = density_support_candidate
+
+        credible_indices: list[int] = []
+        density_entropy = 0.0
+        density_peak_probability = 0.0
+        if density_probability is not None and density_support is not None:
+            centre = density_probability @ density_support
+            residual = density_support - centre
+            covariance = np.einsum("n,ni,nj->ij", density_probability, residual, residual)
+            covariance = (covariance + covariance.T) / 2.0
+            eigenvalues, eigenvectors = np.linalg.eigh(covariance)
+            eigenvalues = np.maximum(eigenvalues, 1.0)
+            covariance = eigenvectors @ np.diag(eigenvalues) @ eigenvectors.T
+            confidence_level = 0.90
+            order = np.argsort(density_probability)[::-1]
+            cumulative = np.cumsum(density_probability[order])
+            count = int(np.searchsorted(cumulative, confidence_level) + 1)
+            credible_indices = order[:count].astype(int).tolist()
+            density_entropy = float(
+                -np.sum(density_probability * np.log(np.maximum(density_probability, 1e-12)))
+                / np.log(len(density_probability))
+            )
+            density_peak_probability = float(np.max(density_probability))
+            empirical_coverage = float(
+                bundle.get("density_validation", {}).get("top1_cell_accuracy", 0.0)
+            )
+            threshold = -2.0 * np.log(1.0 - confidence_level)
+            major_index = int(np.argmax(eigenvalues))
+            minor_index = 1 - major_index
+            ellipse_axes = np.sqrt(
+                np.asarray((eigenvalues[major_index], eigenvalues[minor_index])) * threshold
+            )
+            major_vector = eigenvectors[:, major_index]
+            ellipse_angle = float(np.degrees(np.arctan2(major_vector[1], major_vector[0])))
+            spread = np.sqrt(np.diag(covariance))
+            method = "pc_mlp_48cell_probability_map"
+        elif model_positions is None:
             centre = centres[int(np.clip(predicted_class, 0, class_count - 1))]
             spread = np.asarray((0.0, 0.0))
             covariance = None
@@ -160,9 +212,12 @@ class PositionEstimator:
             float(np.clip(covariance[0, 1] / max(sigma[0] * sigma[1], 1e-9), -0.99, 0.99))
             if covariance is not None else 0.0
         )
-        classification_confidence = float(
-            np.clip((1.0 - entropy) * np.exp(-np.linalg.norm(spread) / 35.0), 0.0, 1.0)
-        )
+        if density_probability is not None:
+            classification_confidence = density_peak_probability
+        else:
+            classification_confidence = float(np.clip(
+                (1.0 - entropy) * np.exp(-np.linalg.norm(spread) / 35.0), 0.0, 1.0
+            ))
         return {
             "x_mm": float(centre[0]),
             "y_mm": float(centre[1]),
@@ -180,6 +235,17 @@ class PositionEstimator:
             "covariance_mm2": covariance.astype(float).tolist() if covariance is not None else [],
             "classification_confidence": classification_confidence,
             "class_probabilities": probabilities.astype(float).tolist(),
+            "probability_map": (
+                {
+                    "support_xy_mm": density_support.astype(float).tolist(),
+                    "probabilities": density_probability.astype(float).tolist(),
+                    "credible_90_indices": credible_indices,
+                    "normalization": "sum_1",
+                }
+                if density_probability is not None and density_support is not None else None
+            ),
+            "distribution_entropy": density_entropy,
+            "distribution_peak_probability": density_peak_probability,
             "ensemble_positions_mm": (
                 model_positions.astype(float).tolist() if model_positions is not None else []
             ),

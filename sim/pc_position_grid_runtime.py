@@ -19,8 +19,9 @@ import warnings
 import joblib
 import numpy as np
 from sklearn.exceptions import ConvergenceWarning
-from sklearn.neural_network import MLPRegressor
+from sklearn.neural_network import MLPClassifier, MLPRegressor
 from sklearn.preprocessing import StandardScaler
+from scipy.optimize import minimize_scalar
 
 from .sampling_experiment import extract_features, regression_metrics
 
@@ -56,6 +57,7 @@ GRID_SESSION_ID = GRID_SESSION_IDS[0]  # Compatibility name for the first grid s
 DEFAULT_SESSION_IDS = (*CENTRE_SESSION_IDS, *GRID_SESSION_IDS)
 DEFAULT_SEEDS = (1, 7, 21)
 HIDDEN_LAYERS = (384, 192, 96)
+DENSITY_HIDDEN_LAYERS = (384, 192, 96)
 
 
 @dataclass(frozen=True)
@@ -198,8 +200,83 @@ def _model(seed: int) -> MLPRegressor:
     )
 
 
-def _parameter_count(input_count: int) -> int:
-    sizes = (input_count, *HIDDEN_LAYERS, 2)
+def _density_model(seed: int) -> MLPClassifier:
+    return MLPClassifier(
+        hidden_layer_sizes=DENSITY_HIDDEN_LAYERS,
+        activation="relu",
+        solver="adam",
+        alpha=1e-3,
+        batch_size=128,
+        learning_rate_init=1e-3,
+        max_iter=350,
+        early_stopping=True,
+        validation_fraction=0.15,
+        n_iter_no_change=20,
+        random_state=seed,
+    )
+
+
+def _temperature_scaled(probabilities: np.ndarray, temperature: float) -> np.ndarray:
+    logits = np.log(np.clip(probabilities, 1e-12, 1.0)) / max(float(temperature), 1e-6)
+    logits -= logits.max(axis=1, keepdims=True)
+    scaled = np.exp(logits)
+    return scaled / scaled.sum(axis=1, keepdims=True)
+
+
+def _calibrate_temperature(probabilities: np.ndarray, labels: np.ndarray) -> float:
+    def objective(temperature: float) -> float:
+        calibrated = _temperature_scaled(probabilities, temperature)
+        true_probability = calibrated[np.arange(len(labels)), labels]
+        return float(-np.mean(np.log(np.clip(true_probability, 1e-12, 1.0))))
+
+    result = minimize_scalar(objective, bounds=(0.25, 4.0), method="bounded")
+    return float(result.x)
+
+
+def density_metrics(expected_xy: np.ndarray, labels: np.ndarray,
+                    probabilities: np.ndarray, support_xy: np.ndarray) -> dict:
+    expected = probabilities @ support_xy
+    map_xy = support_xy[np.argmax(probabilities, axis=1)]
+    expected_distance = np.linalg.norm(expected - expected_xy, axis=1)
+    map_distance = np.linalg.norm(map_xy - expected_xy, axis=1)
+    support_distance = np.linalg.norm(
+        support_xy[None, :, :] - expected_xy[:, None, :], axis=2
+    )
+    sorted_probability = np.sort(probabilities, axis=1)[:, ::-1]
+    credible_cells = 1 + np.sum(np.cumsum(sorted_probability, axis=1) < 0.90, axis=1)
+    confidence = probabilities.max(axis=1)
+    correct = np.argmax(probabilities, axis=1) == labels
+    ece = 0.0
+    for lower in np.linspace(0.0, 0.9, 10):
+        selected = (confidence >= lower) & (confidence < lower + 0.1)
+        if np.any(selected):
+            ece += float(np.mean(selected)) * abs(
+                float(np.mean(confidence[selected])) - float(np.mean(correct[selected]))
+            )
+    return {
+        "nll": float(-np.mean(np.log(np.clip(
+            probabilities[np.arange(len(labels)), labels], 1e-12, 1.0
+        )))),
+        "brier_score": float(np.mean(np.sum(
+            (probabilities - np.eye(probabilities.shape[1])[labels]) ** 2, axis=1
+        ))),
+        "top1_cell_accuracy": float(np.mean(correct)),
+        "expected_mean_distance_mm": float(np.mean(expected_distance)),
+        "expected_median_distance_mm": float(np.median(expected_distance)),
+        "map_mean_distance_mm": float(np.mean(map_distance)),
+        "probability_mass_within_25mm": float(np.mean(np.sum(
+            probabilities * (support_distance <= 25.0), axis=1
+        ))),
+        "probability_mass_within_50mm": float(np.mean(np.sum(
+            probabilities * (support_distance <= 50.0), axis=1
+        ))),
+        "mean_credible_90_cell_count": float(np.mean(credible_cells)),
+        "expected_calibration_error": ece,
+    }
+
+
+def _parameter_count(input_count: int, output_count: int = 2) -> int:
+    sizes = (input_count, *HIDDEN_LAYERS, output_count)
     return int(sum((left + 1) * right for left, right in zip(sizes[:-1], sizes[1:])))
 
 
@@ -350,6 +427,48 @@ def run(sessions_root: Path, output_dir: Path, seeds: tuple[int, ...] = DEFAULT_
     }
     uncertainty = _uncertainty(dataset.xy_mm[common_test], four_grid_prediction)
 
+    density_support_xy = np.unique(dataset.xy_mm[grid], axis=0)
+    if len(density_support_xy) != 48:
+        raise ValueError(f"expected 48 measured density cells, got {len(density_support_xy)}")
+    density_lookup = {
+        (float(coordinate[0]), float(coordinate[1])): index
+        for index, coordinate in enumerate(density_support_xy)
+    }
+    density_labels = np.asarray([
+        density_lookup[(float(coordinate[0]), float(coordinate[1]))]
+        for coordinate in dataset.xy_mm[grid]
+    ], dtype=np.int64)
+    density_train = ~np.isin(dataset.repetitions[grid], (9, 10))
+    density_test = ~density_train
+    density_scaler = StandardScaler().fit(features[centre | (grid & ~common_test)])
+    density_validation_model = _density_model(seeds[0])
+    density_validation_model.fit(
+        density_scaler.transform(features[grid][density_train]),
+        density_labels[density_train],
+    )
+    raw_density_probability = density_validation_model.predict_proba(
+        density_scaler.transform(features[grid][density_test])
+    )
+    density_temperature = _calibrate_temperature(
+        raw_density_probability, density_labels[density_test]
+    )
+    density_probability = _temperature_scaled(
+        raw_density_probability, density_temperature
+    )
+    density_validation = {
+        "held_out_repetitions": [9, 10],
+        "test_count": int(density_test.sum()),
+        "support_cell_count": int(len(density_support_xy)),
+        "temperature": density_temperature,
+        "iterations": int(density_validation_model.n_iter_),
+        **density_metrics(
+            dataset.xy_mm[grid][density_test],
+            density_labels[density_test],
+            density_probability,
+            density_support_xy,
+        ),
+    }
+
     scaler = StandardScaler().fit(features)
     scaled = scaler.transform(features)
     targets = dataset.xy_mm / (PANEL_WIDTH_MM, PANEL_HEIGHT_MM)
@@ -361,16 +480,30 @@ def run(sessions_root: Path, output_dir: Path, seeds: tuple[int, ...] = DEFAULT_
         models.append(model)
         final_iterations.append(int(model.n_iter_))
 
+    density_models = []
+    density_iterations = []
+    grid_scaled = scaler.transform(features[grid])
+    for seed in seeds:
+        model = _density_model(seed)
+        model.fit(grid_scaled, density_labels)
+        density_models.append(model)
+        density_iterations.append(int(model.n_iter_))
+
     output_dir.mkdir(parents=True, exist_ok=True)
     bundle_path = output_dir / "position_ensemble.joblib"
     scope = (
-        "400×300×5 mmの12中心点と、50 mm格子相当の四隅48点を4セッションで学習した"
-        "PC専用XYモデルです。評価は反復9・10を4セッションから除外した共通holdoutです。"
+        "400×300×5 mmの50 mm格子相当48セルについて、各セルの条件付き確率を直接出力する"
+        "PC専用確率マップモデルです。座標は48セル分布の期待値として算出します。"
+        "評価は反復9・10を4セッションから除外した共通holdoutです。"
         "四隅セッションをすべて学習へ使用したため、完全未学習の外部セッションは残っていません。"
     )
     bundle = {
         "scaler": scaler,
         "models": models,
+        "density_models": density_models,
+        "density_support_xy_mm": density_support_xy.astype(float),
+        "density_temperature": density_temperature,
+        "density_validation": density_validation,
         "contract": {
             "panel_profile_id": PANEL_ID,
             "sample_rate_hz": SAMPLE_RATE_HZ,
@@ -382,7 +515,7 @@ def run(sessions_root: Path, output_dir: Path, seeds: tuple[int, ...] = DEFAULT_
         },
         "validation": four_grid_metrics,
         "uncertainty": uncertainty,
-        "method": "pc_large_mlp_xy_grid_calibrated_gaussian",
+        "method": "pc_mlp_48cell_probability_map",
         "scope": scope,
     }
     joblib.dump(bundle, bundle_path, compress=3)
@@ -419,8 +552,13 @@ def run(sessions_root: Path, output_dir: Path, seeds: tuple[int, ...] = DEFAULT_
         "feature_count": int(features.shape[1]),
         "architecture": [int(features.shape[1]), *HIDDEN_LAYERS, 2],
         "trainable_parameters_per_model": _parameter_count(features.shape[1]),
+        "density_trainable_parameters_per_model": _parameter_count(
+            features.shape[1], len(density_support_xy)
+        ),
         "runtime_seeds": list(seeds),
         "final_iterations": final_iterations,
+        "density_iterations": density_iterations,
+        "density_validation": density_validation,
         "previous_model_unseen_new_session": previous_model_unseen,
         "common_holdout_comparison": common_comparison,
         "external_unused_sessions_comparison": external_evaluation,

@@ -54,7 +54,7 @@ async function refreshStatus() {
 function applyPanelGeometry() {
   const canvas = $('positionHeatmap');
   canvas.height = Math.round(canvas.width * activePanel.height_mm / activePanel.width_mm);
-  $('positionPanel').setAttribute('aria-label', `${activePanel.width_mm} × ${activePanel.height_mm} mm アクリル板上の推定座標と不確実性分布`);
+  $('positionPanel').setAttribute('aria-label', `${activePanel.width_mm} × ${activePanel.height_mm} mm アクリル板上の条件付き座標確率分布`);
   const grid = document.querySelector('.panel-grid');
   if (grid) grid.style.backgroundImage =
     `repeating-linear-gradient(90deg,transparent 0,transparent calc(${100 / activePanel.columns}% - 1px),#ffffff42 calc(${100 / activePanel.columns}% - 1px),#ffffff42 ${100 / activePanel.columns}%),` +
@@ -87,50 +87,30 @@ function heatColor(value) {
   return stops.at(-1).slice(1);
 }
 
-function gaussian(x, y, cx, cy, sx, sy, rho) {
-  const dx = (x - cx) / Math.max(sx, 1);
-  const dy = (y - cy) / Math.max(sy, 1);
-  const correlation = Math.max(-0.99, Math.min(0.99, Number(rho) || 0));
-  const denominator = Math.max(1 - correlation * correlation, 0.02);
-  const distance = (dx * dx - 2 * correlation * dx * dy + dy * dy) / denominator;
-  return Math.exp(-0.5 * distance);
-}
-
 function drawHeatmap(position) {
-  const canvas = $('positionHeatmap');
-  const context = canvas.getContext('2d');
-  const width = 160, height = Math.round(width * activePanel.height_mm / activePanel.width_mm);
-  const image = context.createImageData(width, height);
-  const sigmaX = Number(position.sigma_x_mm) || 0;
-  const sigmaY = Number(position.sigma_y_mm) || 0;
-  const hasDistribution = Boolean(position.model_available && sigmaX > 0 && sigmaY > 0);
-  const density = new Float32Array(width * height);
-  let peak = 0;
-  for (let py = 0; py < height; py++) {
-    const y = (py + 0.5) * activePanel.height_mm / height;
-    for (let px = 0; px < width; px++) {
-      const x = (px + 0.5) * activePanel.width_mm / width;
-      const value = hasDistribution
-        ? gaussian(x, y, position.x_mm, position.y_mm, sigmaX, sigmaY, position.rho_xy)
-        : 0;
-      density[py * width + px] = value;
-      peak = Math.max(peak, value);
-    }
-  }
-  for (let index = 0; index < density.length; index++) {
-    const normalized = peak > 0 ? Math.pow(density[index] / peak, 0.72) : 0;
+  const layer = $('positionProbabilityCells');
+  const map = position.probability_map || {};
+  const support = Array.isArray(map.support_xy_mm) ? map.support_xy_mm : [];
+  const probability = Array.isArray(map.probabilities) ? map.probabilities : [];
+  const hasDistribution = support.length > 0 && support.length === probability.length;
+  if (!hasDistribution) { layer.replaceChildren(); return; }
+  const peak = Math.max(...probability.map(value => Math.max(0, Number(value) || 0)), 1e-12);
+  const cells = support.map(([x, y], index) => {
+    const value = Math.max(0, Number(probability[index]) || 0);
+    const normalized = Math.pow(value / peak, 0.52);
     const [r, g, b] = heatColor(normalized);
-    image.data[index * 4] = r;
-    image.data[index * 4 + 1] = g;
-    image.data[index * 4 + 2] = b;
-    image.data[index * 4 + 3] = 255;
-  }
-  const buffer = document.createElement('canvas');
-  buffer.width = width; buffer.height = height;
-  buffer.getContext('2d').putImageData(image, 0, 0);
-  context.imageSmoothingEnabled = true;
-  context.clearRect(0, 0, canvas.width, canvas.height);
-  context.drawImage(buffer, 0, 0, canvas.width, canvas.height);
+    const column = Math.max(0, Math.min(7, Math.round((Number(x) - 25) / 50)));
+    const row = Math.max(0, Math.min(5, Math.round((Number(y) - 25) / 50)));
+    const cell = document.createElement('div');
+    cell.className = 'probability-cell';
+    cell.style.left = `${column * 12.5}%`;
+    cell.style.top = `${row * 100 / 6}%`;
+    cell.style.backgroundColor = `rgb(${r} ${g} ${b})`;
+    cell.title = `X ${Number(x).toFixed(0)} / Y ${Number(y).toFixed(0)} mm: ${(value * 100).toFixed(2)}%`;
+    cell.setAttribute('aria-label', cell.title);
+    return cell;
+  });
+  layer.replaceChildren(...cells);
 }
 
 function renderProbabilities(values) {
@@ -152,15 +132,17 @@ function renderPosition(position) {
   $('coordinateReadout').textContent = `X ${x.toFixed(1)} / Y ${y.toFixed(1)} mm`;
   $('metricCoordinate').textContent = `${x.toFixed(1)}, ${y.toFixed(1)} mm`;
   const level = Number(position.confidence_level || 0);
-  const coverage = Number(position.empirical_coverage || 0);
-  $('metricConfidence').textContent = level > 0
-    ? `${(level * 100).toFixed(0)}%（実測 ${(coverage * 100).toFixed(1)}%）` : '—';
-  const ellipse = position.confidence_ellipse_90 || {};
-  $('metricRegion').textContent = Number.isFinite(ellipse.semi_major_mm)
-    ? `±${ellipse.semi_major_mm.toFixed(1)} / ±${ellipse.semi_minor_mm.toFixed(1)} mm` : '—';
+  const map = position.probability_map || {};
+  const credibleCells = Array.isArray(map.credible_90_indices) ? map.credible_90_indices.length : 0;
+  const peakProbability = Number(position.distribution_peak_probability || 0);
+  const entropy = Number(position.distribution_entropy || 0);
+  $('metricConfidence').textContent = peakProbability > 0
+    ? `最大セル ${(peakProbability * 100).toFixed(1)}%` : '—';
+  $('metricRegion').textContent = credibleCells > 0
+    ? `${(level * 100).toFixed(0)}%信用領域 ${credibleCells}セル` : '—';
   $('metricSigma').textContent = position.model_available
-    ? `σx ${Number(position.sigma_x_mm).toFixed(1)} / σy ${Number(position.sigma_y_mm).toFixed(1)} / ρ ${Number(position.rho_xy).toFixed(2)}` : '—';
-  $('metricMethod').textContent = position.model_available ? 'XY回帰＋校正ガウス' : 'エリア分類（座標モデルなし）';
+    ? `σx ${Number(position.sigma_x_mm).toFixed(1)} / σy ${Number(position.sigma_y_mm).toFixed(1)} / H ${entropy.toFixed(2)}` : '—';
+  $('metricMethod').textContent = map.probabilities ? '48セル条件付き確率モデル' : 'エリア分類（確率マップなし）';
   $('scopeNote').textContent = position.scope || '選択したパネル用PCモデルによる座標推定です。';
   renderProbabilities(position.class_probabilities || Array(activePanel.class_count).fill(1 / activePanel.class_count));
 }
@@ -182,12 +164,25 @@ async function inferenceLoop() {
 }
 
 function renderDemo() {
+  const support = [];
+  for (let y = 25; y < activePanel.height_mm; y += 50) {
+    for (let x = 25; x < activePanel.width_mm; x += 50) support.push([x, y]);
+  }
+  const raw = support.map(([x, y]) =>
+    Math.exp(-((x-activePanel.width_mm*.53)**2+(y-activePanel.height_mm*.59)**2)/2400) +
+    .35*Math.exp(-((x-activePanel.width_mm*.72)**2+(y-activePanel.height_mm*.32)**2)/1800));
+  const total = raw.reduce((sum, value) => sum + value, 0);
+  const probability = raw.map(value => value / total);
+  const order = probability.map((value,index)=>({value,index})).sort((a,b)=>b.value-a.value);
+  let cumulative = 0; const credible = [];
+  for (const item of order) { credible.push(item.index); cumulative += item.value; if(cumulative >= .9) break; }
   renderPosition({
-    x_mm: activePanel.width_mm * .53, y_mm: activePanel.height_mm * .59, sigma_x_mm: 18.2, sigma_y_mm: 8.4, rho_xy: 0.38,
+    x_mm: activePanel.width_mm * .58, y_mm: activePanel.height_mm * .55, sigma_x_mm: 48.2, sigma_y_mm: 41.4, rho_xy: 0.18,
     confidence: 0.90, confidence_level: 0.90, empirical_coverage: 0.90,
-    confidence_ellipse_90: {semi_major_mm: 40.1, semi_minor_mm: 16.5, angle_deg: 11.2},
+    probability_map: {support_xy_mm:support, probabilities:probability, credible_90_indices:credible, normalization:'sum_1'},
+    distribution_peak_probability: Math.max(...probability), distribution_entropy: .61,
     class_probabilities: Array.from({length:activePanel.class_count},(_,i)=>i===Math.min(6,activePanel.class_count-1)?.53:.47/(activePanel.class_count-1)), model_available: true,
-    scope: '表示デモです。XY推定座標を中心に、検証誤差で校正した二次元ガウスを表示しています。'
+    scope: '表示デモです。各色は48空間セルへモデルが直接割り当てた確率を表します。'
   });
 }
 
