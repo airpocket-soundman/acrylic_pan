@@ -849,8 +849,7 @@ class AcquisitionController:
                     "active": self.inference_active,
                     "mode": self.device_mode,
                     "position_model_available": (
-                        self.position_estimator.available
-                        and self.panel_profile_id == DEFAULT_PANEL_PROFILE_ID
+                        self.position_estimator.available_for(self.panel_profile_id)
                     ),
                     "latest_sequence": (
                         self.latest_ai.get("sequence") if self.latest_ai else None

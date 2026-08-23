@@ -10,6 +10,7 @@ import joblib
 import numpy as np
 
 from pc.acrylic_pan_monitor.protocol import EventData
+from sim.pc_position_grid_runtime import FEATURE_MODE as GRID_FEATURE_MODE, extract_grid_features
 from sim.pc_position_runtime import extract_live_features
 
 PANEL_SIZE_MM = np.asarray((400.0, 200.0), dtype=np.float64)
@@ -18,6 +19,10 @@ AREA_CENTRES_MM = np.asarray(
     dtype=np.float64,
 )
 DEFAULT_MODEL_PATH = Path(__file__).resolve().parents[2] / "artifacts/pc_position_runtime/position_ensemble.joblib"
+GRID_MODEL_PATH = (
+    Path(__file__).resolve().parents[2]
+    / "artifacts/pc_position_runtime_400x300x5/position_ensemble.joblib"
+)
 
 
 def class_probabilities(
@@ -45,10 +50,18 @@ def load_bundle(path: str) -> dict[str, Any] | None:
 class PositionEstimator:
     def __init__(self, model_path: str | Path = DEFAULT_MODEL_PATH) -> None:
         self.model_path = Path(model_path).resolve()
+        self.model_paths = {
+            "400x200x3": self.model_path,
+            "400x300x5": GRID_MODEL_PATH.resolve(),
+        }
 
     @property
     def available(self) -> bool:
         return load_bundle(str(self.model_path)) is not None
+
+    def available_for(self, panel_profile_id: str) -> bool:
+        path = self.model_paths.get(panel_profile_id)
+        return path is not None and load_bundle(str(path)) is not None
 
     def predict(self, event: EventData, outputs: tuple[float, ...] | list[float],
                 predicted_class: int, panel: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -66,7 +79,8 @@ class PositionEstimator:
         ])
         probabilities = class_probabilities(outputs, class_count)
         entropy = float(-np.sum(probabilities * np.log(np.maximum(probabilities, 1e-12))) / np.log(class_count))
-        bundle = load_bundle(str(self.model_path)) if panel.get("id") == "400x200x3" else None
+        selected_model_path = self.model_paths.get(str(panel.get("id")))
+        bundle = load_bundle(str(selected_model_path)) if selected_model_path is not None else None
         model_positions: np.ndarray | None = None
         if bundle is not None:
             contract = bundle["contract"]
@@ -75,7 +89,12 @@ class PositionEstimator:
                 and len(event.samples) == int(contract["sample_count"])
                 and event.trigger_index == int(contract["trigger_index"])
             ):
-                feature = extract_live_features(np.asarray(event.samples, dtype=np.float64))[None, :]
+                waveform = np.asarray(event.samples, dtype=np.float64)
+                feature = (
+                    extract_grid_features(waveform)
+                    if contract.get("feature_mode") == GRID_FEATURE_MODE
+                    else extract_live_features(waveform)
+                )[None, :]
                 scaled = bundle["scaler"].transform(feature)
                 model_positions = np.stack([
                     np.clip(model.predict(scaled)[0], 0.0, 1.0) * panel_size
@@ -131,7 +150,7 @@ class PositionEstimator:
             )
             major_vector = eigenvectors[:, major_index]
             ellipse_angle = float(np.degrees(np.arctan2(major_vector[1], major_vector[0])))
-            method = "pc_mlp_xy_calibrated_gaussian"
+            method = str(bundle.get("method", "pc_mlp_xy_calibrated_gaussian"))
 
         sigma = (
             np.sqrt(np.diag(covariance))
@@ -168,9 +187,7 @@ class PositionEstimator:
             "model_available": model_positions is not None,
             "method": method,
             "scope": (
-                "XY回帰の平均座標と、LOSO実測誤差で90%被覆に校正した不確実性分布です。"
-                "モデル間分散も加算しています。8中心点教師からの補間であり、"
-                "任意位置の実測精度は未検証です。"
+                str(bundle.get("scope", "PC座標モデルによるXY推定です。"))
                 if model_positions is not None else
                 "PC座標モデルを利用できないため、不確実性分布は表示していません。"
             ),

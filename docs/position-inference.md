@@ -1,5 +1,32 @@
 # PC側・確率分布型位置推定
 
+## 400 × 300 × 5 mm・12領域モデル（2026-08-23）
+
+12領域中心の4セッション2,345件へ、50 mm格子相当のエリア内四隅4点セッション
+`20260823_081435_223491a5`（480件）を追加し、PC専用モデルを学習した。
+合計2,825件、60座標を使用する。実機から受ける25.6 kHz・512点は変えず、PC側で
+448時系列、256周波数、振幅・減衰統計10値の計714特徴を抽出する。
+
+モデルは714－384－192－96－2の全層学習MLPを3初期値で平均する。1モデル367,202
+パラメータ、bundleは約20.1 MiBで、エッジのモデル容量制限は適用しない。初回ロード後の
+実測推論時間はこのPCで平均0.93 ms、90%点1.24 msだった。
+生成bundleのSHA-256は`53167139ec3a455f378b63955b51b6e929dee83f831d48601cd900b473b431ca`である。
+
+| 評価 | 平均距離 | 中央値 | 90%点 | 25 mm以内 | 50 mm以内 |
+|---|---:|---:|---:|---:|---:|
+| 四隅48座標・反復番号分離5-fold | 16.82 mm | 10.73 mm | 33.61 mm | 83.96% | 95.00% |
+| 12中心点・4セッションLOSO | 21.31 mm | 14.33 mm | 41.66 mm | 76.84% | 92.62% |
+
+四隅評価は同一収録セッション内で、各座標10反復のうち反復番号をfold単位で分離した。
+別日・固定し直し・別打撃者への汎化評価ではない。次は同じ48座標を独立セッションで収録し、
+今回のモデルを再学習せず評価する必要がある。
+
+生成物:
+
+- `artifacts/pc_position_runtime_400x300x5/position_ensemble.joblib`
+- `artifacts/pc_position_runtime_400x300x5/training_report.json`
+- `artifacts/pc_position_runtime_400x300x5/validation_predictions.npz`
+
 ## 構成
 
 「位置推定」タブは、ファームが返す25.6 kHz・512点・20 msの`INFERENCE_EVENT`を使う。
@@ -34,9 +61,10 @@ PC側では時間64＋FFT 64特徴を作り、128－256－128－64－2の直接X
 ## 再実行
 
 ```powershell
-.\scripts\train-pc-position-runtime.ps1
+.\scripts\train-pc-position-runtime.ps1 `
+  -Python C:\ProgramData\anaconda3\python.exe
 .\scripts\run-position-monitor.ps1
 ```
 
-生成モデルは`artifacts/pc_position_runtime/position_ensemble.joblib`、学習条件とLOSO結果は
-`artifacts/pc_position_runtime/training_report.json`へ保存する。
+既定の生成先は`artifacts/pc_position_runtime_400x300x5`である。旧400 × 200 × 3 mmモデルは
+`artifacts/pc_position_runtime`に残し、Web UIがパネルプロファイルに応じて切り替える。

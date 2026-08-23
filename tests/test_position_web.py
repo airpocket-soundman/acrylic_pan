@@ -55,7 +55,7 @@ class PositionWebTests(unittest.TestCase):
         self.assertIn("rho_xy", script)
         self.assertIn("confidence_ellipse_90", script)
         self.assertIn(".position-marker", css)
-        self.assertIn("8中心点", page)
+        self.assertIn("PC座標モデル", page)
 
     def test_all_operating_pages_link_to_position_tab(self):
         for path in ("/", "/collector.html", "/position.html", "/instrument.html"):

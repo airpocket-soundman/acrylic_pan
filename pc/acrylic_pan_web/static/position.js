@@ -54,6 +54,7 @@ async function refreshStatus() {
 function applyPanelGeometry() {
   const canvas = $('positionHeatmap');
   canvas.height = Math.round(canvas.width * activePanel.height_mm / activePanel.width_mm);
+  $('positionPanel').setAttribute('aria-label', `${activePanel.width_mm} × ${activePanel.height_mm} mm アクリル板上の推定座標と不確実性分布`);
   const grid = document.querySelector('.panel-grid');
   if (grid) grid.style.backgroundImage =
     `repeating-linear-gradient(90deg,transparent 0,transparent calc(${100 / activePanel.columns}% - 1px),#ffffff42 calc(${100 / activePanel.columns}% - 1px),#ffffff42 ${100 / activePanel.columns}%),` +
@@ -160,7 +161,7 @@ function renderPosition(position) {
   $('metricSigma').textContent = position.model_available
     ? `σx ${Number(position.sigma_x_mm).toFixed(1)} / σy ${Number(position.sigma_y_mm).toFixed(1)} / ρ ${Number(position.rho_xy).toFixed(2)}` : '—';
   $('metricMethod').textContent = position.model_available ? 'XY回帰＋校正ガウス' : 'エリア分類（座標モデルなし）';
-  $('scopeNote').textContent = position.scope || '8中心点教師からの補間推定です。';
+  $('scopeNote').textContent = position.scope || '選択したパネル用PCモデルによる座標推定です。';
   renderProbabilities(position.class_probabilities || Array(activePanel.class_count).fill(1 / activePanel.class_count));
 }
 
