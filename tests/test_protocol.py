@@ -9,6 +9,8 @@ from pc.acrylic_pan_monitor.protocol import (
     EVENT_CHUNK_HEADER,
     AI_RESULT_PAYLOAD,
     AI_RESULT_12_PAYLOAD,
+    POSITION_RESULT_PAYLOAD,
+    POSITION_DIAGNOSTIC_PAYLOAD,
     Frame,
     FrameStreamDecoder,
     MessageType,
@@ -19,6 +21,8 @@ from pc.acrylic_pan_monitor.protocol import (
     decode_event_chunk,
     decode_ai_result,
     decode_inference_event,
+    decode_position_result,
+    decode_position_diagnostic,
     decode_frame,
     encode_event_payload,
     encode_frame,
@@ -104,6 +108,28 @@ class ProtocolTests(unittest.TestCase):
         combined = decode_inference_event(frame)
         self.assertEqual(combined.result.predicted_class, 11)
         self.assertEqual(len(combined.result.outputs), 12)
+
+    def test_position_result_contains_normalized_device_probabilities_and_timing(self):
+        probabilities = [0.0] * 60
+        probabilities[17] = 0.75
+        probabilities[18] = 0.25
+        payload = POSITION_RESULT_PAYLOAD.pack(17, 60, 1, 1234, 456, 1690, *probabilities)
+        result = decode_position_result(Frame(MessageType.POSITION_RESULT, 101, payload))
+        self.assertEqual(result.position_id, 17)
+        self.assertAlmostEqual(sum(result.probabilities), 1.0)
+        self.assertEqual(result.inference_us, 1234)
+        self.assertEqual(result.softmax_us, 456)
+        self.assertEqual(result.total_us, 1690)
+
+    def test_position_diagnostic_decodes_sixty_logits(self):
+        logits = [float(index) / 8 for index in range(60)]
+        payload = POSITION_DIAGNOSTIC_PAYLOAD.pack(2, 59, 0, *logits)
+        result = decode_position_diagnostic(
+            Frame(MessageType.POSITION_DIAGNOSTIC, 102, payload)
+        )
+        self.assertEqual(result.case_id, 2)
+        self.assertEqual(result.position_id, 59)
+        self.assertEqual(len(result.logits), 60)
 
     def test_long_event_reassembles_out_of_order_once(self):
         source = tuple(range(2048))

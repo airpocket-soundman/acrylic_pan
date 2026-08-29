@@ -3,6 +3,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
+#include <math.h>
 
 #include "AIContext.h"
 #include "ConfigData.h"
@@ -13,6 +14,8 @@
 #include "Uart1.h"
 #include "apan_ai_selftest.h"
 #include "apan_inference.h"
+#include "apan_position_inference.h"
+#include "apan_position_probability_model.h"
 #include "apan_capture.h"
 #include "apan_protocol.h"
 #include "mcu.h"
@@ -58,6 +61,8 @@ static uint32_t inference_sequence;
 static volatile bool instrument_transmit_done;
 static bool lcd_result_pending;
 static uint8_t lcd_class_id;
+static uint16_t lcd_x_mm;
+static uint16_t lcd_y_mm;
 static uint32_t lcd_inference_us;
 static volatile uint32_t app_tick_10ms;
 static uint32_t last_accepted_inference_tick;
@@ -137,16 +142,16 @@ static void display_area_on_leds(uint8_t class_id)
 
 static void display_inference_result(void)
 {
-    char first_line[17] = "X000 Y000 AREA0 ";
+    char first_line[17] = "X000 Y000 A00   ";
     char second_line[17] = "INFER 000.00ms  ";
-    uint16_t x_mm = (uint16_t)((lcd_class_id % 4U) * 100U + 50U);
-    uint16_t y_mm = (uint16_t)((lcd_class_id / 4U) * 100U + 50U);
     uint32_t hundredths_ms = (lcd_inference_us + 5UL) / 10UL;
+    uint8_t area_number = (uint8_t)(lcd_class_id + 1U);
 
     if (hundredths_ms > 99999UL) { hundredths_ms = 99999UL; }
-    put_three_digits(&first_line[1], x_mm);
-    put_three_digits(&first_line[6], y_mm);
-    first_line[14] = (char)('1' + lcd_class_id);
+    put_three_digits(&first_line[1], lcd_x_mm);
+    put_three_digits(&first_line[6], lcd_y_mm);
+    first_line[11] = (char)('0' + (area_number / 10U));
+    first_line[12] = (char)('0' + (area_number % 10U));
     put_three_digits(&second_line[6], (uint16_t)(hundredths_ms / 100UL));
     second_line[10] = (char)('0' + ((hundredths_ms / 10UL) % 10UL));
     second_line[11] = (char)('0' + (hundredths_ms % 10UL));
@@ -182,7 +187,8 @@ static void inference_transmit_complete(uint32_t count, uint16_t error_status)
     /* Live inference must not depend on the PC receiving telemetry and
        sending another START.  Defer SensorStart to the main loop because
        this callback runs in the UART completion context. */
-    inference_rearm_pending = (operating_mode == APAN_MODE_INFERENCE);
+    inference_rearm_pending = ((operating_mode == APAN_MODE_INFERENCE) ||
+                               (operating_mode == APAN_MODE_POSITION));
     Uart1StartReadByte(receive_byte);
 }
 
@@ -414,6 +420,8 @@ static void send_inference_result(void)
             return;
         }
         lcd_class_id = class_id;
+        lcd_x_mm = (uint16_t)((class_id % 4U) * 100U + 50U);
+        lcd_y_mm = (uint16_t)((class_id / 4U) * 100U + 50U);
         lcd_inference_us = elapsed_systick_us(inference_start, inference_end);
         lcd_result_pending = true;
         display_area_on_leds(class_id);
@@ -455,6 +463,106 @@ static void send_inference_result(void)
             return;
         }
         write_protocol(APAN_MESSAGE_AI_RESULT, inference_sequence, payload, sizeof(payload));
+        return;
+    }
+    ApanCaptureReleaseEvent(&capture);
+    collector_stopped = true;
+}
+
+static void send_position_result(void)
+{
+    const ApanEvent *event = ApanCaptureGetEvent(&capture);
+    float probability[APAN_POSITION_OUTPUT_COUNT];
+    uint8_t payload[16U + (APAN_POSITION_OUTPUT_COUNT * 4U)];
+    uint8_t position_id;
+    uint8_t area_id;
+    uint16_t x_mm;
+    uint16_t y_mm;
+    uint16_t index;
+    float maximum;
+    float total = 0.0F;
+    size_t encoded_size;
+    uint32_t inference_start;
+    uint32_t inference_end;
+    uint32_t softmax_end;
+    uint32_t inference_us;
+    uint32_t softmax_us;
+    uint32_t total_us;
+
+    if ((event == NULL) || transmit_busy) { return; }
+    inference_start = SysTick->VAL;
+    if (!ApanPositionInferencePredict(event, probability, &position_id))
+    {
+        payload[0] = APAN_MESSAGE_POSITION_RESULT;
+        payload[1] = 4U;
+        write_protocol(APAN_MESSAGE_NACK, sequence++, payload, 2U);
+        ApanCaptureReleaseEvent(&capture);
+        collector_stopped = true;
+        return;
+    }
+    inference_end = SysTick->VAL;
+    probability[0] *= APAN_POSITION_SOFTMAX_INVERSE_TEMPERATURE;
+    maximum = probability[0];
+    for (index = 1U; index < APAN_POSITION_OUTPUT_COUNT; index++)
+    {
+        probability[index] *= APAN_POSITION_SOFTMAX_INVERSE_TEMPERATURE;
+        if (probability[index] > maximum) { maximum = probability[index]; }
+    }
+    for (index = 0U; index < APAN_POSITION_OUTPUT_COUNT; index++)
+    {
+        probability[index] = expf(probability[index] - maximum);
+        total += probability[index];
+    }
+    if (total <= 0.0F) { total = 1.0F; }
+    for (index = 0U; index < APAN_POSITION_OUTPUT_COUNT; index++)
+    {
+        probability[index] /= total;
+    }
+    softmax_end = SysTick->VAL;
+    inference_us = elapsed_systick_us(inference_start, inference_end);
+    softmax_us = elapsed_systick_us(inference_end, softmax_end);
+    total_us = elapsed_systick_us(inference_start, softmax_end);
+    ApanPositionInferenceSupport(position_id, &x_mm, &y_mm);
+    area_id = (uint8_t)((y_mm / 100U) * 4U + (x_mm / 100U));
+    lcd_class_id = area_id;
+    lcd_x_mm = x_mm;
+    lcd_y_mm = y_mm;
+    lcd_inference_us = total_us;
+    lcd_result_pending = true;
+    display_area_on_leds(area_id);
+
+    payload[0] = position_id;
+    payload[1] = APAN_POSITION_OUTPUT_COUNT;
+    payload[2] = 1U; payload[3] = 0U;
+    payload[4] = (uint8_t)inference_us;
+    payload[5] = (uint8_t)(inference_us >> 8);
+    payload[6] = (uint8_t)(inference_us >> 16);
+    payload[7] = (uint8_t)(inference_us >> 24);
+    payload[8] = (uint8_t)softmax_us;
+    payload[9] = (uint8_t)(softmax_us >> 8);
+    payload[10] = (uint8_t)(softmax_us >> 16);
+    payload[11] = (uint8_t)(softmax_us >> 24);
+    payload[12] = (uint8_t)total_us;
+    payload[13] = (uint8_t)(total_us >> 8);
+    payload[14] = (uint8_t)(total_us >> 16);
+    payload[15] = (uint8_t)(total_us >> 24);
+    for (index = 0U; index < APAN_POSITION_OUTPUT_COUNT; index++)
+    {
+        union { float value; uint32_t bits; } packed;
+        uint16_t offset = (uint16_t)(16U + index * 4U);
+        packed.value = probability[index];
+        payload[offset] = (uint8_t)packed.bits;
+        payload[offset + 1U] = (uint8_t)(packed.bits >> 8);
+        payload[offset + 2U] = (uint8_t)(packed.bits >> 16);
+        payload[offset + 3U] = (uint8_t)(packed.bits >> 24);
+    }
+    encoded_size = ApanProtocolEncodeFrame(
+        APAN_MESSAGE_POSITION_RESULT, 0U, sequence++, 0U,
+        payload, sizeof(payload), transmit_buffer, sizeof(transmit_buffer));
+    if (encoded_size > 0U)
+    {
+        transmit_busy = true;
+        Uart1Write(transmit_buffer, (uint32_t)encoded_size, inference_transmit_complete);
         return;
     }
     ApanCaptureReleaseEvent(&capture);
@@ -538,7 +646,7 @@ void ApanCollectorAppProcess(void)
     bool binary;
     uint32_t request_sequence;
     uint8_t request_type;
-    uint8_t payload[36];
+    uint8_t payload[4U + (APAN_POSITION_OUTPUT_COUNT * 4U)];
 
     if (inference_rearm_pending)
     {
@@ -567,7 +675,8 @@ void ApanCollectorAppProcess(void)
     }
     if (ApanCaptureEventReady(&capture) && !transmit_busy)
     {
-        if (operating_mode != APAN_MODE_COLLECT) { send_inference_result(); }
+        if (operating_mode == APAN_MODE_POSITION) { send_position_result(); }
+        else if (operating_mode != APAN_MODE_COLLECT) { send_inference_result(); }
         else { send_ready_event(); }
     }
     if (transmit_busy || (pending_command == COMMAND_NONE))
@@ -676,12 +785,52 @@ void ApanCollectorAppProcess(void)
             uint8_t class_id;
             uint8_t index;
             bool result_ok = false;
+            if (pending_case_id >= 0x80U)
+            {
+                float position_output[APAN_POSITION_OUTPUT_COUNT];
+                uint8_t position_id;
+                uint8_t position_case = (uint8_t)(pending_case_id - 0x80U);
+                if (collector_stopped)
+                {
+                    result_ok = ApanPositionInferenceSelfTest(
+                        position_case, position_output, &position_id);
+                }
+                if (operating_mode == APAN_MODE_POSITION)
+                {
+                    ApanPositionInferenceInitialize();
+                }
+                else { ApanInferenceInitialize(); }
+                if (!result_ok)
+                {
+                    payload[0] = request_type;
+                    payload[1] = 3U;
+                    write_protocol(APAN_MESSAGE_NACK, request_sequence, payload, 2U);
+                    break;
+                }
+                payload[0] = position_case;
+                payload[1] = position_id;
+                payload[2] = 0U; payload[3] = 0U;
+                for (index = 0U; index < APAN_POSITION_OUTPUT_COUNT; index++)
+                {
+                    union { float value; uint32_t bits; } packed;
+                    uint16_t offset = (uint16_t)(4U + index * 4U);
+                    packed.value = position_output[index];
+                    payload[offset] = (uint8_t)packed.bits;
+                    payload[offset + 1U] = (uint8_t)(packed.bits >> 8);
+                    payload[offset + 2U] = (uint8_t)(packed.bits >> 16);
+                    payload[offset + 3U] = (uint8_t)(packed.bits >> 24);
+                }
+                write_protocol(APAN_MESSAGE_POSITION_DIAGNOSTIC, request_sequence,
+                               payload, 4U + APAN_POSITION_OUTPUT_COUNT * 4U);
+                break;
+            }
             if (collector_stopped)
             {
                 result_ok = ApanAiSelfTestRun(pending_case_id, output, &class_id);
             }
             /* The self-test replaces the accelerator's global alpha. */
-            ApanInferenceInitialize();
+            if (operating_mode == APAN_MODE_POSITION) { ApanPositionInferenceInitialize(); }
+            else { ApanInferenceInitialize(); }
             if (!result_ok)
             {
                 if (binary)
@@ -713,7 +862,7 @@ void ApanCollectorAppProcess(void)
             break;
         }
         case COMMAND_SET_MODE:
-            if (pending_mode > APAN_MODE_INSTRUMENT)
+            if (pending_mode > APAN_MODE_POSITION)
             {
                 payload[0] = request_type;
                 payload[1] = 2U;
@@ -732,6 +881,14 @@ void ApanCollectorAppProcess(void)
                 instrument_transmit_done = false;
                 collector_stopped = true;
                 operating_mode = pending_mode;
+                if (operating_mode == APAN_MODE_POSITION)
+                {
+                    ApanPositionInferenceInitialize();
+                }
+                else if (operating_mode != APAN_MODE_COLLECT)
+                {
+                    ApanInferenceInitialize();
+                }
                 (void)ApanCaptureSetTargetSamples(
                     &capture,
                     (operating_mode != APAN_MODE_COLLECT) ?

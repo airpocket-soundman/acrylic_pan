@@ -8,6 +8,7 @@ from enum import IntEnum
 import struct
 import zlib
 import time
+import math
 
 MAGIC = b"APAN"
 PROTOCOL_VERSION = 1
@@ -16,6 +17,8 @@ CRC = struct.Struct("<I")
 EVENT_HEADER = struct.Struct("<IHHHH")
 AI_RESULT_PAYLOAD = struct.Struct("<BBH8f")
 AI_RESULT_12_PAYLOAD = struct.Struct("<BBH12f")
+POSITION_RESULT_PAYLOAD = struct.Struct("<BBHIII60f")
+POSITION_DIAGNOSTIC_PAYLOAD = struct.Struct("<BBH60f")
 EVENT_CHUNK_HEADER = struct.Struct("<IHHIHHHH")
 MAX_PAYLOAD_SIZE = 4096
 
@@ -37,6 +40,8 @@ class MessageType(IntEnum):
     AI_RESULT = 0x21
     INFERENCE_EVENT = 0x22
     EVENT_CHUNK = 0x23
+    POSITION_RESULT = 0x24
+    POSITION_DIAGNOSTIC = 0x26
     ACK = 0x70
     NACK = 0x71
 
@@ -74,6 +79,26 @@ class AiResult:
 class InferenceEvent:
     event: EventData
     result: AiResult
+
+
+@dataclass(frozen=True)
+class PositionResult:
+    position_id: int
+    probabilities: tuple[float, ...]
+    inference_us: int
+    softmax_us: int
+    total_us: int
+    sequence: int = 0
+    timestamp_us: int = 0
+
+
+@dataclass(frozen=True)
+class PositionDiagnostic:
+    case_id: int
+    position_id: int
+    logits: tuple[float, ...]
+    sequence: int = 0
+    timestamp_us: int = 0
 
 
 @dataclass(frozen=True)
@@ -287,6 +312,47 @@ def decode_inference_event(frame: Frame) -> InferenceEvent:
         case_id, predicted_class, tuple(outputs), frame.sequence, frame.timestamp_us
     )
     return InferenceEvent(event, result)
+
+
+def decode_position_result(frame: Frame) -> PositionResult:
+    """Decode 60 device-inferred position logits and timing metadata."""
+    if frame.message_type != MessageType.POSITION_RESULT:
+        raise ProtocolError("frame is not POSITION_RESULT")
+    if len(frame.payload) != POSITION_RESULT_PAYLOAD.size:
+        raise ProtocolError("position result payload length mismatch")
+    position_id, output_count, flags, inference_us, softmax_us, total_us, *probabilities = (
+        POSITION_RESULT_PAYLOAD.unpack(frame.payload)
+    )
+    if output_count != 60 or flags != 1:
+        raise ProtocolError("unsupported position result payload version")
+    if position_id >= output_count:
+        raise ProtocolError("position result ID is outside the output vector")
+    if not all(math.isfinite(value) and value >= 0.0 for value in probabilities):
+        raise ProtocolError("position result contains an invalid probability")
+    probability_sum = sum(probabilities)
+    if not 0.98 <= probability_sum <= 1.02:
+        raise ProtocolError("position probabilities are not normalized")
+    return PositionResult(
+        position_id, tuple(value / probability_sum for value in probabilities),
+        inference_us, softmax_us, total_us, frame.sequence, frame.timestamp_us
+    )
+
+
+def decode_position_diagnostic(frame: Frame) -> PositionDiagnostic:
+    if frame.message_type != MessageType.POSITION_DIAGNOSTIC:
+        raise ProtocolError("frame is not POSITION_DIAGNOSTIC")
+    if len(frame.payload) != POSITION_DIAGNOSTIC_PAYLOAD.size:
+        raise ProtocolError("position diagnostic payload length mismatch")
+    case_id, position_id, reserved, *logits = POSITION_DIAGNOSTIC_PAYLOAD.unpack(
+        frame.payload
+    )
+    if reserved != 0 or case_id >= 8 or position_id >= 60:
+        raise ProtocolError("unsupported position diagnostic payload")
+    if not all(math.isfinite(value) for value in logits):
+        raise ProtocolError("position diagnostic contains a non-finite logit")
+    return PositionDiagnostic(
+        case_id, position_id, tuple(logits), frame.sequence, frame.timestamp_us
+    )
 
 
 def decode_event_chunk(frame: Frame) -> EventChunk:

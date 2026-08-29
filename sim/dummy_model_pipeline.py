@@ -19,7 +19,7 @@ INPUT_COUNT = 128
 HIDDEN_COUNT = 32
 CLASS_COUNT = 8
 SEED = 20260716
-DEFAULT_SIM_ALPHA = Path(r"D:\GitHub\IchiPing_solist_AI\sim_export\_alpha32_sim.npy")
+DEFAULT_SIM_ALPHA = Path(__file__).resolve().parents[1] / "data/dummy_model/model.npz"
 
 
 def to_bfloat16_bits(values: np.ndarray) -> np.ndarray:
@@ -60,6 +60,12 @@ def hidden(features: np.ndarray, alpha: np.ndarray) -> np.ndarray:
 def load_official_sim_alpha(path: Path = DEFAULT_SIM_ALPHA) -> np.ndarray:
     """Load seed=1 alpha captured from the official Solist-AI Simulator."""
     source = np.load(path, allow_pickle=False)
+    if isinstance(source, np.lib.npyio.NpzFile):
+        archive = source
+        try:
+            source = archive["alpha"]
+        finally:
+            archive.close()
     if source.ndim != 2 or source.shape[0] < INPUT_COUNT or source.shape[1] < HIDDEN_COUNT:
         raise ValueError(f"official Simulator alpha must cover {INPUT_COUNT}x{HIDDEN_COUNT}")
     return np.asarray(source[:INPUT_COUNT, :HIDDEN_COUNT], dtype=np.float32)

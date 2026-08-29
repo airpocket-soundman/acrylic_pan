@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 from dataclasses import dataclass, field
 import json
+import math
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -32,15 +33,30 @@ from pc.acrylic_pan_monitor.protocol import (
     decode_event,
     decode_event_chunk,
     decode_inference_event,
+    decode_position_result,
+    decode_position_diagnostic,
     encode_frame,
 )
 from pc.acrylic_pan_monitor.recorder import Recorder, ReceiveStats, make_demo_event
 from pc.acrylic_pan_monitor.serial_link import SerialLink, available_ports
 from pc.acrylic_pan_monitor.signal_processing import prepare_plot_data
-from pc.acrylic_pan_web.position_model import DEFAULT_MODEL_PATH, PositionEstimator
+from pc.acrylic_pan_web.position_model import (
+    DEFAULT_MODEL_PATH, PositionEstimator, compare_device_diagnostic,
+)
 
 
 STATIC_DIR = Path(__file__).with_name("static")
+
+
+def _json_safe(value: Any) -> Any:
+    """Return strict-JSON data even when a faulty device emits NaN/Infinity."""
+    if isinstance(value, float) and not math.isfinite(value):
+        return None
+    if isinstance(value, dict):
+        return {key: _json_safe(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_json_safe(item) for item in value]
+    return value
 @dataclass(frozen=True)
 class PanelProfile:
     profile_id: str
@@ -408,9 +424,9 @@ class AcquisitionController:
 
     def set_mode(self, mode: str) -> dict[str, Any]:
         """Set and confirm the firmware operating mode through its ACK."""
-        values = {"collection": 0, "inference": 1, "instrument": 2}
+        values = {"collection": 0, "inference": 1, "instrument": 2, "device_position": 3}
         if mode not in values:
-            raise ValueError("mode must be collection, inference, or instrument")
+            raise ValueError("mode must be collection, inference, instrument, or device_position")
         with self._lock:
             if self.collection.active or self.inference_active:
                 raise ValueError("動作中はモードを切り替えられません。先に停止してください。")
@@ -432,6 +448,7 @@ class AcquisitionController:
             raise ValueError("ファームがモード変更を拒否しました")
         with self._lock:
             self.device_mode = mode
+            self.latest_ai = None
             self.event_assembler.reset()
             self.assembly_retry_required = False
             self.last_control = {"command": "set_mode", "mode": mode,
@@ -441,8 +458,10 @@ class AcquisitionController:
     def start_inference(self, mode: str = "inference") -> dict[str, Any]:
         if self.collection.active:
             raise ValueError("データ採取中は推論を開始できません")
-        if mode not in ("inference", "instrument"):
-            raise ValueError("inference mode must be inference or instrument")
+        if mode not in ("inference", "instrument", "device_position"):
+            raise ValueError("inference mode must be inference, instrument, or device_position")
+        if mode == "device_position" and self.panel_profile_id != "400x300x5":
+            raise ValueError("デバイス確率推論は400x300x5パネル専用です")
         if self.device_mode != mode:
             self.set_mode(mode)
         with self._lock:
@@ -556,7 +575,7 @@ class AcquisitionController:
         # collection mode.  Only request a mode switch when we know it is in
         # one of the inference modes; otherwise mocked/legacy links would
         # wait for an ACK they cannot provide.
-        if self.device_mode in ("inference", "instrument"):
+        if self.device_mode in ("inference", "instrument", "device_position"):
             self.set_mode("collection")
         profile = get_panel_profile(panel_profile_id or self.panel_profile_id)
         with self._lock:
@@ -648,7 +667,7 @@ class AcquisitionController:
             raise ValueError("保存件数が採取計画を超えています。")
         if sum(target_counts) >= len(targets) * repetitions:
             raise ValueError("このセッションは既に完了しています。")
-        if self.device_mode in ("inference", "instrument"):
+        if self.device_mode in ("inference", "instrument", "device_position"):
             self.set_mode("collection")
         with self._lock:
             if self.collection.active:
@@ -1221,11 +1240,81 @@ class AcquisitionController:
                 except Exception as error:
                     with self._lock:
                         self.last_error = f"Inference event error: {error}"
+            elif item.message_type == MessageType.POSITION_RESULT:
+                try:
+                    result = decode_position_result(item)
+                    timing = {
+                        "solist_inference": result.inference_us,
+                        "softmax": result.softmax_us,
+                        "total": result.total_us,
+                    }
+                    payload = {
+                        "case_id": 0xFF,
+                        "predicted_position": result.position_id,
+                        "probabilities": list(result.probabilities),
+                        "sequence": result.sequence,
+                        "timestamp_us": result.timestamp_us,
+                        "comparison": {"available": False},
+                        "position": self.position_estimator.from_device_probabilities(
+                            result.probabilities, result.position_id,
+                            panel_info(self.panel_profile), timing,
+                        ),
+                    }
+                    with self._lock:
+                        self.latest_ai = payload
+                        self._ai_condition.notify_all()
+                        self.last_control = {
+                            "response": "position_result",
+                            "position_id": result.position_id,
+                            "sequence": result.sequence,
+                            "timing_us": timing,
+                        }
+                except Exception as error:
+                    with self._lock:
+                        self.last_error = f"Position result error: {error}"
+                finally:
+                    # Even a malformed result means the firmware completed
+                    # that one-shot capture. Rearm after the complete frame so
+                    # one bad result cannot permanently stop later hits.
+                    with self._lock:
+                        rearm_inference = self.inference_active
+                    if rearm_inference:
+                        try:
+                            self.send_command("start")
+                        except Exception as rearm_error:
+                            with self._lock:
+                                self.last_error = f"Position rearm error: {rearm_error}"
+            elif item.message_type == MessageType.POSITION_DIAGNOSTIC:
+                try:
+                    result = decode_position_diagnostic(item)
+                    comparison = compare_device_diagnostic(result.case_id, result.logits)
+                    payload = {
+                        "diagnostic": True,
+                        "case_id": result.case_id,
+                        "predicted_position": result.position_id,
+                        "outputs": list(result.logits),
+                        "sequence": result.sequence,
+                        "timestamp_us": result.timestamp_us,
+                        "comparison": comparison,
+                    }
+                    with self._lock:
+                        self.latest_ai = payload
+                        self._ai_condition.notify_all()
+                        self.last_control = {
+                            "response": "position_diagnostic",
+                            "case_id": result.case_id,
+                            "sequence": result.sequence,
+                            "comparison": comparison,
+                        }
+                except Exception as error:
+                    with self._lock:
+                        self.last_error = f"Position diagnostic error: {error}"
             elif item.message_type == MessageType.STATUS:
                 with self._lock:
-                    if len(item.payload) >= 11 and item.payload[10] in (0, 1, 2):
+                    if len(item.payload) >= 11 and item.payload[10] in (0, 1, 2, 3):
                         self.device_mode = {
-                            0: "collection", 1: "inference", 2: "instrument"
+                            0: "collection", 1: "inference", 2: "instrument",
+                            3: "device_position",
                         }[item.payload[10]]
                     self.last_control = {
                         "response": "status", "payload_hex": item.payload.hex(),
@@ -1380,7 +1469,8 @@ class ApiHandler(BaseHTTPRequestHandler):
         return json.loads(self.rfile.read(length) or b"{}")
 
     def _json(self, value: Any, status: HTTPStatus = HTTPStatus.OK) -> None:
-        body = json.dumps(value, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+        body = json.dumps(_json_safe(value), ensure_ascii=False, allow_nan=False,
+                          separators=(",", ":")).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
@@ -1395,11 +1485,14 @@ class ApiHandler(BaseHTTPRequestHandler):
             "/collector.html": "collector.html",
             "/position.html": "position.html",
             "/instrument.html": "instrument.html",
+            "/instrument-probability.html": "instrument-probability.html",
             "/collector.css": "collector.css",
             "/controls.css": "controls.css",
             "/instrument.css": "instrument.css",
+            "/instrument-probability.css": "instrument-probability.css",
             "/position.css": "position.css",
             "/instrument.js": "instrument.js",
+            "/instrument-probability.js": "instrument-probability.js",
             "/position.js": "position.js",
             "/panel-profile.js": "panel-profile.js",
             "/panel-profile.css": "panel-profile.css",
@@ -1435,7 +1528,7 @@ def main() -> None:
     parser.add_argument("--output", default="data/raw/sessions")
     parser.add_argument(
         "--page",
-        choices=("index.html", "collector.html", "position.html", "instrument.html"),
+        choices=("index.html", "collector.html", "position.html", "instrument.html", "instrument-probability.html"),
         default="index.html",
     )
     parser.add_argument("--no-browser", action="store_true")

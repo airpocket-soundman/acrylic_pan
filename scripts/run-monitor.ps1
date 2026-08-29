@@ -5,7 +5,7 @@ param(
     [ValidateRange(1, 65535)]
     [int]$Port = 8765,
     [string]$Output = "data/raw/sessions",
-    [ValidateSet("index.html", "collector.html", "position.html", "instrument.html")]
+    [ValidateSet("index.html", "collector.html", "position.html", "instrument.html", "instrument-probability.html")]
     [string]$Page = "index.html",
     [switch]$NoBrowser,
     [switch]$InstallDependencies

@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Acrylic Pan 確率分布演奏</title>
+  <link rel="stylesheet" href="/style.css?v=20260719-1">
+  <link rel="stylesheet" href="/controls.css?v=20260718-1">
+  <link rel="stylesheet" href="/tabs.css?v=20260719-1">
+  <link rel="stylesheet" href="/position.css?v=20260823-3">
+<link rel="stylesheet" href="/instrument-probability.css?v=20260829-2">
+  <link rel="stylesheet" href="/panel-profile.css?v=20260720-1">
+</head>
+<body><main>
+  <header>
+    <div><h1>Acrylic Pan Probability Instrument</h1><p id="introText">60座標の確率分布を12エリアへ集約し、最尤エリアをリアルタイムに発音します。</p></div>
+    <div class="language-actions"><button id="languageToggle" type="button">English</button><span id="connection" class="badge">未接続</span></div>
+  </header>
+  <nav class="app-tabs" role="tablist" aria-label="動作モード">
+    <a role="tab" aria-selected="false" href="/collector.html">学習データ採取</a>
+    <a role="tab" aria-selected="false" href="/">推論結果</a>
+    <a role="tab" aria-selected="false" href="/position.html">位置推定</a>
+    <a role="tab" aria-selected="false" href="/instrument.html">クラス演奏</a>
+    <a role="tab" aria-selected="true" class="active" href="/instrument-probability.html">確率演奏</a>
+  </nav>
+
+  <section class="controls card">
+    <label id="panelProfileLabel">板仕様 <select id="panelProfile"></select></label>
+    <label id="portLabel">COMポート <select id="port"></select></label><button id="refresh">更新</button>
+    <label id="sourceLabel">確率推論元 <select id="positionSource"><option value="device">デバイス（Solist-AI）</option><option value="pc">PC（高精度モデル）</option></select></label>
+    <label id="displayLabel">表示 <select id="displayMode"><option value="panel">パネル表示</option><option value="camera">カメラ重畳</option></select></label>
+    <label id="instrumentLabel">音色 <select id="instrumentSelect"><option value="steel_drum">スチールドラム</option><option value="piano">ピアノ</option><option value="harpsichord">チェンバロ</option><option value="guitar">ギター</option><option value="drums">ドラム</option></select></label>
+    <button id="connect">接続</button><button id="disconnect" disabled>切断</button>
+    <button id="performanceStart" disabled>演奏開始</button><button id="performanceStop" disabled>演奏停止</button>
+    <button id="probabilityDemo" type="button">表示デモ</button><span id="firmwareMode" class="badge">モード不明</span>
+  </section>
+  <div id="performanceStatus" class="probability-status">「演奏開始」を押すと音声と確率推論が有効になります。</div>
+  <div id="error" class="error" role="alert"></div>
+
+  <section class="probability-layout">
+    <div class="probability-main">
+      <div class="card position-stage">
+        <div class="position-heading"><div><span class="kicker">LIVE PROBABILITY PERFORMANCE</span><h2 id="heatmapTitle">座標確率ヒートマップ</h2></div><div id="lastNote" class="probability-last-note">—</div></div>
+        <div id="positionPanel" class="position-panel" aria-label="400 × 300 mm アクリル板上の条件付き座標確率分布" aria-live="polite">
+          <canvas id="positionHeatmap" width="800" height="600"></canvas>
+          <div class="panel-grid" aria-hidden="true"></div>
+          <div id="areaSelectionGrid" class="area-selection-grid" aria-hidden="true"></div>
+          <div id="pseudoPositionMarker" class="pseudo-position-marker" hidden></div>
+          <div class="sensor-marker" aria-label="加速度センサ位置"><span>sensor</span></div>
+          <div class="clamp-marker" aria-label="固定領域"><span>固定</span></div>
+        </div>
+        <div class="position-axis"><span>0 mm</span><span>400 mm</span></div>
+        <div class="probability-summary"><strong id="coordinateReadout">最尤60点 —</strong><strong id="pseudoCoordinateReadout" class="pseudo-coordinate-readout">疑似XY座標 —</strong><span id="areaReadout">最尤エリア —</span><span id="peakReadout">エリア確率 —</span></div>
+      </div>
+      <div class="card">
+        <div class="position-heading"><div><span class="kicker">AREA PROBABILITY</span><h2 id="areaProbabilityTitle">12エリア確率</h2></div><span id="distributionSource" class="source-label">—</span></div>
+        <div id="areaProbabilities" class="area-probabilities probability-area-bars"></div>
+      </div>
+    </div>
+    <aside class="probability-camera">
+      <div class="card camera-card">
+        <div class="position-heading"><div><span class="kicker">CAMERA</span><h2 id="cameraTitle">USBカメラ</h2></div><div class="camera-heading-actions"><span id="cameraState" class="camera-state">準備中</span><button id="heatmapToggle" type="button" aria-pressed="true">ヒートマップ ON</button><button id="panelAreaToggle" type="button" aria-pressed="true">エリア表示 ON</button></div></div>
+        <div class="camera-viewport"><video id="usbCamera" autoplay playsinline muted aria-label="USBカメラ映像"></video><canvas id="cameraHeatmapOverlay" aria-label="カメラ映像上のヒートマップ位置合わせ"></canvas><div id="cameraPlaceholder" class="camera-placeholder">使用するUSBカメラを選んで「カメラ開始」を押してください</div></div>
+        <div class="camera-controls"><label id="cameraLabel">カメラ<select id="cameraDevice"></select></label><button id="cameraStart" type="button">カメラ開始</button><button id="cameraStop" type="button" disabled>停止</button><button id="calibrationStart" type="button" disabled>4点位置合わせ</button><button id="calibrationClear" type="button">位置合わせ消去</button></div>
+        <div class="song-assist"><label id="songLabel">演奏補助<select id="songSelect"><option value="">自由演奏</option></select></label><label id="noteLengthLabel" class="note-length-control">音の長さ <output id="noteLengthValue" for="noteLength">100%</output><input id="noteLength" type="range" min="25" max="250" step="5" value="100" aria-label="音の長さ"></label><strong id="songProgress">自由演奏：C～B 半音階</strong><div class="song-actions"><button id="songReset" type="button">最初から</button><button id="guidePlay" type="button">手本演奏</button></div></div>
+        <div id="calibrationStatus" class="calibration-status" hidden></div>
+      </div>
+    </aside>
+  </section>
+</main><script src="/panel-profile.js?v=20260720-1"></script><script src="/instrument-probability.js?v=20260829-9"></script></body>
+</html>

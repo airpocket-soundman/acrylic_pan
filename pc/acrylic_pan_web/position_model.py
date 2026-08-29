@@ -12,6 +12,7 @@ import numpy as np
 from pc.acrylic_pan_monitor.protocol import EventData
 from sim.pc_position_grid_runtime import FEATURE_MODE as GRID_FEATURE_MODE, extract_grid_features
 from sim.pc_position_runtime import extract_live_features
+from sim.dummy_model_pipeline import from_bfloat16_bits, quantize_bfloat16
 
 PANEL_SIZE_MM = np.asarray((400.0, 200.0), dtype=np.float64)
 AREA_CENTRES_MM = np.asarray(
@@ -23,6 +24,15 @@ GRID_MODEL_PATH = (
     Path(__file__).resolve().parents[2]
     / "artifacts/pc_position_runtime_400x300x5/position_ensemble.joblib"
 )
+DEVICE_MODEL_PATH = (
+    Path(__file__).resolve().parents[2]
+    / "artifacts/device_position_probability_400x300x5/model.npz"
+)
+DEVICE_SUPPORT_XY_MM = np.asarray(sorted(set(
+    [(x, 35 if y == 25 and x in (225, 275) else y)
+     for x in range(25, 400, 50) for y in range(25, 300, 50)]
+    + [(x, y) for x in range(50, 400, 100) for y in range(50, 300, 100)]
+)), dtype=np.float64)
 
 
 def class_probabilities(
@@ -37,6 +47,48 @@ def class_probabilities(
     shifted = (scores - scores.max()) / temperature
     probability = np.exp(np.clip(shifted, -40.0, 0.0))
     return probability / probability.sum()
+
+
+def compare_device_diagnostic(case_id: int, logits: tuple[float, ...]) -> dict[str, Any]:
+    if not DEVICE_MODEL_PATH.is_file():
+        return {"available": False, "error": "device model artifact is missing"}
+    with np.load(DEVICE_MODEL_PATH, allow_pickle=False) as model:
+        golden_inputs = from_bfloat16_bits(model["golden_inputs_bfloat16"])
+        if not 0 <= case_id < len(golden_inputs) * 2:
+            return {"available": False, "error": f"unknown diagnostic case {case_id}"}
+        if case_id < len(golden_inputs):
+            expected = from_bfloat16_bits(model["golden_logits_bfloat16"])[case_id]
+            stage = "logits"
+        else:
+            alpha = from_bfloat16_bits(model["alpha_bfloat16"])
+            hidden = np.clip(
+                0.2 * (golden_inputs[case_id - len(golden_inputs)] @ alpha) + 0.5,
+                0.0, 1.0,
+            )
+            expected = np.zeros(60, dtype=np.float32)
+            expected[: len(hidden)] = quantize_bfloat16(hidden)
+            stage = "hidden"
+    actual = np.asarray(logits, dtype=np.float32)
+    if not np.isfinite(actual).all():
+        return {
+            "available": True,
+            "case_id": case_id,
+            "stage": "logits",
+            "non_finite_indices": np.flatnonzero(~np.isfinite(actual)).astype(int).tolist(),
+            "passed": False,
+        }
+    delta = np.abs(actual - expected)
+    return {
+        "available": True,
+        "case_id": case_id,
+        "stage": stage,
+        "max_abs_logit_delta": float(delta.max()),
+        "mean_abs_logit_delta": float(delta.mean()),
+        "expected_position": int(np.argmax(expected)),
+        "actual_position": int(np.argmax(actual)),
+        "argmax_match": bool(np.argmax(expected) == np.argmax(actual)),
+        "passed": bool(delta.max() <= 0.015625 and np.argmax(expected) == np.argmax(actual)),
+    }
 
 
 @lru_cache(maxsize=4)
@@ -62,6 +114,82 @@ class PositionEstimator:
     def available_for(self, panel_profile_id: str) -> bool:
         path = self.model_paths.get(panel_profile_id)
         return path is not None and load_bundle(str(path)) is not None
+
+    def from_device_probabilities(
+        self, probabilities: tuple[float, ...] | list[float], position_id: int,
+        panel: dict[str, Any], timing: dict[str, int],
+    ) -> dict[str, Any]:
+        """Build display metadata without running any PC-side ML model."""
+        if str(panel.get("id")) != "400x300x5":
+            raise ValueError("デバイス確率推論は400x300x5パネル専用です")
+        probability = np.asarray(probabilities, dtype=np.float64)
+        if probability.shape != (len(DEVICE_SUPPORT_XY_MM),) or not np.isfinite(probability).all():
+            raise ValueError("デバイス確率ベクトルが60出力ではありません")
+        probability = np.maximum(probability, 0.0)
+        probability /= max(float(probability.sum()), 1e-12)
+        support = DEVICE_SUPPORT_XY_MM
+        map_index = int(np.argmax(probability))
+        if position_id != map_index:
+            position_id = map_index
+        expected = probability @ support
+        map_coordinate = support[position_id]
+        residual = support - expected
+        covariance = np.einsum("n,ni,nj->ij", probability, residual, residual)
+        covariance = (covariance + covariance.T) / 2.0
+        eigenvalues, eigenvectors = np.linalg.eigh(covariance)
+        eigenvalues = np.maximum(eigenvalues, 1.0)
+        covariance = eigenvectors @ np.diag(eigenvalues) @ eigenvectors.T
+        sigma = np.sqrt(np.diag(covariance))
+        confidence_level = 0.90
+        order = np.argsort(probability)[::-1]
+        count = int(np.searchsorted(np.cumsum(probability[order]), confidence_level) + 1)
+        credible = order[:count].astype(int).tolist()
+        entropy = float(
+            -np.sum(probability * np.log(np.maximum(probability, 1e-12)))
+            / np.log(len(probability))
+        )
+        threshold = -2.0 * np.log(1.0 - confidence_level)
+        major_index = int(np.argmax(eigenvalues))
+        minor_index = 1 - major_index
+        axes = np.sqrt(np.asarray((eigenvalues[major_index], eigenvalues[minor_index])) * threshold)
+        major_vector = eigenvectors[:, major_index]
+        area_ids = (
+            np.floor(support[:, 1] / 100.0).astype(int) * 4
+            + np.floor(support[:, 0] / 100.0).astype(int)
+        )
+        area_probability = np.asarray([
+            probability[area_ids == class_id].sum()
+            for class_id in range(int(panel["class_count"]))
+        ])
+        return {
+            "x_mm": float(map_coordinate[0]), "y_mm": float(map_coordinate[1]),
+            "expected_x_mm": float(expected[0]), "expected_y_mm": float(expected[1]),
+            "map_x_mm": float(map_coordinate[0]), "map_y_mm": float(map_coordinate[1]),
+            "sigma_x_mm": float(sigma[0]), "sigma_y_mm": float(sigma[1]),
+            "rho_xy": float(np.clip(covariance[0, 1] / max(sigma[0] * sigma[1], 1e-9), -0.99, 0.99)),
+            "confidence": confidence_level, "confidence_level": confidence_level,
+            "empirical_coverage": 0.982468443197756,
+            "confidence_ellipse_90": {
+                "semi_major_mm": float(axes[0]), "semi_minor_mm": float(axes[1]),
+                "angle_deg": float(np.degrees(np.arctan2(major_vector[1], major_vector[0]))),
+            },
+            "covariance_mm2": covariance.astype(float).tolist(),
+            "classification_confidence": float(probability[position_id]),
+            "class_probabilities": area_probability.astype(float).tolist(),
+            "probability_map": {
+                "support_xy_mm": support.astype(float).tolist(),
+                "probabilities": probability.astype(float).tolist(),
+                "credible_90_indices": credible, "normalization": "device_softmax_sum_1",
+            },
+            "distribution_entropy": entropy,
+            "distribution_peak_probability": float(probability[position_id]),
+            "ensemble_positions_mm": [], "ensemble_spread_mm": [0.0, 0.0],
+            "model_available": True,
+            "method": "device_solist_60class_probability_map",
+            "inference_source": "device",
+            "device_timing_us": timing,
+            "scope": "デバイスが60位置推論とsoftmaxを実行し、PCは受信した確率分布を表示しています。",
+        }
 
     def predict(self, event: EventData, outputs: tuple[float, ...] | list[float],
                 predicted_class: int, panel: dict[str, Any] | None = None) -> dict[str, Any]:

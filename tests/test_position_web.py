@@ -11,6 +11,7 @@ import numpy as np
 
 from pc.acrylic_pan_monitor.protocol import (
     AI_RESULT_PAYLOAD,
+    POSITION_RESULT_PAYLOAD,
     EVENT_HEADER,
     Frame,
     MessageType,
@@ -47,11 +48,12 @@ class PositionWebTests(unittest.TestCase):
         for element in (
             "positionHeatmap", "positionProbabilityCells", "positionMarker", "coordinateReadout",
             "areaProbabilities", "metricRegion", "metricExpectedCoordinate", "positionStart", "positionDemo",
+            "positionSource", "metricDeviceTiming",
         ):
             self.assertIn(f'id="{element}"', page)
         self.assertIn("drawHeatmap", script)
         self.assertIn("class_probabilities", script)
-        self.assertIn("/api/ai/latest", script)
+        self.assertIn("/api/ai/wait", script)
         self.assertIn("probability_map", script)
         self.assertIn("credible_90_indices", script)
         self.assertNotIn("function gaussian", script)
@@ -64,9 +66,104 @@ class PositionWebTests(unittest.TestCase):
         self.assertIn("条件付き確率", page)
 
     def test_all_operating_pages_link_to_position_tab(self):
-        for path in ("/", "/collector.html", "/position.html", "/instrument.html"):
+        for path in ("/", "/collector.html", "/position.html", "/instrument.html", "/instrument-probability.html"):
             with self.subTest(path=path):
                 self.assertIn('href="/position.html"', self.read_text(path))
+
+    def test_probability_instrument_combines_heatmap_camera_and_audio(self):
+        page = self.read_text("/instrument-probability.html")
+        script = self.read_text("/instrument-probability.js")
+        css = self.read_text("/instrument-probability.css")
+        for element in (
+            "positionHeatmap", "areaSelectionGrid", "pseudoPositionMarker",
+            "pseudoCoordinateReadout", "areaProbabilities", "usbCamera",
+            "cameraDevice", "performanceStart", "positionSource", "instrumentSelect",
+            "lastNote", "areaReadout", "peakReadout", "displayMode",
+            "cameraHeatmapOverlay", "calibrationStart", "calibrationClear",
+            "heatmapToggle", "panelAreaToggle", "songSelect", "songProgress", "songReset",
+            "noteLength", "noteLengthValue", "languageToggle", "guidePlay",
+        ):
+            self.assertIn(f'id="{element}"', page)
+        self.assertIn("function areaProbabilities", script)
+        self.assertIn("function pseudoCoordinate", script)
+        self.assertIn("position.expected_x_mm", script)
+        self.assertIn("area-selection-cell", script)
+        self.assertNotIn('id="positionMarker"', page)
+        self.assertIn("MIN_HEATMAP_DISPLAY_MS = 450", script)
+        self.assertIn("scheduleLivePosition(result.position)", script)
+        self.assertIn("function quadPoint", script)
+        self.assertIn("function beginCalibration", script)
+        self.assertIn("['左上','右上','右下','左下']", script)
+        self.assertIn("function overlayPointerMove", script)
+        self.assertIn("saveCalibration();", script)
+        self.assertIn("function toggleHeatmap", script)
+        self.assertIn("function togglePanelArea", script)
+        self.assertIn("PANEL_AREA_VISIBLE_KEY", script)
+        self.assertIn("if(panelAreaVisible&&calibrationPoints.length===4)", script)
+        self.assertIn("function configureSong", script)
+        self.assertIn("function advanceSong", script)
+        self.assertIn("function currentSongArea(offset=0)", script)
+        self.assertIn("currentSongArea(1)", script)
+        self.assertIn("function toggleGuide", script)
+        self.assertIn("function stopGuide", script)
+        self.assertIn("source==='live'&&guidePlaying", script)
+        self.assertIn("playArea(currentSongArea(),1,'guide',timing.beats)", script)
+        self.assertIn("const SONG_GUIDE", script)
+        self.assertIn("function guideTiming", script)
+        self.assertIn("function validateSongGuides", script)
+        self.assertNotIn("index%rhythm.length", script)
+        self.assertIn("60000/score.bpm*beats", script)
+        self.assertIn("fur_elise:{bpm:72,bars:16,expectedBeats:25", script)
+        self.assertIn("score.bars!==16", script)
+        self.assertIn("new Set(song.notes).size>12", script)
+        self.assertIn("Math.abs(beats-score.expectedBeats)>.001", script)
+        self.assertNotIn("480*noteLengthScale", script)
+        self.assertIn("function applyLanguage", script)
+        self.assertIn("LANGUAGE_KEY", script)
+        self.assertIn("Probability Instrument", script)
+        self.assertIn("エリーゼのために", script)
+        self.assertNotIn("さくらさくら", script)
+        self.assertNotIn("sakura:", script)
+        self.assertNotIn("ハッピーバースデー", script)
+        self.assertNotIn("ジングルベル", script)
+        self.assertNotIn("きらきら星", script)
+        self.assertNotIn("メリーさんのひつじ", script)
+        self.assertNotIn("ロンドン橋", script)
+        self.assertNotIn("カノン", script)
+        self.assertIn("korobeiniki", script)
+        self.assertIn("アメイジング・グレイス", script)
+        self.assertIn("オールド・ラング・サイン", script)
+        self.assertIn("フレール・ジャック", script)
+        self.assertNotIn("ベートーヴェン「運命」冒頭動機", script)
+        self.assertNotIn("モーツァルト「トルコ行進曲」", script)
+        self.assertIn("ペツォールト「メヌエット ト長調」", script)
+        self.assertIn("ブラームスの子守歌", script)
+        self.assertNotIn("8bitプラットフォーマー", page)
+        self.assertNotIn("レトロRPG序曲", page)
+        self.assertIn("*noteLengthScale", script)
+        self.assertIn("NOTE_LENGTH_KEY", script)
+        self.assertNotIn("保存済みの4点位置合わせを使用します", script)
+        self.assertIn("if(heatmapVisible&&support.length", script)
+        self.assertIn("camera-overlay-mode", css)
+        self.assertIn("background:transparent", css)
+        self.assertIn("#cameraHeatmapOverlay.calibrated", css)
+        self.assertIn("grid-template-rows:repeat(12", css)
+        self.assertIn("font:800 18px/1 Consolas", css)
+        self.assertIn("min-height:44px", css)
+        self.assertIn(".area-selection-cell.next-note", css)
+        self.assertIn(".area-selection-cell.second-next-note", css)
+        self.assertIn(".area-probability.second-next-note", css)
+        self.assertIn("probabilities.indexOf(Math.max(...probabilities))", script)
+        self.assertIn("playArea(area,areaProbability)", script)
+        self.assertIn("/api/ai/wait", script)
+        self.assertIn("device_position", script)
+        self.assertIn("getUserMedia", script)
+        self.assertIn(".probability-layout", css)
+
+    def test_all_operating_pages_link_to_probability_instrument(self):
+        for path in ("/", "/collector.html", "/position.html", "/instrument.html", "/instrument-probability.html"):
+            with self.subTest(path=path):
+                self.assertIn('href="/instrument-probability.html"', self.read_text(path))
 
     def test_class_scores_become_a_normalized_distribution(self):
         probability = class_probabilities((0.0, 0.1, 0.9, 0.2, 0.0, 0.0, 0.0, 0.0))
@@ -166,6 +263,50 @@ class PositionWebTests(unittest.TestCase):
         )
         self.assertGreater(len(probability_map["credible_90_indices"]), 0)
         self.assertEqual(result["method"], "pc_mlp_60class_probability_map")
+
+    def test_device_position_result_is_displayed_without_pc_model_inference(self):
+        self.controller.set_panel_profile("400x300x5")
+        self.controller.inference_active = True
+        probabilities = [0.0] * 60
+        probabilities[17] = 0.8
+        probabilities[18] = 0.2
+        payload = POSITION_RESULT_PAYLOAD.pack(
+            17, 60, 1, 2200, 700, 2900, *probabilities
+        )
+        with patch.object(self.controller, "send_command") as send_command:
+            self.controller._queue.put(Frame(MessageType.POSITION_RESULT, 124, payload))
+            deadline = time.monotonic() + 3
+            while ((self.controller.latest_ai is None or not send_command.called)
+                   and time.monotonic() < deadline):
+                time.sleep(0.01)
+            send_command.assert_called_once_with("start")
+        position = self.controller.latest_ai["position"]
+        self.assertEqual(position["method"], "device_solist_60class_probability_map")
+        self.assertEqual(position["inference_source"], "device")
+        self.assertAlmostEqual(sum(position["probability_map"]["probabilities"]), 1.0)
+        self.assertEqual(position["device_timing_us"]["solist_inference"], 2200)
+        self.assertEqual(position["device_timing_us"]["softmax"], 700)
+        self.assertEqual(position["device_timing_us"]["total"], 2900)
+
+    def test_status_response_stays_valid_json_for_nonfinite_device_data(self):
+        self.controller.latest_ai = {"outputs": [1.0, float("inf"), float("nan")]}
+        with urlopen(f"{self.base}/api/status") as response:
+            status = json.load(response)
+        self.assertEqual(status["latest_ai"]["outputs"], [1.0, None, None])
+
+    def test_invalid_device_position_result_is_still_rearmed(self):
+        self.controller.set_panel_profile("400x300x5")
+        self.controller.inference_active = True
+        probabilities = [0.0] * 60
+        probabilities[0] = float("nan")
+        payload = POSITION_RESULT_PAYLOAD.pack(0, 60, 1, 1, 1, 2, *probabilities)
+        with patch.object(self.controller, "send_command") as send_command:
+            self.controller._queue.put(Frame(MessageType.POSITION_RESULT, 125, payload))
+            deadline = time.monotonic() + 3
+            while (not send_command.called) and time.monotonic() < deadline:
+                time.sleep(0.01)
+            send_command.assert_called_once_with("start")
+        self.assertIn("invalid probability", self.controller.last_error)
 
 
 if __name__ == "__main__":

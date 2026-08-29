@@ -105,7 +105,7 @@ Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'S_AcrylicPan.subdir.mk') `
 
 $baseResponse = [IO.File]::ReadAllText((Join-Path $debug 'S_System\main.res'))
 $includeOption = '-I"' + $newForward + '/S_AcrylicPan" '
-foreach ($name in @('apan_capture', 'apan_protocol', 'apan_ai_selftest', 'apan_inference', 'apan_collector_app')) {
+foreach ($name in @('apan_capture', 'apan_protocol', 'apan_ai_selftest', 'apan_inference', 'apan_position_inference', 'apan_collector_app')) {
     $response = $baseResponse.Replace('[output_dir]"./S_System/"', '[output_dir]"./S_AcrylicPan/"')
     $response = $response.Replace('[output_filename]"main.asm"', ('[output_filename]"' + $name + '.asm"'))
     $response = $response.Replace('[file_c]"../S_System/main.c"', ('[file_c]"../S_AcrylicPan/' + $name + '.c"'))

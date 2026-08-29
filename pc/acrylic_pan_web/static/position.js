@@ -4,6 +4,7 @@ let loopRunning = true;
 let cameraStream = null;
 let activePanel = {id:'400x200x3', width_mm:400, height_mm:200, columns:4, rows:2, class_count:8};
 const CAMERA_STORAGE_KEY = 'acrylicPanCameraDevice';
+const modeForSource = () => $('positionSource').value === 'device' ? 'device_position' : 'inference';
 
 async function api(path, body) {
   const options = body === undefined ? {} : {
@@ -30,14 +31,18 @@ async function ports() {
 function updateControls(data) {
   const connected = Boolean(data.connected);
   const running = Boolean(data.inference_active);
+  if (data.device_mode === 'device_position') $('positionSource').value = 'device';
+  else if (data.device_mode === 'inference') $('positionSource').value = 'pc';
   $('connection').textContent = connected ? `接続中 ${data.port}` : '未接続';
   $('connection').classList.toggle('online', connected);
   $('firmwareMode').textContent = running ? '位置推定中' :
-    (data.device_mode === 'inference' ? '推論モード' :
+    (data.device_mode === 'device_position' ? 'デバイス確率推論モード' :
+      (data.device_mode === 'inference' ? 'PC確率推論モード' :
       (data.device_mode === 'collection' ? 'データ採取モード' :
-        (data.device_mode === 'instrument' ? '楽器モード' : 'モード不明')));
+        (data.device_mode === 'instrument' ? '楽器モード' : 'モード不明'))));
   $('firmwareMode').classList.toggle('online', running);
   $('port').disabled = connected;
+  $('positionSource').disabled = running;
   setButtonState('connect', connected, connected);
   setButtonState('disconnect', !connected);
   setButtonState('positionStart', !connected || running, running);
@@ -180,7 +185,12 @@ function renderPosition(position) {
     ? `${(level * 100).toFixed(0)}%信用領域 ${credibleCells}セル` : '—';
   $('metricSigma').textContent = position.model_available
     ? `σx ${Number(position.sigma_x_mm).toFixed(1)} / σy ${Number(position.sigma_y_mm).toFixed(1)} / H ${entropy.toFixed(2)}` : '—';
-  $('metricMethod').textContent = map.probabilities ? '60座標条件付き確率モデル' : 'エリア分類（確率マップなし）';
+  $('metricMethod').textContent = position.inference_source === 'device'
+    ? 'デバイス60座標確率モデル' : (map.probabilities ? 'PC 60座標条件付き確率モデル' : 'エリア分類（確率マップなし）');
+  const timing = position.device_timing_us || {};
+  $('metricDeviceTiming').textContent = Number.isFinite(Number(timing.total))
+    ? `推論 ${(Number(timing.solist_inference) / 1000).toFixed(2)} + softmax ${(Number(timing.softmax) / 1000).toFixed(2)} = ${(Number(timing.total) / 1000).toFixed(2)} ms`
+    : 'PC推論（デバイス計測なし）';
   $('scopeNote').textContent = position.scope || '選択したパネル用PCモデルによる座標推定です。';
   renderProbabilities(position.class_probabilities || Array(activePanel.class_count).fill(1 / activePanel.class_count));
 }
@@ -188,7 +198,8 @@ function renderPosition(position) {
 async function inferenceLoop() {
   while (loopRunning) {
     try {
-      const result = await api('/api/ai/latest');
+      const after = lastSequence === null ? '' : String(lastSequence);
+      const result = await api(`/api/ai/wait?after=${encodeURIComponent(after)}&timeout=1.0`);
       if (result.sequence !== undefined && result.sequence !== lastSequence && result.position) {
         lastSequence = result.sequence;
         renderPosition(result.position);
@@ -196,8 +207,8 @@ async function inferenceLoop() {
       }
     } catch (error) {
       if (!String(error.message).includes('204')) $('error').textContent = error.message;
+      await new Promise(resolve => setTimeout(resolve, 100));
     }
-    await new Promise(resolve => setTimeout(resolve, 180));
   }
 }
 
@@ -323,11 +334,12 @@ async function setupCamera() {
 }
 
 $('refresh').onclick = () => ports().catch(error => $('error').textContent = error.message);
-$('connect').onclick = async () => { try { await api('/api/connect', {port: $('port').value}); await api('/api/device/mode', {mode:'inference'}); await refreshStatus(); } catch (error) { $('error').textContent = error.message; } };
+$('connect').onclick = async () => { try { await api('/api/connect', {port: $('port').value}); await api('/api/device/mode', {mode:modeForSource()}); await refreshStatus(); } catch (error) { $('error').textContent = error.message; } };
 $('disconnect').onclick = async () => { try { await api('/api/disconnect', {}); await refreshStatus(); } catch (error) { $('error').textContent = error.message; } };
-$('positionStart').onclick = async () => { try { await api('/api/inference/start', {mode:'inference'}); await refreshStatus(); } catch (error) { $('error').textContent = error.message; } };
+$('positionStart').onclick = async () => { try { await api('/api/inference/start', {mode:modeForSource()}); await refreshStatus(); } catch (error) { $('error').textContent = error.message; } };
 $('positionStop').onclick = async () => { try { await api('/api/inference/stop', {}); await refreshStatus(); } catch (error) { $('error').textContent = error.message; } };
 $('positionDemo').onclick = renderDemo;
+$('positionSource').onchange = async () => { try { const current = await api('/api/status'); if (current.connected && !current.inference_active && current.device_mode !== modeForSource()) await api('/api/device/mode', {mode:modeForSource()}); await refreshStatus(); } catch (error) { $('error').textContent = error.message; } };
 document.querySelectorAll('.app-tabs a').forEach(link => link.addEventListener('click', async event => {
   event.preventDefault();
   try {

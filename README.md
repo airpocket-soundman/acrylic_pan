@@ -28,6 +28,7 @@ Anaconda Pythonを明示して起動します。
 | 学習データ採取 | `http://127.0.0.1:8765/collector.html` |
 | 位置推定 | `http://127.0.0.1:8765/position.html` |
 | 推論結果から発音する楽器UI | `http://127.0.0.1:8765/instrument.html` |
+| 60座標確率から発音する楽器UI | `http://127.0.0.1:8765/instrument-probability.html` |
 
 `run-monitor.ps1` の既定値はPATH上の `python` です。現在のPATHでは
 `C:\Python313\python.exe` が選ばれ、必要な依存関係が揃わないため、そのままでは起動できません。

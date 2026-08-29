@@ -192,6 +192,58 @@ Web UIは60確率を40×30のドットキャンバスへ距離重み付きで補
 「位置推定」タブは、ファームが返す25.6 kHz・512点・20 msの`INFERENCE_EVENT`を使う。
 PC側では時間64＋FFT 64特徴を作り、128－256－128－64－2の直接XY MLPを3初期値で推論する。
 
+## デバイス確率推論モード
+
+位置推定ページの「確率推論元」で、従来の`PC（高精度モデル）`に加えて
+`デバイス（Solist-AI）`を選択できる。デバイス側モード値は`3`、PC上の名称は
+`device_position`である。このモードは400 × 300 × 5 mmパネル専用である。
+
+デバイスモデルは、時間領域127特徴量と定数入力1、隠れ32、60測定位置出力の
+`128-32-60`構成である。現行Solist-AIライブラリは`ODL_Initialize`時にseed=1と
+scaleAlpha=0.205からAlpha（入力→隠れ重み）を生成する。リンク済みライブラリの
+`ODL_SetWeightAlpha`は2-byteのreturn-onlyシンボルであり、任意Alphaは設定できない。
+学習時はROHM公式Simulatorから取得した同一Alphaを固定し、Beta（隠れ→出力重み）
+だけを学習する。60出力は、実機動作を確認済みの12出力を5ヘッド切り替えて得る。
+
+Betaは正解one-hot 75%とPC 714特徴・60クラスMLPアンサンブルの教師確率25%を
+混合した蒸留ターゲットで学習する。Solist-AIが出した60 logitに温度0.05のsoftmaxを
+MCUで実行し、合計1へ正規化したfloat32確率60個を`POSITION_RESULT` (`0x24`)で送る。
+PC側はモデル推論を行わず、最尤座標、期待座標、信用領域、エリア確率と
+ヒートマップを受信確率から計算して表示する。
+
+`POSITION_RESULT`にはSolist-AI推論時間、60出力softmax時間、その合計時間を含む。
+位置ページの「デバイス処理時間」欄に打撃ごとの3値をmsで表示する。この合計は
+512点を揃えるまでの収録時間とUART送信時間を含まない。送信ペイロードは256 byteで、
+115200 bit/sのUARTではフレーム送信に別途およそ24 msを要する。
+
+2026-08-27の旧モデル実機初回確認では、Solist-AI推論18.369 ms、MCU softmax
+16.932 ms、合計35.301 msだった。ただし旧モデルは設定不能なAlphaを外部設定できる
+前提で作られており、精度値としては無効である。修正版の処理時間は実機セルフテストと
+打撃試験後に更新する。
+
+```powershell
+$env:PYTHONPATH = (Get-Location).Path
+.\.venv\Scripts\python.exe -m sim.device_position_probability
+```
+
+成果物は`artifacts/device_position_probability_400x300x5`、実機ヘッダは
+`firmware/AcrylicPanCollector/generated/apan_position_probability_model.h`である。
+現行評価は60測定位置に対するもので、未測定座標間の補間性能は未確認である。
+
+反復番号を5で割った余りが0の1,426件を固定評価用にした結果、蒸留モデルは
+60位置top-1精度97.34%、期待座標平均誤差5.55 mm、25 mm以内95.30%だった。
+蒸留なしは97.27%、5.55 mmであり、蒸留の上積みは小さいがtop-1では再現した。
+
+### Solist-AI実装上の制約
+
+- ML63Q2557: Cortex-M0+、Flash 256 KB、RAM 16 KB、AxlCORE-ODLはbFloat16演算。
+- このビルドのライブラリ上限: インスタンス2、入力256、隠れ64。
+- Alphaはseed/scaleから生成される固定ランダム射影。現在のライブラリでは変更不可。
+- 学習・PC参照計算には、同じseed/scaleの公式Simulator Alphaが必須。
+- 取得済みAlphaは`data/dummy_model/model.npz`へ格納済みで、別リポジトリは不要。
+- デプロイ対象はBetaのみ。Alphaを学習する一般的なニューラルネットの蒸留は不可。
+- 公式Simulator同梱例に隠れ48・出力10があり、サイズは2のべき乗に限定されない。
+
 - 推定座標: 3モデルのXY平均
 - モデル不確実性: 3モデルのXY標準偏差
 - 空間的な第二候補: ファームの8エリアスコアを温度付きsoftmaxで確率化
