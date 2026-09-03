@@ -111,5 +111,7 @@ ELM参照実装を置き、公式Simulatorへ渡す前に次元・精度・デ�
 6. 必要に応じてPWM音源などへ移し、スタンドアロン化
 
 設計内容は [HTMLドキュメント](index.html)、[設計メモ](docs/design.md)、[今後のタスク](docs/future-tasks.md) を参照してください。
+PCモデルの知識蒸留を含むデバイス向け座標推論の検討・学習手順は、
+[Solist-AI向け座標推論モデルの実施計画](docs/device-xy-distillation-plan.md)にまとめています。
 交換用KX134評価基板の配線は [KX134-1211-EVK-001変換配線](docs/kx134-evk-adapter.md) にまとめています。
 ROHM提供資料は `doc/` に保存しています。
