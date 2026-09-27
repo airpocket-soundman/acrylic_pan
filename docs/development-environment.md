@@ -1,6 +1,6 @@
 # DT-EBML63Q2557 開発環境
 
-確認日: 2026-08-21
+確認日: 2026-09-27
 
 ## 推奨構成
 
@@ -13,8 +13,8 @@
 | 基盤ソース | ML63Q2500 Reference Software | IOドライバとサンプルプロジェクト |
 | ボードソフト | AISignalInferenceと対応するソース／IOドライバ | DT-EBML63Q2557固有のセンサ・通信実装 |
 | AI | Solist-AI Sim 教師あり版 SLV1.00.04 | 学習、bfloat16確認、モデルの.h出力 |
-| デバッガ | SEGGER J-Link PLUS、J-Link Software 7.62以降 | SWDデバッグと内蔵Flash書込み |
-| USB通信 | FTDI FT2232H VCP/D2XXドライバ | UARTチャンネルB、SPIチャンネルA |
+| 書込み | MCU-Link（CMSIS-DAP）+ LEXIDE同梱のROHM版OpenOCD | 内蔵Flash書込みと全バイト検証 |
+| USB通信 | FTDI FT2232H VCPドライバ | UARTF1（COM3、115200 bps） |
 | PC収録・実機Web UI | Anaconda Python 3.12.7 + pyserial + numpy + scikit-learn | 打撃波形の受信、推論表示、ブラウザ発音、ラベル、品質管理、保存 |
 
 LEXIDE-Ω V2.2.0のインストーラは `LexideInstaller_20260317.exe`、標準インストール先は
@@ -31,8 +31,9 @@ CMSIS-Pack Managerから追加する。LEXIDE本体だけではML63Q2557の機�
 | Build Tools | Ver.20260317導入済み。付属makeによるCLIビルドを確認 |
 | ML63Q25x7_DFP / CMSIS-Core(M) | Pack Managerへ導入済み。ROHM ML63Q25x7を認識 |
 | サンプルファーム | `AIVibrationInference`をLEXIDEへ取込み、0 errorsでビルド確認 |
-| J-Link Software | 本体未導入。古いWindowsドライバ登録だけ存在 |
-| FT2232H | 現在ボード未接続のためVCP/D2XX認識は未確認 |
+| 書込み | MCU-LinkとOpenOCDで書込み・検証（`scripts/flash-firmware.ps1`） |
+| UART | COM3（115200 bps、8-N-1）。COM5はMCU-Link VCom |
+| Visual C++ | Visual Studio 2022 Community。ファームウェアのホストテストに使用 |
 | Docker | Desktop Linux Engine 28.0.4、解析コンテナ実行済み |
 | Python | `C:\ProgramData\anaconda3\python.exe`（3.12.7）でWeb UIを動作確認。scikit-learn 1.5.1、joblib 1.4.2、pyserial 3.5導入済み |
 
@@ -54,27 +55,14 @@ IchiPing側から移植した8クラス用の設定とCSV生成方法は
 
 ## 導入順序
 
-1. 導入済みのLEXIDE-Ω、Build Tools、DFPで公式サンプルをCLIビルドする。
-2. DAPLinkまたはJ-Linkの実機接続方式を確定し、対応する書込みCLIを導入する。
-3. DT-EBML63Q2557をUSB Type-Cで接続し、FT2232HのCOM番号を確認する。
-4. 公式サンプルを書込み、KX134とUARTの動作を無改造で確認する。
-5. 動作確認済みプロジェクトを複製し、Acrylic Pan収録ファームウェアを実装する。
-6. 収録データから8クラスCSVを生成し、公式Simulatorでモデルを学習・保存する。
+1. LEXIDE-Ω、Build Tools、ML63Q25x7_DFPを導入し、公式サンプル `AIVibrationInference` をLEXIDEで一度ビルドする。
+2. `firmware/AcrylicPanCollector/tools/install-overlay.ps1` で、サンプルを複製したprivateプロジェクトを作る。
+3. `scripts/build-firmware.ps1` または `build-private-project.ps1` でビルドし、`scripts/flash-firmware.ps1` で書き込む。
+4. Anaconda Pythonで `python -m pytest tests` と `firmware/AcrylicPanCollector/tools/test-host.ps1` を実行する。
+5. `scripts/run-monitor.ps1` でWeb UIを起動し、収録と推論を確認する。
 
-## Acrylic Panで追加するファームウェア
-
-- KX134-1211をZ軸、25.6 kHzで取得
-- 採取用2,048点（80 ms）バッファ。推論モードは現行モデル互換の512点（20 ms）
-- jerkによる打撃トリガ
-- 採取時は前64点（2.5 ms）+ トリガを含む後1,984点（77.5 ms）のイベント波形
-- UARTF1によるコマンドとイベントパケット転送
-- sequence、timestamp、flags、CRC32
-- 後段でSolist-AI 8出力モデルを組込み
-
-UARTFの115,200 bpsでは25.6 kHz・16 bitの連続Z波形を常時転送できません。
-採取モードはボード側で2,048点を切り出し、512点ずつ4フレームに分けて1打ごとにUART送信します。
-現行の推論モードは512点を使用します。長時間採取の転送中は次の打撃を受け付けないため、連打対応ではイベント領域の2面化、
-ボーレート向上、またはSPI転送を検討します。
+手順の詳細は [収録システム・実機Web UIクイックスタート](collector-quickstart.md)、
+ファームウェアの構成は [ファームウェア仕様](firmware-specifications.md) を参照する。
 
 ## 公式資料
 

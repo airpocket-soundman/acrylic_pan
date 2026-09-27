@@ -1,54 +1,48 @@
-# Dummy Solist-AI model validation
+# ダミーSolist-AIモデルの実機検証
 
-Validated on 2026-07-16 before collecting real acrylic-panel data.
+実アクリルパネルのデータを収録する前に、2026-07-16に検証した。
 
-## Model
+## モデル
 
-- topology: 128 inputs, 32 hidden nodes, 8 outputs
-- activation/loss: hard sigmoid / MSE
-- output decision: eight raw scores from Solist-AI, followed by CPU argmax
-- model data: bfloat16 alpha and beta
-- test data: eight deterministic synthetic cases, one per class
+- 構成: 入力128、隠れ層32、出力8
+- 活性化関数/損失関数: hard sigmoid / MSE
+- 出力判定: Solist-AIが出力する8個の生スコアに対し、CPUでargmaxを取る
+- モデルデータ: bfloat16のalphaとbeta
+- テストデータ: 決定的に生成した合成ケース8件（各クラス1件）
 
-The alpha matrix is the first 128 rows of the seed-1 matrix previously
-captured from ROHM Solist-AI Simulator SLV1.00.04. The current run did not
-automate the official Simulator GUI; its PC golden values are a reproducible
-BF16 reference calculation using that official-Simulator alpha. This
-distinction is intentional and must be retained in later reports.
+alpha行列は、ROHM Solist-AI Simulator SLV1.00.04で以前取得したseed 1の行列の先頭128行である。
+今回の検証では公式SimulatorのGUI操作は自動化しておらず、PC側の正解値は、この公式Simulator由来の
+alphaを用いた再現可能なBF16参照計算で求めた。この区別は意図的なものであり、以後の報告でも
+明記する。
 
-## Hardware result
+## 実機結果
 
-- board UART: COM3 at 115200 bit/s
-- programmer: MCU-Link CMSIS-DAP
-- firmware size: text 32,330 / data 1,304 / bss 8,104 bytes
-- class result: 8/8 matched
-- score values compared: 64/64
-- maximum absolute score difference: 0.03125
-- acceptance limit: 0.035 absolute, 5% relative
+- ボードUART: COM3、115200 bit/s
+- 書き込み器: MCU-Link CMSIS-DAP
+- ファームウェアサイズ: text 32,330 / data 1,304 / bss 8,104 bytes
+- クラス判定: 8/8一致
+- 比較したスコア値: 64/64
+- スコアの最大絶対誤差: 0.03125
+- 合格基準: 絶対誤差0.035、相対誤差5%
 
-The PC reference quantizes layer boundaries, while the ML63Q25x7 accelerator
-also rounds within its multiply-accumulate path. Therefore exact bit equality
-is not expected; class agreement plus the bounded score error is the smoke-test
-criterion.
+PC側の参照計算は層の境界で量子化するのに対し、ML63Q25x7のアクセラレータは積和演算の途中でも
+丸めを行う。そのためビット単位の完全一致は想定しない。クラス判定の一致と、スコア誤差が上限内に
+収まることをスモークテストの判定基準とする。
 
-Machine-readable results are in `../data/dummy_model/board_comparison.json`.
+機械可読な結果は `../data/dummy_model/board_comparison.json` にある。
 
-## Interfaces
+## インターフェース
 
-- request `AI_SELFTEST` (`0x14`), payload: one case number from 0 to 7
-- response `AI_RESULT` (`0x21`), payload: little-endian `<BBH8f`
-- response fields: case number, argmax class, reserved zero, eight raw scores
+- 要求 `AI_SELFTEST`（`0x14`）、ペイロード: 0〜7のケース番号1つ
+- 応答 `AI_RESULT`（`0x21`）、ペイロード: リトルエンディアン `<BBH8f`
+- 応答フィールド: ケース番号、argmaxクラス、予約（0）、8個の生スコア
 
-The PC AI demo also loads the exact 128-element normalized input for the
-returned case from `golden_outputs.json`. It displays that synthetic input as
-a waveform and shows its DC-removed, Hann-windowed FFT. The graph is explicitly
-labelled as normalized dummy-model input, not a physical accelerometer waveform.
+PCのAIデモは、返されたケースに対応する128要素の正規化済み入力を `golden_outputs.json` から
+そのまま読み込む。この合成入力を波形として表示し、DC成分を除去してHann窓をかけたFFTも表示する。
+グラフには、物理的な加速度波形ではなくダミーモデル用の正規化入力であることを明示している。
 
-## Applications retained
+## 保持しているアプリケーション
 
-- AI demo: `scripts/run-ai-demo.ps1`, page `/`
-- initial vibration collector: `scripts/run-collector-monitor.ps1`, page
-  `/collector.html`
-- original collector firmware snapshot:
-  `firmware/variants/collector-baseline`
-- AI demo firmware overlay: `firmware/AcrylicPanCollector`
+- AIデモ: `scripts/run-ai-demo.ps1`、ページ `/`
+- 初期の振動収録ツール: `scripts/run-collector-monitor.ps1`、ページ `/collector.html`
+- AIデモ用ファームウェアオーバーレイ: `firmware/AcrylicPanCollector`

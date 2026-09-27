@@ -8,18 +8,29 @@
 
 ## ファームのビルドと書き込み
 
-LEXIDE GUIやJavaは不要です。privateプロジェクトをCLIでビルドします。
+LEXIDE GUIやJavaは不要です。LEXIDEで一度ビルドしたprivateプロジェクトを元に、CLIでビルドします。
+元のプロジェクトは変更せず、`.local\firmware-build\<日時>` に作業コピーを作り、
+リポジトリの最新のオーバーレイ（`firmware/AcrylicPanCollector`）を入れてビルドします。
 
 ```powershell
-.\firmware\AcrylicPanCollector\tools\build-private-project.ps1 `
-  -Project C:\Users\yamas\lexide\workspace_omega_v2\AcrylicPanCollector_cli_verified2
+.\scripts\build-firmware.ps1 `
+  -SourceProject C:\Users\yamas\lexide\workspace_omega_v2\AcrylicPanCollector_odl
 ```
 
-書き込み、Flash全バイト検証、リセット実行を行います。
+privateプロジェクトがない場合は、ベンダーの `AIVibrationInference` から作成します。
+
+```powershell
+.\firmware\AcrylicPanCollector\tools\install-overlay.ps1 `
+  -Destination C:\Users\yamas\lexide\workspace_omega_v2\AcrylicPanCollector_odl
+.\firmware\AcrylicPanCollector\tools\build-private-project.ps1 `
+  -Project C:\Users\yamas\lexide\workspace_omega_v2\AcrylicPanCollector_odl
+```
+
+ビルドが表示したHEXを指定して、書き込み、Flash全バイト検証、リセット実行を行います。
 
 ```powershell
 .\scripts\flash-firmware.ps1 `
-  -FirmwareHex C:\Users\yamas\lexide\workspace_omega_v2\AcrylicPanCollector_cli_verified2\Debug\AIVibrationInference.hex `
+  -FirmwareHex <ビルドが表示したHEXのパス> `
   -Execute
 ```
 
@@ -133,6 +144,27 @@ Get-NetTCPConnection -LocalPort 8765 -State Listen
 - `POST /api/collection/start` — `{"repetitions":10,"position_pattern":"corners","output_root":"data/raw/sessions"}`
 - `POST /api/collection/stop`
 - `POST /api/collection/undo` — `{"expected_completed_samples":12}`（直前の1件を削除し、同じ位置へ戻る）
+
+## 現場キャリブレーション
+
+400 × 300 × 5 mmパネルを設置し直したときは、12クラスモデルをボード上で現場に合わせます。
+Web UIを止めてCOMポートを空けてから実行し、画面の指示どおりに各エリアを叩きます。
+
+```powershell
+C:\ProgramData\anaconda3\python.exe -m pc.acrylic_pan_monitor.calibrate --port COM3
+```
+
+各エリア1打の確認、既定5周（60打）の学習、各エリア1打の再確認の順に進みます。
+再確認の正解数が確認時より下がらなければFRAMへ保存し、再起動後も推論モードと楽器モードで
+使われます。下がった場合は破棄して元のモデルに戻ります。
+
+| オプション | 動作 |
+|---|---|
+| `--rounds N` | 学習の周回数（1周 = 12打） |
+| `--ask` | 正解数の比較ではなく、保存するかを確認する |
+| `--status` | 保存済みキャリブレーションの有無を表示する |
+| `--factory-reset` | 保存済みキャリブレーションを消して工場モデルに戻す |
+| `--log path.json` | 各打撃の結果をJSONで保存する |
 
 ## 収録済みデータの閲覧と削除
 

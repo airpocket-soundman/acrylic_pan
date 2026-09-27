@@ -1,76 +1,71 @@
-# KX134 sensor diagnostic — 2026-08-23
+# KX134センサー診断（2026-08-23）
 
-## Symptom
+## 症状
 
-The PC can exchange APAN control frames with the ML63Q2557 over COM3, but no
-impact event or sensor sample frame is received. Both normal inference and
-forced collection capture remain armed indefinitely.
+PCはCOM3経由でML63Q2557とAPAN制御フレームをやり取りできるが、打撃イベントもセンサーサンプルの
+フレームも受信されない。通常の推論でも強制収録キャプチャでも、待機状態のまま進まない。
 
-## Diagnostic firmware
+## 診断用ファームウェア
 
-The current `AcrylicPanCollector_xy_staged` project was copied to the private
-local project below and instrumented without changing the normal project.
+通常のプロジェクトを変更しないよう、現行の `AcrylicPanCollector_xy_staged` プロジェクトを
+下記のローカル専用プロジェクトへ複製し、診断用の計測処理を追加した。
 
-- Project: `C:\Users\yamas\lexide\workspace_omega_v2\AcrylicPanSensorDiag`
-- Diagnostic HEX: `Debug\AIVibrationInference.hex`
-- Diagnostic HEX SHA-256: `4EF43F160CEE9EC6F243F6562EDFA69BD147B5614F85486CDF6B142264960974`
-- Normal HEX SHA-256: `56B80C41C96DB4A9E66F8CF0086B045E1E20FDD1DACFD7453800B3A58614973F`
+- プロジェクト: `C:\Users\yamas\lexide\workspace_omega_v2\AcrylicPanSensorDiag`
+- 診断用HEX: `Debug\AIVibrationInference.hex`
+- 診断用HEXのSHA-256: `4EF43F160CEE9EC6F243F6562EDFA69BD147B5614F85486CDF6B142264960974`
+- 通常HEXのSHA-256: `56B80C41C96DB4A9E66F8CF0086B045E1E20FDD1DACFD7453800B3A58614973F`
 
-The diagnostic STATUS extension reports configuration write/read failures,
-KX134 `WHO_AM_I`, register readbacks, DRDY count, raw sample count, the last raw
-sample, completed sensor blocks, and relevant GPIO states.
+診断用に拡張したSTATUSは、設定の書き込み/読み出し失敗、KX134の `WHO_AM_I`、レジスタの読み戻し値、
+DRDY回数、生サンプル数、最後の生サンプル、完了したセンサーブロック数、関連するGPIOの状態を報告する。
 
-## Results
+## 結果
 
-Software configuration writes and readbacks all succeeded:
+ソフトウェア上の設定の書き込みと読み戻しはすべて成功した。
 
-- sensor selection: MEMS (`1`)
-- axis: Z (`2`)
-- sample-rate code: `15` (25.6 kHz)
-- block size: 512 samples
-- LPF: enabled (`1`)
-- real-time vendor transfer: disabled (`0`)
-- configuration write failure mask: `0x00`
-- configuration read failure mask: `0x00`
+- センサー選択: MEMS（`1`）
+- 軸: Z（`2`）
+- サンプルレートコード: `15`（25.6 kHz）
+- ブロックサイズ: 512サンプル
+- LPF: 有効（`1`）
+- リアルタイムのベンダー転送: 無効（`0`）
+- 設定書き込み失敗マスク: `0x00`
+- 設定読み出し失敗マスク: `0x00`
 
-After forced capture and one second of acquisition time:
+強制キャプチャを行い、1秒間の取得時間を置いた後の値は次のとおり。
 
-- sensor-running flag: `1`
-- expected `WHO_AM_I`: `0x46`
-- measured `WHO_AM_I`: `0xFF`
-- CNTL1 readback: `0xFF`
-- ODCNTL readback: `0xFF`
-- INC1 readback: `0xFF`
-- INC4 readback: `0xFF`
-- DRDY interrupts: `0`
-- raw samples: `0`
-- completed 512-sample blocks: `0`
-- P2 input: `0xFF` (DRDY/P2.2 remains high)
-- P4 input: `0xEE`
-- P4 output: `0x60` (5 V regulator enable/P4.6 is high)
+- センサー動作フラグ: `1`
+- 期待される `WHO_AM_I`: `0x46`
+- 測定された `WHO_AM_I`: `0xFF`
+- CNTL1の読み戻し値: `0xFF`
+- ODCNTLの読み戻し値: `0xFF`
+- INC1の読み戻し値: `0xFF`
+- INC4の読み戻し値: `0xFF`
+- DRDY割り込み: `0`
+- 生サンプル: `0`
+- 完了した512サンプルブロック: `0`
+- P2入力: `0xFF`（DRDY/P2.2はHighのまま）
+- P4入力: `0xEE`
+- P4出力: `0x60`（5 Vレギュレータ有効/P4.6はHigh）
 
-Power-cycling the board and toggling the MCU's 5 V regulator enable output
-OFF→ON did not change the result.
+ボードの電源再投入や、MCUの5 Vレギュレータ有効出力のOFF→ON切り替えを行っても結果は変わらなかった。
 
-## Conclusion
+## 結論
 
-The application configuration layer and UART protocol work. SPI transfers
-complete at the MCU, but every tested KX134 register reads `0xFF`, the DRDY line
-never produces an edge, and no sample is captured. This is characteristic of a
-sensor that is not driving MISO. The likely causes are, in order to check:
+アプリケーションの設定層とUARTプロトコルは正常に動作している。MCU側ではSPI転送が完了するが、
+確認したKX134のレジスタはすべて `0xFF` を返し、DRDY線にはエッジが一度も発生せず、サンプルも
+取得されない。これはセンサーがMISOを駆動していない場合に特有の状態である。考えられる原因を、
+確認すべき順に示す。
 
-1. missing sensor-board supply or ground;
-2. loose, reversed, or open sensor/SPI connector or cable;
-3. open CS, SCLK, or MISO trace;
-4. failed KX134 or sensor board.
+1. センサーボードの電源またはGNDの欠落
+2. センサー/SPIコネクタやケーブルの緩み、逆挿し、断線
+3. CS、SCLK、MISO配線の断線
+4. KX134またはセンサーボードの故障
 
-The regulator control output being high does not prove that the supply voltage
-is present at the sensor. Measure the sensor-board supply at the connector and
-at the device, then verify ground and cable continuity. If supply and continuity
-are correct, replacement of the KX134 board/device is justified.
+レギュレータ制御出力がHighであっても、センサーに電源電圧が届いていることの証明にはならない。
+センサーボードの電源電圧をコネクタ部とデバイス部で測定し、続いてGNDとケーブルの導通を確認する。
+電源と導通に問題がなければ、KX134ボード/デバイスの交換が妥当である。
 
-Keep the diagnostic firmware installed until the connector, supply, or sensor
-has been serviced. A successful repair must return `WHO_AM_I=0x46`, increasing
-DRDY/raw-sample counters, and non-constant samples around the static-gravity
-level. After confirmation, restore the normal HEX from
-`AcrylicPanCollector_xy_staged` using `scripts/flash-firmware.ps1`.
+コネクタ、電源、センサーのいずれかを修理するまでは、診断用ファームウェアを書き込んだままにしておく。
+修理が成功した場合は、`WHO_AM_I=0x46` が返り、DRDY/生サンプルのカウンタが増加し、静的な重力加速度の
+レベル付近で変動するサンプルが得られる。これを確認した後、`scripts/flash-firmware.ps1` を使って
+`AcrylicPanCollector_xy_staged` の通常HEXを書き戻す。

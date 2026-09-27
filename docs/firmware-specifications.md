@@ -1,51 +1,52 @@
 # Acrylic Pan ファームウェア仕様
 
-文書版: Draft 0.1  
-対象: DT-EBML63Q2557 / ML63Q2557 / KX134-1211  
-作成日: 2026-07-13
+対象: DT-EBML63Q2557（ML63Q2557）/ KX134-1211
 
-## 1. 方針
+通信プロトコルの各メッセージ形式、ビルドと書き込みの手順は
+[ファームウェア実装と通信プロトコル](../firmware/AcrylicPanCollector/README.md)に記載する。
+本書はファームウェア全体の構成と、取得・推論・学習の仕様をまとめる。
 
-用途の異なる2つの独立したファームウェアを作る。
+## 1. 構成
 
-| バイナリ | 目的 | AIモデル |
-|---|---|---|
-| `acrylic_pan_collector` | 教師データの高品質な収録 | 搭載しない |
-| `acrylic_pan_inference` | 打撃位置推論と低遅延イベント出力 | 8出力モデルを搭載 |
+ベンダーの `AIVibrationInference` サンプルを複製した private プロジェクトへ、
+`firmware/AcrylicPanCollector` のオーバーレイ（`S_AcrylicPan`）と `main.c` を重ねて
+1つのイメージを作る。収録・推論・学習は同じイメージの動作モードとして切り替える。
 
-センサ、時刻、CRC、USB-UART、共通パケット、エラー処理は共通モジュールにする。
-初期段階ではJ-Linkで書き分ける。自己書換えブートローダや1バイナリ内のモード切替は
-実装範囲に含めない。
+| mode | 用途 | 使うモデル |
+|---:|---|---|
+| 0 | 教師データの収録（2,048点波形を送信） | なし |
+| 1 | 12エリア推論（結果と512点波形を送信） | 12クラス分類 |
+| 2 | 楽器用の低遅延推論（結果のみ送信、再トリガ抑止付き） | 12クラス分類 |
+| 3 | 60座標の確率分布推論 | 位置確率（5ヘッド） |
+| 4 | 現場キャリブレーション | 12クラス分類を学習 |
 
-## 2. 共通仕様
+| ソース | 役割 |
+|---|---|
+| `apan_capture.c` | 連続サンプルからの打撃検出と波形切り出し |
+| `apan_protocol.c` | APANフレームの符号化・復号 |
+| `apan_inference.c` | 12クラス分類の前処理と Solist-AI 推論 |
+| `apan_position_inference.c` | 60座標位置確率の推論 |
+| `apan_calibration.c` | OS-ELMによるβの逐次学習とFRAM保存 |
+| `apan_ai_selftest.c` | 固定8クラスモデルによる Solist-AI の自己試験 |
+| `integration/apan_collector_app.c` | モード管理、コマンド処理、送信、LCD・LED表示 |
 
-### 2.1 ハードウェア
+## 2. ハードウェア
 
-- MCU: ML63Q2557、48 MHz、Flash 256 KB、RAM 16 KB
-- センサ: KX134-1211、Z軸、符号付き16 bit
-- 初期設定: ±32 g、ODR 25.6 kHz（最大）、High Performance、LPF ODR/2
-- USB: FT2232H Channel B / UARTF1、115200 bps、8-N-1、フロー制御なし
-- センサ位置: `(200,100) mm`
+- MCU: ML63Q2557、Cortex-M0+ 48 MHz、Flash 256 KB、ワークRAM 16 KB、Solist-AI（AxlCORE-ODL）
+- センサ: KX134-1211、Z軸、±32 g（1024 LSB/g）、ODR 25.6 kHz
+- FRAM: MB85RS2MTA（256 KB、ソフトウェアSPI）。現場キャリブレーションのPとβを保持する
+- 通信: UARTF1、115200 bps、8-N-1、フロー制御なし
+- センサ位置: パネル中央
+- 表示: 16文字×2行LCD、LED 3個
 
-### 2.2 バージョン情報
+## 3. 通信フレーム
 
-両ファームは次を応答する。
-
-- firmware kind: `COLLECTOR` / `INFERENCE`
-- semantic version
-- protocol version
-- Git commit
-- build timestamp
-- sensor configuration
-- model version/hash（推論用のみ）
-
-### 2.3 通信フレーム
-
-UARTはバイナリフレームとする。COBSで符号化し、`0x00`をフレーム境界に使用する。
+UARTはCOBSで符号化したバイナリフレームとし、`0x00` をフレーム境界に使う。
+数値は little endian で、CRC32 は COBS 変換前の header + payload に適用する。
 
 ```text
 magic[4] = "APAN"
-protocol_version : uint8
+protocol_version : uint8   (1)
 message_type     : uint8
 flags            : uint16
 sequence         : uint32
@@ -55,199 +56,71 @@ payload[]
 crc32            : uint32
 ```
 
-数値はlittle endian。CRCはCOBS変換前のheader + payloadへ適用する。sequence欠落、
-CRC不一致、長さ不一致をPCで検出する。
+応答は要求の sequence を保持し、受理した要求には `ACK`、拒否した要求には理由付きの
+`NACK` を返す。診断用に `PING`、`STATUS`、`CAPTURE` のASCIIコマンドも受け付ける。
 
-### 2.4 共通コマンド
+## 4. 打撃検出と切り出し
 
-| コマンド | 内容 |
+- 512点のダブルバッファで連続取得し、ブロック境界をまたいで判定する。
+- 候補: 隣接サンプル差 ≥ 700 LSB かつ振幅 ≥ 200 LSB。
+- 確定: 候補から16サンプル以内に、直前64サンプル平均からの偏差が 3,000 LSB 以上になること。
+- 切り出し: プリトリガ64点（2.5 ms）を含み、収録モードは2,048点（80 ms）、
+  推論モードは512点（20 ms）。トリガ位置は常にインデックス64。
+- イベント全体がそろってからセンサを停止し、送信・推論を行う。
+- mode 2 では、指定間隔（0〜500 ms、既定80 ms）内の再打撃を結果として送らない。
+
+## 5. 推論
+
+### 5.1 前処理
+
+1. プリトリガ64点の平均をベースラインとして差し引く。
+2. トリガ後448点の絶対値最大で割り、振幅を正規化する。
+3. トリガ後448点から等間隔に128点を取り出す。
+4. 学習時の平均・標準偏差で標準化し、bfloat16 へ丸めて Solist-AI へ入力する。
+
+前処理の係数は PC の学習パイプラインが `generated/*.h` へ書き出し、PCとMCUで同じ入力になる。
+
+### 5.2 モデル
+
+| モデル | 構成 | 出力 | ヘッダー |
+|---|---|---|---|
+| 12クラス分類 | 入力128・隠れ32・出力12、hard sigmoid | 12エリアのスコア、argmax をエリアとする | `apan_12class_model.h` |
+| 位置確率 | 入力128・隠れ32・出力12 × 5ヘッド | 60座標のロジット、温度0.05のsoftmax | `apan_position_probability_model.h` |
+| 自己試験 | 入力128・隠れ32・出力8 | 固定入力8件の出力 | `apan_dummy_model.h` |
+
+α は公式 Simulator の seed-1 射影で、学習するのは β だけである。α・β・入力・出力は
+bfloat16 で扱う。PC 側の参照計算（`sim.dummy_model_pipeline.mcu_reference`）は
+同じ bfloat16 の丸め位置を再現する。
+
+## 6. 現場キャリブレーション
+
+12クラス分類の β を、設置後の数十打で現場の固定状態に合わせる。
+
+- 更新: 忘却係数1の OS-ELM を CPU の float32 で計算し、更新後の β を bfloat16 へ丸めて
+  AxlCORE へ書き込む。AxlCORE の `ODL_StartTrain` は P と β を bfloat16 で保持するため使わない。
+- 初期値: 工場 β と `P0 = 30 (G + I)⁻¹`（`generated/apan_calibration_prior.h`）。
+  校正1打は工場データ30打分の重みを持つ。
+- 記憶域: FRAM のアドレス 100000 以降に、作業用 P（32 × 32）・作業用 β（32 × 12）・
+  保存済み β・ヘッダーを float32 で置き、1行ずつ読み書きする。
+- 保存: 確定時に保存済み β を書き、CRC32 付きヘッダーを最後に書く。起動時は、ヘッダーの
+  工場モデル CRC32 と β の CRC32 が一致した場合だけ保存済み β を使う。
+- 適用範囲: mode 1・2・4。位置確率（mode 3）は対象外。
+
+評価と設計判断は[現場キャリブレーションのPC検証](odl-calibration-experiment-20260927.md)を参照する。
+
+## 7. 資源
+
+| 項目 | 値 |
 |---|---|
-| `HELLO` | 識別・バージョン取得 |
-| `GET_STATUS` | 状態、エラー、統計取得 |
-| `GET_CONFIG` | センサ・通信設定取得 |
-| `SET_CONFIG` | 許可された設定変更 |
-| `START` | 動作開始 |
-| `STOP` | 安全に停止してIDLEへ |
-| `CLEAR_STATS` | 統計カウンタ初期化 |
-| `PING` | 通信確認 |
-| `RESET` | MCUソフトリセット |
+| Flash（text） | 約64.7 KB / 256 KB |
+| RAM（data + bss） | 12,116 B、スタック 1,280 B、空き約2.9 KB / 16 KB |
+| 現場キャリブレーションの追加RAM | 316 B |
+| FRAM使用量 | 約7.2 KB（アドレス 100000〜） |
 
-全コマンドにACK/NACKを返し、NACKは理由コードを含む。実行中に変更できない設定は
-`ERR_BUSY`を返す。
+## 8. 検証
 
-### 2.5 共通品質フラグ
-
-- `CLIPPED`: ±32 g付近で飽和
-- `TOO_WEAK`: トリガ後ピークが採用下限未満
-- `MULTI_PEAK`: 同一窓に複数の立上り
-- `BUFFER_OVERRUN`: サンプル欠落
-- `TX_BACKLOG`: 未送信イベント滞留
-- `SENSOR_ERROR`: KX134通信／設定異常
-- `CRC_ERROR`: PCコマンド破損
-- `TIMING_ERROR`: サンプル周期逸脱
-
-## 3. データ採取用ファームウェア
-
-### 3.1 目的
-
-PCが教師ラベルとセッションを管理し、ボードは連続サンプリング、リングバッファ、
-打撃検出、波形切出し、欠損のない送信を担当する。AIライブラリはリンクしない。
-
-### 3.2 状態
-
-```text
-BOOT -> SELF_TEST -> IDLE -> ARMED -> CAPTURING -> QUEUED -> TRANSMITTING
-                      ^                                      |
-                      +--------------------------------------+
-任意状態 -> ERROR -> IDLE（CLEAR/RESET後）
-```
-
-### 3.3 通常EVENTモード
-
-- リングバッファ: Z軸2048点、80 ms、int16
-- トリガ: `abs(z[n]-z[n-1])` を基本とするjerkしきい値
-- 保存: 2,048点、前64点（2.5 ms）+ トリガを含む後1,984点（77.5 ms）
-- trigger index: 64
-- 再トリガ抑止: 初期150 ms、PCから変更可能
-- 1 Hz程度の単打収録に使用
-- 1イベント約4.1 KB。512点ずつ4フレームに分け、UART送信は1 Hz程度の教師収録に限定
-
-トリガ時刻は仮位置である。PCは保存波形内の最大jerkを再探索し、整列済み位置を
-manifestへ別フィールドで保存する。
-
-### 3.4 BURSTモード
-
-同時打撃と100 ms連打を収録する。
-
-- 明示的なPCコマンドでARM
-- 25.6 kHzで取得しながらアンチエイリアスLPFと4分周を実行
-- 保存はZ軸6.4 kHz・2048点、320 msの1ブロック
-- 先頭に40 ms以上の静止区間を含める
-- ブロック内の全ピークを保存し、ボード側では1打へ分割しない
-- 取得完了後にUART送信
-- 100/150/200 ms間隔、同一点連打、異なる点への遷移をPC側でラベル化
-
-### 3.5 メッセージ
-
-- `ARM_EVENT`: 通常イベント収録開始
-- `ARM_BURST`: バースト収録開始
-- `DISARM`: トリガ待ち解除
-- `SET_TRIGGER`: しきい値、抑止時間、弱打下限
-- `EVENT_DATA`: 1,280点波形とメタデータ
-- `BURST_DATA`: 2048点波形とメタデータ
-- `EVENT_REJECTED`: 品質フラグと統計のみ
-- `STATS`: sample/event/reject/overrun/CRCカウンタ
-
-PCのarea ID、座標、note、session IDはボード処理に使用しない。送信波形との対応確認用に
-32 bitの`capture_token`だけボードへ渡し、PC manifestと照合する。
-
-### 3.6 受入条件
-
-- 25.6 kHzのサンプル数誤差0、連続10分でoverrun 0
-- 1 Hz × 100イベントでsequence欠落0、CRCエラー0
-- 前64点のプリトリガが全イベントに存在
-- ±32 g飽和を確実にflag
-- 100 ms間隔の2打がBURST波形内に両方存在
-- STOP後100 ms以内にIDLE
-- センサ切断時にERRORへ遷移
-
-## 4. 推論用ファームウェア
-
-### 4.1 目的
-
-ボード上で打撃検出、前処理、Solist-AI推論を実行し、PCへ位置スコアとイベント情報を
-低遅延で送る。通常は生波形を送らない。
-
-### 4.2 初期モデル
-
-- 教師あり、3層FFNN、隠れ層1層
-- 取得: Z軸 25.6 kHz、50 ms、1,280点
-- 連続フィルタ: HPF 100 Hzを初期候補とし、約5 kHz LPF後に2分周
-- 入力32～64: 12.8 kHz・640点のFFT帯域強度（Hann窓、1,024点へゼロパディング）
-- 隠れ64: Hard Sigmoid
-- 出力8: AREA_0..AREA_7の独立スコア
-- 入力64時は合計136ノード、最終AI RAMはSolist-AI Sim表示で確認
-- 演算精度: bfloat16
-- 単打教師: one-hot
-- 同時2点教師: multi-hot
-
-モデル、入力正規化、しきい値、エリア／音階対応にはversionとCRCを付ける。
-
-### 4.3 イベント処理
-
-```text
-Z 25.6 kHz連続取得 -> 連続HPF -> jerkトリガ -> 前64点（2.5 ms）を含む1,280点
--> 打撃開始再整列 -> LPF -> 2分周 -> 640点 -> Hann窓 -> 1024点FFT -> 帯域圧縮 -> 正規化 -> Solist-AI
--> 8スコア -> 単打/同時2点判定 -> RESULT送信
-```
-
-- 入力窓は前2.5 ms＋トリガを含む後47.5 msの合50 ms
-- 打撃開始から60 ms以内に再アーム
-- 100 ms以上離れた打撃を別イベントとして処理
-- 前打の残響を含む学習データで2打目を評価
-- 同時打撃は最大2エリアを返す
-- 3エリア以上がしきい値を超えた場合は`AMBIGUOUS`を付け、上位2件を参考値として返す
-
-### 4.4 判定後処理
-
-- 各出力をPC設定の校正値で補正
-- 有効下限しきい値と上位差を確認
-- 単打: 1つのarea ID
-- 同時2点: 2つのarea ID
-- 不確実: `UNKNOWN`または`AMBIGUOUS`
-- 単打時のみ確率重み付き期待座標を計算
-- 同時2点時は中間座標へ潰さず、2点を別々に報告
-
-### 4.5 メッセージ
-
-- `START_INFERENCE` / `STOP_INFERENCE`
-- `GET_MODEL_INFO`
-- `SET_THRESHOLDS`
-- `INFERENCE_RESULT`
-- `DEBUG_SNAPSHOT`: 明示要求時だけ1,280点生波形、640点分周後波形、圧縮特徴を付加
-- `INFERENCE_STATS`: hit/unknown/ambiguous/latency/overrun統計
-
-`INFERENCE_RESULT`にはsequence、timestamp、8 raw scores、検出数、area IDs、
-期待座標、peak、品質flag、推論時間を含める。
-
-### 4.6 受入条件
-
-- Solist-AI SimでAI RAMがML63Q2557の制約内
-- 単打の別セッション8エリア精度90%以上、デモ目標95%以上
-- 同時2点は完全一致率とlabel F1を報告
-- 100 ms連打の2打目欠落率1%未満を目標
-- 打撃開始からRESULT送信開始まで50 ms未満
-- 再アーム60 ms以内
-- 1時間連続動作でoverrun、hard fault、watchdog reset 0
-- model CRC不一致時は推論を開始しない
-
-## 5. 共通ソース構成案
-
-```text
-firmware/
-  common/
-    kx134.c
-    sample_clock.c
-    ring_buffer.c
-    trigger.c
-    protocol.c
-    crc32.c
-    uart_transport.c
-    diagnostics.c
-  collector/
-    main.c
-    collector_state.c
-    burst_capture.c
-  inference/
-    main.c
-    inference_state.c
-    preprocessing.c
-    model_config.h
-    postprocess.c
-pc/
-  collector/
-models/
-```
-
-2つのファームで共通モジュールの同じcommitを使用し、センサ波形の差がファーム差に
-起因しないようにする。
+- `firmware/AcrylicPanCollector/tools/test-host.ps1`: 打撃検出、APANフレーム、
+  現場キャリブレーションの数値計算を Visual C++ でホスト実行して検証する。
+- `AI_SELFTEST`: 固定入力に対する Solist-AI の出力を PC の参照値と比較する
+  （[ダミーモデルによる検証](ai-dummy-validation.md)）。
+- `python -m pytest tests`: PC 側のプロトコル、学習パイプライン、ヘッダーの整合性を検証する。
