@@ -19,6 +19,9 @@ AI_RESULT_PAYLOAD = struct.Struct("<BBH8f")
 AI_RESULT_12_PAYLOAD = struct.Struct("<BBH12f")
 POSITION_RESULT_PAYLOAD = struct.Struct("<BBHIII60f")
 POSITION_DIAGNOSTIC_PAYLOAD = struct.Struct("<BBH60f")
+CALIBRATION_RESULT_PAYLOAD = struct.Struct("<BBBBHHII12f")
+CALIBRATION_ACK_PAYLOAD = struct.Struct("<BBBBHH")
+CALIBRATION_CHECK_ONLY = 0xFF
 EVENT_CHUNK_HEADER = struct.Struct("<IHHIHHHH")
 MAX_PAYLOAD_SIZE = 4096
 
@@ -36,12 +39,14 @@ class MessageType(IntEnum):
     CAPTURE = 0x13
     AI_SELFTEST = 0x14
     SET_MODE = 0x15
+    CALIBRATION = 0x16
     EVENT_DATA = 0x20
     AI_RESULT = 0x21
     INFERENCE_EVENT = 0x22
     EVENT_CHUNK = 0x23
     POSITION_RESULT = 0x24
     POSITION_DIAGNOSTIC = 0x26
+    CALIBRATION_RESULT = 0x27
     ACK = 0x70
     NACK = 0x71
 
@@ -99,6 +104,44 @@ class PositionDiagnostic:
     logits: tuple[float, ...]
     sequence: int = 0
     timestamp_us: int = 0
+
+
+class CalibrationOp(IntEnum):
+    STATUS = 0
+    BEGIN = 1
+    ARM = 2
+    COMMIT = 3
+    DISCARD = 4
+    FACTORY_RESET = 5
+
+
+class CalibrationSource(IntEnum):
+    FACTORY = 0
+    SAVED = 1
+    WORKING = 2
+
+
+@dataclass(frozen=True)
+class CalibrationStatus:
+    operation: CalibrationOp
+    source: CalibrationSource
+    saved_valid: bool
+    saved_count: int
+    work_count: int
+
+
+@dataclass(frozen=True)
+class CalibrationResult:
+    target: int | None
+    predicted_class: int
+    trained: bool
+    training_failed: bool
+    source: CalibrationSource
+    work_count: int
+    inference_us: int
+    train_us: int
+    outputs: tuple[float, ...]
+    sequence: int = 0
 
 
 @dataclass(frozen=True)
@@ -352,6 +395,54 @@ def decode_position_diagnostic(frame: Frame) -> PositionDiagnostic:
         raise ProtocolError("position diagnostic contains a non-finite logit")
     return PositionDiagnostic(
         case_id, position_id, tuple(logits), frame.sequence, frame.timestamp_us
+    )
+
+
+def encode_calibration_request(sequence: int, operation: CalibrationOp,
+                               argument: int = 0) -> bytes:
+    """Encode one CALIBRATION request (operation, argument)."""
+    if not 0 <= argument <= 0xFF:
+        raise ValueError("calibration argument must fit in one byte")
+    return encode_frame(Frame(MessageType.CALIBRATION, sequence,
+                              bytes([int(operation), argument])))
+
+
+def decode_calibration_ack(frame: Frame) -> CalibrationStatus:
+    """Decode the status carried by the ACK of every CALIBRATION request."""
+    if frame.message_type != MessageType.ACK or len(frame.payload) != CALIBRATION_ACK_PAYLOAD.size:
+        raise ProtocolError("frame is not a calibration ACK")
+    request, operation, source, saved_valid, saved_count, work_count = (
+        CALIBRATION_ACK_PAYLOAD.unpack(frame.payload)
+    )
+    if request != MessageType.CALIBRATION or saved_valid > 1:
+        raise ProtocolError("unsupported calibration ACK payload")
+    try:
+        return CalibrationStatus(CalibrationOp(operation), CalibrationSource(source),
+                                 bool(saved_valid), saved_count, work_count)
+    except ValueError as error:
+        raise ProtocolError("unknown calibration operation or source") from error
+
+
+def decode_calibration_result(frame: Frame) -> CalibrationResult:
+    """Decode one calibration hit: prediction before learning, then learning status."""
+    if frame.message_type != MessageType.CALIBRATION_RESULT:
+        raise ProtocolError("frame is not CALIBRATION_RESULT")
+    if len(frame.payload) != CALIBRATION_RESULT_PAYLOAD.size:
+        raise ProtocolError("calibration result payload length mismatch")
+    (target, predicted_class, flags, source, work_count, reserved,
+     inference_us, train_us, *outputs) = CALIBRATION_RESULT_PAYLOAD.unpack(frame.payload)
+    if reserved != 0 or flags > 0x03 or predicted_class >= len(outputs):
+        raise ProtocolError("unsupported calibration result payload")
+    if target != CALIBRATION_CHECK_ONLY and target >= len(outputs):
+        raise ProtocolError("calibration target is outside the output vector")
+    try:
+        source_value = CalibrationSource(source)
+    except ValueError as error:
+        raise ProtocolError("unknown calibration source") from error
+    return CalibrationResult(
+        None if target == CALIBRATION_CHECK_ONLY else target,
+        predicted_class, bool(flags & 0x01), bool(flags & 0x02), source_value,
+        work_count, inference_us, train_us, tuple(outputs), frame.sequence,
     )
 
 

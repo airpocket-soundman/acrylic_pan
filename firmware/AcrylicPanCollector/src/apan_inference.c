@@ -6,6 +6,7 @@
 #define ODL_DISABLE_RAND_GENERATOR_ALPHA
 #include "solistAi.h"
 #include "apan_12class_model.h"
+#include "apan_calibration.h"
 #include "smpl_common.h"
 #include "wdt.h"
 
@@ -14,6 +15,8 @@
 
 static bfloat16 model_input[APAN_MODEL_INPUT_SIZE];
 static bool initialized;
+static bool calibration_initialized;
+static bool model_input_valid;
 
 static bfloat16 float_to_bfloat16_rne(float value)
 {
@@ -31,6 +34,21 @@ static float bfloat16_to_float(bfloat16 value)
     return converted.value;
 }
 
+/* Factory beta, or the saved/working calibration held in the FRAM. */
+static void load_active_beta(void)
+{
+    int16_t calibrated[APAN_MODEL_OUTPUT_SIZE];
+    uint16_t row;
+    for (row = 0U; row < APAN_MODEL_HIDDEN_SIZE; row++)
+    {
+        const int16_t *beta = ApanCalibrationActiveBetaRow(row, calibrated) ?
+            calibrated : &apan_model_beta[row * APAN_MODEL_OUTPUT_SIZE];
+        ODL_SetWeightBeta(beta, AI_INSTANCE,
+                          (uint32_t)row * APAN_MODEL_OUTPUT_SIZE * 2U,
+                          APAN_MODEL_OUTPUT_SIZE * 2U);
+    }
+}
+
 void ApanInferenceInitialize(void)
 {
     ODL_Parameters parameters = {
@@ -45,19 +63,18 @@ void ApanInferenceInitialize(void)
         .scaleGamma = 0,
         .leakRate = 0
     };
-    uint16_t row;
 
+    if (!calibration_initialized)
+    {
+        (void)ApanCalibrationInitialize(apan_model_beta);
+        calibration_initialized = true;
+    }
     smpl_enablePeripheral(AI_PERI);
     ODL_Initialize(AI_INSTANCE, &parameters);
     ODL_Reset(AI_INSTANCE);
     ODL_SetWeightAlpha(apan_model_alpha, 0U, sizeof(apan_model_alpha));
-    for (row = 0U; row < APAN_MODEL_HIDDEN_SIZE; row++)
-    {
-        ODL_SetWeightBeta(&apan_model_beta[row * APAN_MODEL_OUTPUT_SIZE],
-                          AI_INSTANCE,
-                          (uint32_t)row * APAN_MODEL_OUTPUT_SIZE * 2U,
-                          APAN_MODEL_OUTPUT_SIZE * 2U);
-    }
+    load_active_beta();
+    model_input_valid = false;
     initialized = true;
 }
 
@@ -107,6 +124,7 @@ bool ApanInferencePredict(const ApanEvent *event,
         model_input[index] = float_to_bfloat16_rne(standardized);
     }
 
+    model_input_valid = true;
     ODL_StartPredict(AI_INSTANCE, model_input, NULL);
     while (ODL_IsBusy() != 0UL)
     {
@@ -120,5 +138,24 @@ bool ApanInferencePredict(const ApanEvent *event,
         if ((index > 0U) && (output[index] > output[best])) { best = (uint8_t)index; }
     }
     *class_id = best;
+    return true;
+}
+
+bool ApanInferenceCalibrationBegin(void)
+{
+    if (!ApanCalibrationBegin()) { return false; }
+    ApanInferenceInitialize();
+    return true;
+}
+
+/* Learn the last predicted hit as target, then use the updated beta. */
+bool ApanInferenceTrainLast(uint8_t target)
+{
+    float hidden[APAN_MODEL_HIDDEN_SIZE];
+    if (!initialized || !model_input_valid) { return false; }
+    ApanCalibrationHidden(model_input, apan_model_alpha, APAN_MODEL_INPUT_SIZE, hidden);
+    model_input_valid = false;
+    if (!ApanCalibrationUpdate(hidden, target)) { return false; }
+    load_active_beta();
     return true;
 }

@@ -14,11 +14,21 @@ $protocolSource = Join-Path $root 'src\apan_protocol.c'
 $include = Join-Path $root 'include'
 
 $compile = 'call "' + $vcvars + '" >nul && cl /nologo /W4 /WX /D_CRT_SECURE_NO_WARNINGS /std:c11 /I"' + $include + '" "' + `
-    $testSource + '" "' + $captureSource + '" "' + $protocolSource + '" /Fe:"' + $exe + '"'
+    $testSource + '" "' + $captureSource + '" "' + $protocolSource + '" /Fo:"' + $build + '\\" /Fe:"' + $exe + '"'
 cmd.exe /d /c $compile
 if ($LASTEXITCODE -ne 0) { throw "Host C build failed: $LASTEXITCODE" }
 & $exe $packet
 if ($LASTEXITCODE -ne 0) { throw "Host capture test failed: $LASTEXITCODE" }
+
+$calibrationExe = Join-Path $build 'test_calibration.exe'
+$compile = 'call "' + $vcvars + '" >nul && cl /nologo /W4 /WX /D_CRT_SECURE_NO_WARNINGS /std:c11 /I"' + $include + '" /I"' + `
+    (Join-Path $root 'generated') + '" /I"' + (Join-Path $root 'tests\stubs') + '" "' + `
+    (Join-Path $root 'tests\test_calibration.c') + '" "' + (Join-Path $root 'src\apan_calibration.c') + `
+    '" /Fo:"' + $build + '\\" /Fe:"' + $calibrationExe + '"'
+cmd.exe /d /c $compile
+if ($LASTEXITCODE -ne 0) { throw "Host calibration build failed: $LASTEXITCODE" }
+& $calibrationExe
+if ($LASTEXITCODE -ne 0) { throw "Host calibration test failed: $LASTEXITCODE" }
 Push-Location $repo
 try {
     $previousPythonPath = $env:PYTHONPATH

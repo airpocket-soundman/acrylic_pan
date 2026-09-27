@@ -53,14 +53,22 @@ Copy-Item -LiteralPath (Join-Path $repoRoot "firmware\AcrylicPanCollector\integr
 Copy-Item -LiteralPath (Join-Path $repoRoot "firmware\AcrylicPanCollector\integration\main_collector.c") `
     -Destination (Join-Path $stagedProject "S_System\main.c") -Force
 Copy-Item -LiteralPath (Join-Path $repoRoot "firmware\AcrylicPanCollector\tools\S_AcrylicPan.subdir.mk") -Destination (Join-Path $debugOverlay "subdir.mk") -Force
-$positionResponse = Join-Path $debugOverlay "apan_position_inference.res"
-if (-not (Test-Path -LiteralPath $positionResponse)) {
+
+# Projects created before an overlay source was added lack its compiler
+# response file.  Derive it from apan_inference.res, which has the same options.
+function Add-MissingOverlayResponses {
     $templateResponse = Join-Path $debugOverlay "apan_inference.res"
-    $responseText = [IO.File]::ReadAllText($templateResponse)
-    $responseText = $responseText.Replace('apan_inference.asm', 'apan_position_inference.asm')
-    $responseText = $responseText.Replace('apan_inference.c', 'apan_position_inference.c')
-    [IO.File]::WriteAllText($positionResponse, $responseText, [Text.UTF8Encoding]::new($false))
+    Get-ChildItem -LiteralPath $stagedOverlay -Filter "*.c" | ForEach-Object {
+        $response = Join-Path $debugOverlay ($_.BaseName + ".res")
+        if (-not (Test-Path -LiteralPath $response)) {
+            $responseText = [IO.File]::ReadAllText($templateResponse)
+            $responseText = $responseText.Replace('apan_inference.asm', $_.BaseName + '.asm')
+            $responseText = $responseText.Replace('apan_inference.c', $_.Name)
+            [IO.File]::WriteAllText($response, $responseText, [Text.UTF8Encoding]::new($false))
+        }
+    }
 }
+Add-MissingOverlayResponses
 
 $buildDir = Join-Path $stagedProject $Configuration
 $makefile = Join-Path $buildDir "makefile"
@@ -91,13 +99,7 @@ try {
             New-Item -ItemType Directory -Path (Split-Path -Parent $destination) -Force | Out-Null
             Copy-Item -LiteralPath $_.FullName -Destination $destination -Force
         }
-        if (-not (Test-Path -LiteralPath $positionResponse)) {
-            $templateResponse = Join-Path $debugOverlay "apan_inference.res"
-            $responseText = [IO.File]::ReadAllText($templateResponse)
-            $responseText = $responseText.Replace('apan_inference.asm', 'apan_position_inference.asm')
-            $responseText = $responseText.Replace('apan_inference.c', 'apan_position_inference.c')
-            [IO.File]::WriteAllText($positionResponse, $responseText, [Text.UTF8Encoding]::new($false))
-        }
+        Add-MissingOverlayResponses
     }
     & $makeExe all -j
     if ($LASTEXITCODE -ne 0) { throw "Firmware build failed with exit code $LASTEXITCODE." }
