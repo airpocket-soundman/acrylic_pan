@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>ROHM公式ツールと学習環境</title>
+  <link rel="stylesheet" href="../css/page.css">
+</head>
+<body>
+  <div class="eyebrow">12 / ROHM Tools &amp; Learning Environment</div>
+  <h1>ROHM公式ツールをどう使い、<br>どんな学習環境で最終モデルを作ったか。</h1>
+  <p class="lead">REHC2026の一次審査で確認された「教師あり学習の有無」と「ROHM公式サンプルソフトの使用状況」に答えるため、使用したROHM公式ツール・資料、Solist-AI Simulatorの使い方、最終モデルを作る学習環境をまとめます。</p>
+
+  <h2>審査確認への回答サマリ</h2>
+  <table class="spec">
+    <tr><th>① 教師あり学習</th><td><strong>Yes</strong></td><td>打点エリア（12クラス）をone-hot教師として与える教師あり学習。モデルはSolist-AIと同じ1隠れ層ELM（α固定・β学習・MSE）</td></tr>
+    <tr><th>② 公式サンプルソフト</th><td><strong>Yes（Simulatorを使用）</strong></td><td>ROHMサイトから入手した <b>Solist-AI Sim 教師あり学習対応版 SLV1.00.04</b> を導入。固定α（Seed 1）の採取、CSV形式・AI設定の基準、bfloat16精度の基準として使用</td></tr>
+    <tr><th>③ その他の共有内容</th><td>下記すべて</td><td>学習コード、学習CSVの生成方法、評価レポート、実機用ヘッダ、実機上のオンデバイス学習（ODL）実装を本リポジトリで公開</td></tr>
+  </table>
+  <div class="status"><strong>学習の実行場所</strong>最終モデルのβは、公式Simulatorと同じアルゴリズム（固定αのELM、MSE、bfloat16境界）をPython/NumPyで再現した<b>PC側の学習スクリプト</b>で求めています。Simulator GUIの学習ボタンで直接求めたβではない点は、以下の各節で区別して記載します。</div>
+
+  <h2>使用したROHM公式ツール・資料</h2>
+  <table class="spec">
+    <tr><th>Solist-AI Sim 教師あり版</th><td><strong>SLV1.00.04</strong></td><td>教師あり学習の公式Simulator（MATLAB Runtime R2024a上で動作）。<code>C:\Program Files\ROHM\SolistAI_Sim_SLV10004sp</code> に導入</td></tr>
+    <tr><th>公式ガイド</th><td>教師あり学習 クイックスタート</td><td>CSVの列配置（Input/Expected、chunk設定）、100万セル以下の推奨、AI settingsの意味を参照（<code>doc/Solist-AI_Sim_SupervisedLearning_qs-j.pdf</code>）</td></tr>
+    <tr><th>アルゴリズム資料</th><td>AxlCORE-ODL</td><td>ELM／OS-ELMの定義、オンデバイス学習の仕様を参照（<code>doc/solist-ai_algorithm_axlcore-odl_an-j.pdf</code>）</td></tr>
+    <tr><th>評価ボード</th><td>DT-EBML63Q2557</td><td>ML63Q2557（Solist-AI・AxlCORE-ODL搭載）。回路図・部品表・ソフトウェアパッケージガイドを参照</td></tr>
+    <tr><th>推論ライブラリ・サンプル</th><td>AIVibrationInference</td><td>振動入力向けの公式サンプルファーム。これを複製したprivateプロジェクトに収録・推論・キャリブレーションを追加</td></tr>
+    <tr><th>開発環境</th><td>LEXIDE-Ω V2.2.0</td><td>Build Tools Ver.20260317、ML63Q25x7_DFP、ML63Q2500 IOドライバ、OpenOCDによる書込み・全バイト検証</td></tr>
+  </table>
+
+  <h2>Simulatorの使い方</h2>
+  <div class="flow">
+    <div><span class="tag">REFERENCE</span><h3>公式サンプルで操作を確認</h3><p>Simulator同梱の <code>Sample_data</code> と <code>Sample_AImodel</code> で、データ読込み、Check、学習、Save、Loadの流れを確認。</p></div>
+    <span>→</span>
+    <div><span class="tag">EXTRACT</span><h3>Seed 1のαを採取</h3><p>Seed 1で生成される入力→隠れ層の固定重みαを取り出し、PC側と実機で同じ値を使う基準にする。</p></div>
+    <span>→</span>
+    <div><span class="tag">ALIGN</span><h3>PCと実機の計算を揃える</h3><p>hard sigmoid、MSE、bfloat16の丸め位置をPCで再現し、実機の出力と照合する。</p></div>
+  </div>
+  <table class="spec">
+    <tr><th>固定αの採取</th><td><strong>Seed 1</strong></td><td>公式Simulator SLV1.00.04から採取したα（167×32）の先頭128行×32列を使用。値は <code>data/dummy_model/model.npz</code> に保存</td></tr>
+    <tr><th>CSV形式</th><td>1行 = 1打撃</td><td>入力128列＋教師one-hot列。Input first column=1、Expected first column=129（8クラス時）。1行目はヘッダ</td></tr>
+    <tr><th>AI settings</th><td>Input 128 / Hidden 32 / Output 12</td><td>Hard sigmoid、MSE、Seed 1、Forgetting 1.0、scaleGamma/leakRate 0。最終精度はbfloat16で評価</td></tr>
+    <tr><th>CSV出力</th><td><code>sim.solist_dataset</code></td><td>Simulatorへそのまま読込めるtrain/test CSVと標準化係数を生成。サンプリング周波数比較ではfold別のSimulator用CSVと設定JSONも出力（<code>official_simulator_packages/</code>）</td></tr>
+    <tr><th>操作手順</th><td><code>docs/solist-ai-simulator.md</code></td><td>画面設定、モデル保存（model1.xlsx / model1.h / model1.mat）、再読込みの手順を記録</td></tr>
+  </table>
+  <p class="note">公式Simulator SLV1.00.04には学習を自動実行するCLIがないため、大量のセッション分離評価（LOSO）や正則化探索はPC側スクリプトで行い、Simulator用CSVは同じ条件の確認用に出力しています。</p>
+
+  <h2>最終的な学習環境</h2>
+  <div class="grid two">
+    <div class="card"><span class="tag">DATA</span><h3>実測の収録データ</h3><p>400 × 300 × 5 mmアクリル板、KX134-1211 1個、12打点。検証済み11セッション・7,132打点（中央点4、四隅7）。ラベルは収録UIが付与し、NGイベントは削除。</p></div>
+    <div class="card"><span class="tag">FEATURE</span><h3>128次元の入力</h3><p>トリガ後の時間波形を128点に等間隔抽出し、最大絶対値で正規化。学習データの列ごと平均・標準偏差で標準化。係数とindexはヘッダへ固定し、PCと実機で共用。</p></div>
+    <div class="card"><span class="tag">TRAIN</span><h3>PCでβを学習</h3><p>固定α（128×32）で隠れ層を計算し、βを正則化付き最小二乗（MSEのELM）で解く。正則化係数は0.0001〜10から共通ホールドアウトで選び、採用値は1。</p></div>
+    <div class="card"><span class="tag">EXPORT</span><h3>bfloat16ヘッダを生成</h3><p>α・β・標準化係数・golden入力をC配列（<code>apan_12class_model.h</code>）へ出力し、LEXIDEでビルドして書込み。</p></div>
+  </div>
+  <table class="spec">
+    <tr><th>学習スクリプト</th><td><code>sim/train_max_data_12class.py</code></td><td>全11セッション・7,132打点で再学習、配備ヘッダとモデルを出力</td></tr>
+    <tr><th>参照ELM</th><td><code>sim/solist_elm.py</code></td><td>Solist-AIのα固定・β学習ELMをNumPyで実装（特徴量設計と事前検証用）</td></tr>
+    <tr><th>MCU参照計算</th><td><code>sim/dummy_model_pipeline.py</code></td><td>bfloat16の丸め位置を実機に合わせて再現。実機と同じ入力のスコアを照合</td></tr>
+    <tr><th>評価</th><td>セッション単位</td><td>LOSO、共通ホールドアウト（測定回数が5の倍数の1,426件）。イベント単位のランダム分割は使わない</td></tr>
+    <tr><th>実機照合</th><td>golden case</td><td>PCのbfloat16参照計算とモデル出力が12 / 12一致。ダミーモデルでは実機64スコアの最大絶対誤差0.03125</td></tr>
+    <tr><th>書込み・通信</th><td>MCU-Link + OpenOCD</td><td>erase・program・全バイトverify。UARTF1（COM3、115200 bps）でPC側Web UIへ接続</td></tr>
+  </table>
+
+  <h2>評価結果</h2>
+  <table class="spec">
+    <tr><th>4セッション・LOSO</th><td><strong>95.12%</strong></td><td>12クラス、2,345件。完全未学習セッションでは98.50%</td></tr>
+    <tr><th>11セッション・共通ホールドアウト</th><td><strong>89.13%</strong></td><td>四隅を含む7,132件で学習。中央点97.01%、四隅85.28%。従来モデルは67.11%</td></tr>
+    <tr><th>サンプリング周波数比較</th><td>6.4〜25.6 kHz</td><td>8クラスで97〜99%。時間波形・FFT・併用を同条件で比較</td></tr>
+  </table>
+
+  <h2>実機でのオンデバイス学習（ODL）</h2>
+  <p>設置後に各エリアを数回ずつ叩くだけで、配備済みβを現場に合わせて更新できます。公式のAxlCORE-ODL資料にあるOS-ELMを基準にしています。</p>
+  <table class="spec">
+    <tr><th>更新方式</th><td>OS-ELM（忘却係数1）</td><td>CPUのfloat32で計算し、更新後のβをbfloat16へ丸めて <code>ODL_SetWeightBeta</code> で書込み</td></tr>
+    <tr><th><code>ODL_StartTrain</code> を使わない理由</th><td>bfloat16逐次学習</td><td>Pとβをbfloat16で保持するため更新が劣化する。IchiPingプロジェクトで実機160回更新による発散を確認済み</td></tr>
+    <tr><th>初期値</th><td>工場β と P0 = 30 (G + I)⁻¹</td><td>配備モデルの学習7,132件から計算。校正1打は工場データ30打分の重み</td></tr>
+    <tr><th>記憶域</th><td>FRAM（MB85RS2MTA）</td><td>float32のP・βをFRAMに置いて1行ずつ読み書きし、追加RAMは316 B</td></tr>
+    <tr><th>安全策</th><td>確認打で判定</td><td>校正前後に各エリア1打で確認し、正解数が下がらなければ保存。CRC32付きで保存し、工場βへ戻すコマンドあり</td></tr>
+    <tr><th>PC検証</th><td>LOSO 11セッション</td><td>60打（5打 × 12エリア）で平均87.89% → 90.23%（+2.3 pt）、固定状態が違うセッションでは86.8% → 95.3%</td></tr>
+  </table>
+
+  <h2>公開している再現手段</h2>
+  <table class="spec">
+    <tr><th>学習</th><td><code>python -m sim.train_max_data_12class</code></td><td>12クラスモデルの再学習と実機用ヘッダ生成</td></tr>
+    <tr><th>Simulator用CSV</th><td><code>python -m sim.solist_dataset</code></td><td>Simulatorへ読込める学習・評価CSV、標準化係数</td></tr>
+    <tr><th>ODL検証</th><td><code>python -m sim.odl_calibration_experiment</code></td><td>キャリブレーション効果のLOSO評価</td></tr>
+    <tr><th>実機キャリブレーション</th><td><code>python -m pc.acrylic_pan_monitor.calibrate --port COM3</code></td><td>各エリアの確認・学習・再確認・保存</td></tr>
+    <tr><th>ファームウェア</th><td><code>firmware/AcrylicPanCollector</code></td><td>AIVibrationInferenceへのオーバーレイ。推論・収録・キャリブレーション</td></tr>
+  </table>
+  <p class="note">リポジトリ: <a href="https://github.com/airpocket-soundman/acrylic_pan" target="_blank" rel="noopener">github.com/airpocket-soundman/acrylic_pan</a>。詳細は各ドキュメント（<code>docs/real-model-training.md</code>、<code>docs/model-training-max-data-20260828.md</code>、<code>docs/odl-calibration-experiment-20260927.md</code>、<code>docs/development-environment.md</code>）にあります。</p>
+</body>
+</html>
