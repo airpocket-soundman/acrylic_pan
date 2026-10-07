@@ -15,7 +15,7 @@
   <table class="spec">
     <tr><th>① 教師あり学習</th><td><strong>Yes</strong></td><td>60測定位置を教師にした教師あり学習。教師は正解one-hot 75%とPC側モデルの確率25%の混合（蒸留）。モデルはSolist-AIと同じ1隠れ層ELM（α固定・β学習）</td></tr>
     <tr><th>② 公式サンプルソフト</th><td><strong>Yes（Simulatorを使用）</strong></td><td>ROHMサイトから入手した <b>Solist-AI Sim 教師あり学習対応版 SLV1.00.04</b> を導入。固定α（Seed 1）の採取、CSV形式・AI設定の基準、bfloat16精度の基準として使用</td></tr>
-    <tr><th>③ その他の共有内容</th><td>下記すべて</td><td>学習コード、評価レポート、実機用ヘッダ、デバイス上の推論の実装を本リポジトリで公開</td></tr>
+    <tr><th>③ その他の共有内容</th><td>下記すべて</td><td>学習コード、評価レポート、実機用ヘッダ、デバイス上の推論とオンデバイス学習（ODL）の実装を本リポジトリで公開</td></tr>
   </table>
   <div class="status"><strong>学習の実行場所</strong>最終モデルのβは、公式Simulatorと同じ固定αのELM構造（hard sigmoid、bfloat16境界）をPython/NumPyで再現した<b>PC側の学習スクリプト</b>で求めています。Simulator GUIの学習ボタンで直接求めたβではない点は、以下の各節で区別して記載します。</div>
 
@@ -412,12 +412,25 @@
   </table>
   <p class="note">位置確率モデルの評価用データは、学習と同じセッションから反復番号で分けたものです。未知のセッションや、測定位置の間の座標に対する精度は含まれません。</p>
 
+  <h2>実機でのオンデバイス学習（ODL）</h2>
+  <p>12エリアのβ（エリア分類モデル）を対象に、設置後に各エリアを数回ずつ叩くだけで、配備済みβを現場に合わせて更新できます。公式のAxlCORE-ODL資料にあるOS-ELMを基準にしています。</p>
+  <table class="spec">
+    <tr><th>更新方式</th><td>OS-ELM（忘却係数1）</td><td>CPUのfloat32で計算し、更新後のβをbfloat16へ丸めて <code>ODL_SetWeightBeta</code> で書込み</td></tr>
+    <tr><th><code>ODL_StartTrain</code> を使わない理由</th><td>bfloat16逐次学習</td><td>Pとβをbfloat16で保持するため更新が劣化する。IchiPingプロジェクトで実機160回更新による発散を確認済み</td></tr>
+    <tr><th>初期値</th><td>工場β と P0 = 30 (G + I)⁻¹</td><td>配備モデルの学習7,132件から計算。校正1打は工場データ30打分の重み</td></tr>
+    <tr><th>記憶域</th><td>FRAM（MB85RS2MTA）</td><td>float32のP・βをFRAMに置いて1行ずつ読み書きし、追加RAMは316 B</td></tr>
+    <tr><th>安全策</th><td>確認打で判定</td><td>校正前後に各エリア1打で確認し、正解数が下がらなければ保存。CRC32付きで保存し、工場βへ戻すコマンドあり</td></tr>
+    <tr><th>PC検証</th><td>LOSO 11セッション</td><td>60打（5打 × 12エリア）で平均87.89% → 90.23%（+2.3 pt）、固定状態が違うセッションでは86.8% → 95.3%</td></tr>
+  </table>
+
   <h2>公開している再現手段</h2>
   <table class="spec">
     <tr><th>位置確率モデルの学習</th><td><code>python -m sim.device_position_probability</code></td><td>蒸留教師の作成、βの学習、実機用ヘッダ生成</td></tr>
     <tr><th>Simulator用CSV</th><td><code>python -m sim.solist_dataset</code></td><td>Simulatorへ読込める学習・評価CSV、標準化係数</td></tr>
+    <tr><th>ODL検証</th><td><code>python -m sim.odl_calibration_experiment</code></td><td>キャリブレーション効果のLOSO評価</td></tr>
+    <tr><th>実機キャリブレーション</th><td><code>python -m pc.acrylic_pan_monitor.calibrate --port COM3</code></td><td>各エリアの確認・学習・再確認・保存</td></tr>
     <tr><th>ファームウェア</th><td><code>firmware/AcrylicPanCollector</code></td><td>AIVibrationInferenceへのオーバーレイ。推論・収録</td></tr>
   </table>
-  <p class="note">リポジトリ: <a href="https://github.com/airpocket-soundman/acrylic_pan" target="_blank" rel="noopener">github.com/airpocket-soundman/acrylic_pan</a>。詳細は各ドキュメント（<code>docs/position-inference.md</code>、<code>docs/ai-dummy-validation.md</code>、<code>docs/development-environment.md</code>）にあります。</p>
+  <p class="note">リポジトリ: <a href="https://github.com/airpocket-soundman/acrylic_pan" target="_blank" rel="noopener">github.com/airpocket-soundman/acrylic_pan</a>。詳細は各ドキュメント（<code>docs/position-inference.md</code>、<code>docs/ai-dummy-validation.md</code>、<code>docs/odl-calibration-experiment-20260927.md</code>、<code>docs/development-environment.md</code>）にあります。</p>
 </body>
 </html>
