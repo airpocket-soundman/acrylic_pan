@@ -14,7 +14,7 @@
   <h2>審査確認への回答サマリ</h2>
   <table class="spec">
     <tr><th>① 教師あり学習</th><td><strong>Yes</strong></td><td>60測定位置を教師にした教師あり学習。教師は正解one-hot 75%とPC側モデルの確率25%の混合（蒸留）。モデルはSolist-AIと同じ1隠れ層ELM（α固定・β学習）</td></tr>
-    <tr><th>② 公式サンプルソフト</th><td><strong>Yes（Simulatorを使用）</strong></td><td>ROHMサイトから入手した <b>Solist-AI Sim 教師あり学習対応版 SLV1.00.04</b> を導入。固定α（Seed 1）の採取、CSV形式・AI設定の基準、bfloat16精度の基準として使用</td></tr>
+    <tr><th>② 公式サンプルソフト</th><td><strong>Yes（Simulatorを使用）</strong></td><td>ROHMサイトから入手した <b>Solist-AI Sim 教師あり学習対応版 SLV1.00.04</b> を導入。固定α（Seed 1）の採取、CSV形式とAI設定（活性化関数・Seedなど）の基準として使用。bfloat16の丸め位置はPC側で再現</td></tr>
     <tr><th>③ その他の共有内容</th><td>下記すべて</td><td>学習コード、評価レポート、実機用ヘッダ、デバイス上の推論とオンデバイス学習（ODL）の実装を本リポジトリで公開</td></tr>
   </table>
   <div class="status"><strong>学習の実行場所</strong>最終モデルのβは、公式Simulatorと同じ固定αのELM構造（hard sigmoid、bfloat16境界）をPython/NumPyで再現した<b>PC側の学習スクリプト</b>で求めています。Simulator GUIの学習ボタンで直接求めたβではない点は、以下の各節で区別して記載します。</div>
@@ -364,7 +364,7 @@
 
   <h2>Simulatorの使い方</h2>
   <div class="flow">
-    <div><span class="tag">REFERENCE</span><h3>公式サンプルで操作を確認</h3><p>Simulator同梱の <code>Sample_data</code> と <code>Sample_AImodel</code> で、データ読込み、Check、学習、Save、Loadの流れを確認。</p></div>
+    <div><span class="tag">REFERENCE</span><h3>公式ガイドとサンプルを参照</h3><p>公式ガイドと、Simulator同梱の <code>Sample_data</code>・<code>Sample_AImodel</code> を参照し、データ形式、Check、学習、Save、Loadの流れを把握。</p></div>
     <span>→</span>
     <div><span class="tag">EXTRACT</span><h3>Seed 1のαを採取</h3><p>Seed 1で生成される入力→隠れ層の固定重みαを取り出し、PC側と実機で同じ値を使う基準にする。</p></div>
     <span>→</span>
