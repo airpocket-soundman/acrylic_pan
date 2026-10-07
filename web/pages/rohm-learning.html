@@ -46,6 +46,227 @@
   </table>
   <p class="note">公式Simulator SLV1.00.04には学習を自動実行するCLIがないため、大量のセッション分離評価（LOSO）や正則化探索はPC側スクリプトで行い、Simulator用CSVは同じ条件の確認用に出力しています。</p>
 
+  <h2>モデル構造</h2>
+  <p>Solist-AIのELMは、入力→隠れ層の重みαを乱数で固定し、隠れ層→出力の重みβだけを学習する1隠れ層ネットワークです。Acrylic Panの配備モデルは入力128・隠れ32・出力12です。</p>
+  <div class="diagram">
+<svg viewBox="0 0 900 470" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="入力128・隠れ層32・出力12のELM構造図">
+<line x1="140" y1="70.0" x2="450" y2="85.0" stroke="#9aa9ad" stroke-width="0.7" opacity="0.55"/>
+<line x1="140" y1="70.0" x2="450" y2="120.7" stroke="#9aa9ad" stroke-width="0.7" opacity="0.55"/>
+<line x1="140" y1="70.0" x2="450" y2="156.4" stroke="#9aa9ad" stroke-width="0.7" opacity="0.55"/>
+<line x1="140" y1="70.0" x2="450" y2="192.1" stroke="#9aa9ad" stroke-width="0.7" opacity="0.55"/>
+<line x1="140" y1="70.0" x2="450" y2="227.9" stroke="#9aa9ad" stroke-width="0.7" opacity="0.55"/>
+<line x1="140" y1="70.0" x2="450" y2="263.6" stroke="#9aa9ad" stroke-width="0.7" opacity="0.55"/>
+<line x1="140" y1="70.0" x2="450" y2="299.3" stroke="#9aa9ad" stroke-width="0.7" opacity="0.55"/>
+<line x1="140" y1="70.0" x2="450" y2="335.0" stroke="#9aa9ad" stroke-width="0.7" opacity="0.55"/>
+<line x1="140" y1="105.0" x2="450" y2="85.0" stroke="#9aa9ad" stroke-width="0.7" opacity="0.55"/>
+<line x1="140" y1="105.0" x2="450" y2="120.7" stroke="#9aa9ad" stroke-width="0.7" opacity="0.55"/>
+<line x1="140" y1="105.0" x2="450" y2="156.4" stroke="#9aa9ad" stroke-width="0.7" opacity="0.55"/>
+<line x1="140" y1="105.0" x2="450" y2="192.1" stroke="#9aa9ad" stroke-width="0.7" opacity="0.55"/>
+<line x1="140" y1="105.0" x2="450" y2="227.9" stroke="#9aa9ad" stroke-width="0.7" opacity="0.55"/>
+<line x1="140" y1="105.0" x2="450" y2="263.6" stroke="#9aa9ad" stroke-width="0.7" opacity="0.55"/>
+<line x1="140" y1="105.0" x2="450" y2="299.3" stroke="#9aa9ad" stroke-width="0.7" opacity="0.55"/>
+<line x1="140" y1="105.0" x2="450" y2="335.0" stroke="#9aa9ad" stroke-width="0.7" opacity="0.55"/>
+<line x1="140" y1="140.0" x2="450" y2="85.0" stroke="#9aa9ad" stroke-width="0.7" opacity="0.55"/>
+<line x1="140" y1="140.0" x2="450" y2="120.7" stroke="#9aa9ad" stroke-width="0.7" opacity="0.55"/>
+<line x1="140" y1="140.0" x2="450" y2="156.4" stroke="#9aa9ad" stroke-width="0.7" opacity="0.55"/>
+<line x1="140" y1="140.0" x2="450" y2="192.1" stroke="#9aa9ad" stroke-width="0.7" opacity="0.55"/>
+<line x1="140" y1="140.0" x2="450" y2="227.9" stroke="#9aa9ad" stroke-width="0.7" opacity="0.55"/>
+<line x1="140" y1="140.0" x2="450" y2="263.6" stroke="#9aa9ad" stroke-width="0.7" opacity="0.55"/>
+<line x1="140" y1="140.0" x2="450" y2="299.3" stroke="#9aa9ad" stroke-width="0.7" opacity="0.55"/>
+<line x1="140" y1="140.0" x2="450" y2="335.0" stroke="#9aa9ad" stroke-width="0.7" opacity="0.55"/>
+<line x1="140" y1="175.0" x2="450" y2="85.0" stroke="#9aa9ad" stroke-width="0.7" opacity="0.55"/>
+<line x1="140" y1="175.0" x2="450" y2="120.7" stroke="#9aa9ad" stroke-width="0.7" opacity="0.55"/>
+<line x1="140" y1="175.0" x2="450" y2="156.4" stroke="#9aa9ad" stroke-width="0.7" opacity="0.55"/>
+<line x1="140" y1="175.0" x2="450" y2="192.1" stroke="#9aa9ad" stroke-width="0.7" opacity="0.55"/>
+<line x1="140" y1="175.0" x2="450" y2="227.9" stroke="#9aa9ad" stroke-width="0.7" opacity="0.55"/>
+<line x1="140" y1="175.0" x2="450" y2="263.6" stroke="#9aa9ad" stroke-width="0.7" opacity="0.55"/>
+<line x1="140" y1="175.0" x2="450" y2="299.3" stroke="#9aa9ad" stroke-width="0.7" opacity="0.55"/>
+<line x1="140" y1="175.0" x2="450" y2="335.0" stroke="#9aa9ad" stroke-width="0.7" opacity="0.55"/>
+<line x1="140" y1="210.0" x2="450" y2="85.0" stroke="#9aa9ad" stroke-width="0.7" opacity="0.55"/>
+<line x1="140" y1="210.0" x2="450" y2="120.7" stroke="#9aa9ad" stroke-width="0.7" opacity="0.55"/>
+<line x1="140" y1="210.0" x2="450" y2="156.4" stroke="#9aa9ad" stroke-width="0.7" opacity="0.55"/>
+<line x1="140" y1="210.0" x2="450" y2="192.1" stroke="#9aa9ad" stroke-width="0.7" opacity="0.55"/>
+<line x1="140" y1="210.0" x2="450" y2="227.9" stroke="#9aa9ad" stroke-width="0.7" opacity="0.55"/>
+<line x1="140" y1="210.0" x2="450" y2="263.6" stroke="#9aa9ad" stroke-width="0.7" opacity="0.55"/>
+<line x1="140" y1="210.0" x2="450" y2="299.3" stroke="#9aa9ad" stroke-width="0.7" opacity="0.55"/>
+<line x1="140" y1="210.0" x2="450" y2="335.0" stroke="#9aa9ad" stroke-width="0.7" opacity="0.55"/>
+<line x1="140" y1="245.0" x2="450" y2="85.0" stroke="#9aa9ad" stroke-width="0.7" opacity="0.55"/>
+<line x1="140" y1="245.0" x2="450" y2="120.7" stroke="#9aa9ad" stroke-width="0.7" opacity="0.55"/>
+<line x1="140" y1="245.0" x2="450" y2="156.4" stroke="#9aa9ad" stroke-width="0.7" opacity="0.55"/>
+<line x1="140" y1="245.0" x2="450" y2="192.1" stroke="#9aa9ad" stroke-width="0.7" opacity="0.55"/>
+<line x1="140" y1="245.0" x2="450" y2="227.9" stroke="#9aa9ad" stroke-width="0.7" opacity="0.55"/>
+<line x1="140" y1="245.0" x2="450" y2="263.6" stroke="#9aa9ad" stroke-width="0.7" opacity="0.55"/>
+<line x1="140" y1="245.0" x2="450" y2="299.3" stroke="#9aa9ad" stroke-width="0.7" opacity="0.55"/>
+<line x1="140" y1="245.0" x2="450" y2="335.0" stroke="#9aa9ad" stroke-width="0.7" opacity="0.55"/>
+<line x1="140" y1="280.0" x2="450" y2="85.0" stroke="#9aa9ad" stroke-width="0.7" opacity="0.55"/>
+<line x1="140" y1="280.0" x2="450" y2="120.7" stroke="#9aa9ad" stroke-width="0.7" opacity="0.55"/>
+<line x1="140" y1="280.0" x2="450" y2="156.4" stroke="#9aa9ad" stroke-width="0.7" opacity="0.55"/>
+<line x1="140" y1="280.0" x2="450" y2="192.1" stroke="#9aa9ad" stroke-width="0.7" opacity="0.55"/>
+<line x1="140" y1="280.0" x2="450" y2="227.9" stroke="#9aa9ad" stroke-width="0.7" opacity="0.55"/>
+<line x1="140" y1="280.0" x2="450" y2="263.6" stroke="#9aa9ad" stroke-width="0.7" opacity="0.55"/>
+<line x1="140" y1="280.0" x2="450" y2="299.3" stroke="#9aa9ad" stroke-width="0.7" opacity="0.55"/>
+<line x1="140" y1="280.0" x2="450" y2="335.0" stroke="#9aa9ad" stroke-width="0.7" opacity="0.55"/>
+<line x1="140" y1="315.0" x2="450" y2="85.0" stroke="#9aa9ad" stroke-width="0.7" opacity="0.55"/>
+<line x1="140" y1="315.0" x2="450" y2="120.7" stroke="#9aa9ad" stroke-width="0.7" opacity="0.55"/>
+<line x1="140" y1="315.0" x2="450" y2="156.4" stroke="#9aa9ad" stroke-width="0.7" opacity="0.55"/>
+<line x1="140" y1="315.0" x2="450" y2="192.1" stroke="#9aa9ad" stroke-width="0.7" opacity="0.55"/>
+<line x1="140" y1="315.0" x2="450" y2="227.9" stroke="#9aa9ad" stroke-width="0.7" opacity="0.55"/>
+<line x1="140" y1="315.0" x2="450" y2="263.6" stroke="#9aa9ad" stroke-width="0.7" opacity="0.55"/>
+<line x1="140" y1="315.0" x2="450" y2="299.3" stroke="#9aa9ad" stroke-width="0.7" opacity="0.55"/>
+<line x1="140" y1="315.0" x2="450" y2="335.0" stroke="#9aa9ad" stroke-width="0.7" opacity="0.55"/>
+<line x1="140" y1="350.0" x2="450" y2="85.0" stroke="#9aa9ad" stroke-width="0.7" opacity="0.55"/>
+<line x1="140" y1="350.0" x2="450" y2="120.7" stroke="#9aa9ad" stroke-width="0.7" opacity="0.55"/>
+<line x1="140" y1="350.0" x2="450" y2="156.4" stroke="#9aa9ad" stroke-width="0.7" opacity="0.55"/>
+<line x1="140" y1="350.0" x2="450" y2="192.1" stroke="#9aa9ad" stroke-width="0.7" opacity="0.55"/>
+<line x1="140" y1="350.0" x2="450" y2="227.9" stroke="#9aa9ad" stroke-width="0.7" opacity="0.55"/>
+<line x1="140" y1="350.0" x2="450" y2="263.6" stroke="#9aa9ad" stroke-width="0.7" opacity="0.55"/>
+<line x1="140" y1="350.0" x2="450" y2="299.3" stroke="#9aa9ad" stroke-width="0.7" opacity="0.55"/>
+<line x1="140" y1="350.0" x2="450" y2="335.0" stroke="#9aa9ad" stroke-width="0.7" opacity="0.55"/>
+<line x1="450" y1="85.0" x2="740" y2="60.0" stroke="#0d7f78" stroke-width="0.8" opacity="0.5"/>
+<line x1="450" y1="85.0" x2="740" y2="87.3" stroke="#0d7f78" stroke-width="0.8" opacity="0.5"/>
+<line x1="450" y1="85.0" x2="740" y2="114.5" stroke="#0d7f78" stroke-width="0.8" opacity="0.5"/>
+<line x1="450" y1="85.0" x2="740" y2="141.8" stroke="#0d7f78" stroke-width="0.8" opacity="0.5"/>
+<line x1="450" y1="85.0" x2="740" y2="169.1" stroke="#0d7f78" stroke-width="0.8" opacity="0.5"/>
+<line x1="450" y1="85.0" x2="740" y2="196.4" stroke="#0d7f78" stroke-width="0.8" opacity="0.5"/>
+<line x1="450" y1="85.0" x2="740" y2="223.6" stroke="#0d7f78" stroke-width="0.8" opacity="0.5"/>
+<line x1="450" y1="85.0" x2="740" y2="250.9" stroke="#0d7f78" stroke-width="0.8" opacity="0.5"/>
+<line x1="450" y1="85.0" x2="740" y2="278.2" stroke="#0d7f78" stroke-width="0.8" opacity="0.5"/>
+<line x1="450" y1="85.0" x2="740" y2="305.5" stroke="#0d7f78" stroke-width="0.8" opacity="0.5"/>
+<line x1="450" y1="85.0" x2="740" y2="332.7" stroke="#0d7f78" stroke-width="0.8" opacity="0.5"/>
+<line x1="450" y1="85.0" x2="740" y2="360.0" stroke="#0d7f78" stroke-width="0.8" opacity="0.5"/>
+<line x1="450" y1="120.7" x2="740" y2="60.0" stroke="#0d7f78" stroke-width="0.8" opacity="0.5"/>
+<line x1="450" y1="120.7" x2="740" y2="87.3" stroke="#0d7f78" stroke-width="0.8" opacity="0.5"/>
+<line x1="450" y1="120.7" x2="740" y2="114.5" stroke="#0d7f78" stroke-width="0.8" opacity="0.5"/>
+<line x1="450" y1="120.7" x2="740" y2="141.8" stroke="#0d7f78" stroke-width="0.8" opacity="0.5"/>
+<line x1="450" y1="120.7" x2="740" y2="169.1" stroke="#0d7f78" stroke-width="0.8" opacity="0.5"/>
+<line x1="450" y1="120.7" x2="740" y2="196.4" stroke="#0d7f78" stroke-width="0.8" opacity="0.5"/>
+<line x1="450" y1="120.7" x2="740" y2="223.6" stroke="#0d7f78" stroke-width="0.8" opacity="0.5"/>
+<line x1="450" y1="120.7" x2="740" y2="250.9" stroke="#0d7f78" stroke-width="0.8" opacity="0.5"/>
+<line x1="450" y1="120.7" x2="740" y2="278.2" stroke="#0d7f78" stroke-width="0.8" opacity="0.5"/>
+<line x1="450" y1="120.7" x2="740" y2="305.5" stroke="#0d7f78" stroke-width="0.8" opacity="0.5"/>
+<line x1="450" y1="120.7" x2="740" y2="332.7" stroke="#0d7f78" stroke-width="0.8" opacity="0.5"/>
+<line x1="450" y1="120.7" x2="740" y2="360.0" stroke="#0d7f78" stroke-width="0.8" opacity="0.5"/>
+<line x1="450" y1="156.4" x2="740" y2="60.0" stroke="#0d7f78" stroke-width="0.8" opacity="0.5"/>
+<line x1="450" y1="156.4" x2="740" y2="87.3" stroke="#0d7f78" stroke-width="0.8" opacity="0.5"/>
+<line x1="450" y1="156.4" x2="740" y2="114.5" stroke="#0d7f78" stroke-width="0.8" opacity="0.5"/>
+<line x1="450" y1="156.4" x2="740" y2="141.8" stroke="#0d7f78" stroke-width="0.8" opacity="0.5"/>
+<line x1="450" y1="156.4" x2="740" y2="169.1" stroke="#0d7f78" stroke-width="0.8" opacity="0.5"/>
+<line x1="450" y1="156.4" x2="740" y2="196.4" stroke="#0d7f78" stroke-width="0.8" opacity="0.5"/>
+<line x1="450" y1="156.4" x2="740" y2="223.6" stroke="#0d7f78" stroke-width="0.8" opacity="0.5"/>
+<line x1="450" y1="156.4" x2="740" y2="250.9" stroke="#0d7f78" stroke-width="0.8" opacity="0.5"/>
+<line x1="450" y1="156.4" x2="740" y2="278.2" stroke="#0d7f78" stroke-width="0.8" opacity="0.5"/>
+<line x1="450" y1="156.4" x2="740" y2="305.5" stroke="#0d7f78" stroke-width="0.8" opacity="0.5"/>
+<line x1="450" y1="156.4" x2="740" y2="332.7" stroke="#0d7f78" stroke-width="0.8" opacity="0.5"/>
+<line x1="450" y1="156.4" x2="740" y2="360.0" stroke="#0d7f78" stroke-width="0.8" opacity="0.5"/>
+<line x1="450" y1="192.1" x2="740" y2="60.0" stroke="#0d7f78" stroke-width="0.8" opacity="0.5"/>
+<line x1="450" y1="192.1" x2="740" y2="87.3" stroke="#0d7f78" stroke-width="0.8" opacity="0.5"/>
+<line x1="450" y1="192.1" x2="740" y2="114.5" stroke="#0d7f78" stroke-width="0.8" opacity="0.5"/>
+<line x1="450" y1="192.1" x2="740" y2="141.8" stroke="#0d7f78" stroke-width="0.8" opacity="0.5"/>
+<line x1="450" y1="192.1" x2="740" y2="169.1" stroke="#0d7f78" stroke-width="0.8" opacity="0.5"/>
+<line x1="450" y1="192.1" x2="740" y2="196.4" stroke="#0d7f78" stroke-width="0.8" opacity="0.5"/>
+<line x1="450" y1="192.1" x2="740" y2="223.6" stroke="#0d7f78" stroke-width="0.8" opacity="0.5"/>
+<line x1="450" y1="192.1" x2="740" y2="250.9" stroke="#0d7f78" stroke-width="0.8" opacity="0.5"/>
+<line x1="450" y1="192.1" x2="740" y2="278.2" stroke="#0d7f78" stroke-width="0.8" opacity="0.5"/>
+<line x1="450" y1="192.1" x2="740" y2="305.5" stroke="#0d7f78" stroke-width="0.8" opacity="0.5"/>
+<line x1="450" y1="192.1" x2="740" y2="332.7" stroke="#0d7f78" stroke-width="0.8" opacity="0.5"/>
+<line x1="450" y1="192.1" x2="740" y2="360.0" stroke="#0d7f78" stroke-width="0.8" opacity="0.5"/>
+<line x1="450" y1="227.9" x2="740" y2="60.0" stroke="#0d7f78" stroke-width="0.8" opacity="0.5"/>
+<line x1="450" y1="227.9" x2="740" y2="87.3" stroke="#0d7f78" stroke-width="0.8" opacity="0.5"/>
+<line x1="450" y1="227.9" x2="740" y2="114.5" stroke="#0d7f78" stroke-width="0.8" opacity="0.5"/>
+<line x1="450" y1="227.9" x2="740" y2="141.8" stroke="#0d7f78" stroke-width="0.8" opacity="0.5"/>
+<line x1="450" y1="227.9" x2="740" y2="169.1" stroke="#0d7f78" stroke-width="0.8" opacity="0.5"/>
+<line x1="450" y1="227.9" x2="740" y2="196.4" stroke="#0d7f78" stroke-width="0.8" opacity="0.5"/>
+<line x1="450" y1="227.9" x2="740" y2="223.6" stroke="#0d7f78" stroke-width="0.8" opacity="0.5"/>
+<line x1="450" y1="227.9" x2="740" y2="250.9" stroke="#0d7f78" stroke-width="0.8" opacity="0.5"/>
+<line x1="450" y1="227.9" x2="740" y2="278.2" stroke="#0d7f78" stroke-width="0.8" opacity="0.5"/>
+<line x1="450" y1="227.9" x2="740" y2="305.5" stroke="#0d7f78" stroke-width="0.8" opacity="0.5"/>
+<line x1="450" y1="227.9" x2="740" y2="332.7" stroke="#0d7f78" stroke-width="0.8" opacity="0.5"/>
+<line x1="450" y1="227.9" x2="740" y2="360.0" stroke="#0d7f78" stroke-width="0.8" opacity="0.5"/>
+<line x1="450" y1="263.6" x2="740" y2="60.0" stroke="#0d7f78" stroke-width="0.8" opacity="0.5"/>
+<line x1="450" y1="263.6" x2="740" y2="87.3" stroke="#0d7f78" stroke-width="0.8" opacity="0.5"/>
+<line x1="450" y1="263.6" x2="740" y2="114.5" stroke="#0d7f78" stroke-width="0.8" opacity="0.5"/>
+<line x1="450" y1="263.6" x2="740" y2="141.8" stroke="#0d7f78" stroke-width="0.8" opacity="0.5"/>
+<line x1="450" y1="263.6" x2="740" y2="169.1" stroke="#0d7f78" stroke-width="0.8" opacity="0.5"/>
+<line x1="450" y1="263.6" x2="740" y2="196.4" stroke="#0d7f78" stroke-width="0.8" opacity="0.5"/>
+<line x1="450" y1="263.6" x2="740" y2="223.6" stroke="#0d7f78" stroke-width="0.8" opacity="0.5"/>
+<line x1="450" y1="263.6" x2="740" y2="250.9" stroke="#0d7f78" stroke-width="0.8" opacity="0.5"/>
+<line x1="450" y1="263.6" x2="740" y2="278.2" stroke="#0d7f78" stroke-width="0.8" opacity="0.5"/>
+<line x1="450" y1="263.6" x2="740" y2="305.5" stroke="#0d7f78" stroke-width="0.8" opacity="0.5"/>
+<line x1="450" y1="263.6" x2="740" y2="332.7" stroke="#0d7f78" stroke-width="0.8" opacity="0.5"/>
+<line x1="450" y1="263.6" x2="740" y2="360.0" stroke="#0d7f78" stroke-width="0.8" opacity="0.5"/>
+<line x1="450" y1="299.3" x2="740" y2="60.0" stroke="#0d7f78" stroke-width="0.8" opacity="0.5"/>
+<line x1="450" y1="299.3" x2="740" y2="87.3" stroke="#0d7f78" stroke-width="0.8" opacity="0.5"/>
+<line x1="450" y1="299.3" x2="740" y2="114.5" stroke="#0d7f78" stroke-width="0.8" opacity="0.5"/>
+<line x1="450" y1="299.3" x2="740" y2="141.8" stroke="#0d7f78" stroke-width="0.8" opacity="0.5"/>
+<line x1="450" y1="299.3" x2="740" y2="169.1" stroke="#0d7f78" stroke-width="0.8" opacity="0.5"/>
+<line x1="450" y1="299.3" x2="740" y2="196.4" stroke="#0d7f78" stroke-width="0.8" opacity="0.5"/>
+<line x1="450" y1="299.3" x2="740" y2="223.6" stroke="#0d7f78" stroke-width="0.8" opacity="0.5"/>
+<line x1="450" y1="299.3" x2="740" y2="250.9" stroke="#0d7f78" stroke-width="0.8" opacity="0.5"/>
+<line x1="450" y1="299.3" x2="740" y2="278.2" stroke="#0d7f78" stroke-width="0.8" opacity="0.5"/>
+<line x1="450" y1="299.3" x2="740" y2="305.5" stroke="#0d7f78" stroke-width="0.8" opacity="0.5"/>
+<line x1="450" y1="299.3" x2="740" y2="332.7" stroke="#0d7f78" stroke-width="0.8" opacity="0.5"/>
+<line x1="450" y1="299.3" x2="740" y2="360.0" stroke="#0d7f78" stroke-width="0.8" opacity="0.5"/>
+<line x1="450" y1="335.0" x2="740" y2="60.0" stroke="#0d7f78" stroke-width="0.8" opacity="0.5"/>
+<line x1="450" y1="335.0" x2="740" y2="87.3" stroke="#0d7f78" stroke-width="0.8" opacity="0.5"/>
+<line x1="450" y1="335.0" x2="740" y2="114.5" stroke="#0d7f78" stroke-width="0.8" opacity="0.5"/>
+<line x1="450" y1="335.0" x2="740" y2="141.8" stroke="#0d7f78" stroke-width="0.8" opacity="0.5"/>
+<line x1="450" y1="335.0" x2="740" y2="169.1" stroke="#0d7f78" stroke-width="0.8" opacity="0.5"/>
+<line x1="450" y1="335.0" x2="740" y2="196.4" stroke="#0d7f78" stroke-width="0.8" opacity="0.5"/>
+<line x1="450" y1="335.0" x2="740" y2="223.6" stroke="#0d7f78" stroke-width="0.8" opacity="0.5"/>
+<line x1="450" y1="335.0" x2="740" y2="250.9" stroke="#0d7f78" stroke-width="0.8" opacity="0.5"/>
+<line x1="450" y1="335.0" x2="740" y2="278.2" stroke="#0d7f78" stroke-width="0.8" opacity="0.5"/>
+<line x1="450" y1="335.0" x2="740" y2="305.5" stroke="#0d7f78" stroke-width="0.8" opacity="0.5"/>
+<line x1="450" y1="335.0" x2="740" y2="332.7" stroke="#0d7f78" stroke-width="0.8" opacity="0.5"/>
+<line x1="450" y1="335.0" x2="740" y2="360.0" stroke="#0d7f78" stroke-width="0.8" opacity="0.5"/>
+<circle cx="140" cy="70.0" r="9" fill="#fff" stroke="#102733" stroke-width="1.6"/>
+<circle cx="140" cy="105.0" r="9" fill="#fff" stroke="#102733" stroke-width="1.6"/>
+<circle cx="140" cy="140.0" r="9" fill="#fff" stroke="#102733" stroke-width="1.6"/>
+<circle cx="140" cy="175.0" r="9" fill="#fff" stroke="#102733" stroke-width="1.6"/>
+<circle cx="140" cy="210.0" r="9" fill="#fff" stroke="#102733" stroke-width="1.6"/>
+<text x="140" y="249.0" text-anchor="middle" font-size="16" fill="#60727a" font-family="Segoe UI,Yu Gothic UI,Meiryo,sans-serif">⋮</text>
+<circle cx="140" cy="280.0" r="9" fill="#fff" stroke="#102733" stroke-width="1.6"/>
+<circle cx="140" cy="315.0" r="9" fill="#fff" stroke="#102733" stroke-width="1.6"/>
+<circle cx="140" cy="350.0" r="9" fill="#fff" stroke="#102733" stroke-width="1.6"/>
+<circle cx="450" cy="85.0" r="10" fill="#e4f2ef" stroke="#0d7f78" stroke-width="1.8"/>
+<circle cx="450" cy="120.7" r="10" fill="#e4f2ef" stroke="#0d7f78" stroke-width="1.8"/>
+<circle cx="450" cy="156.4" r="10" fill="#e4f2ef" stroke="#0d7f78" stroke-width="1.8"/>
+<circle cx="450" cy="192.1" r="10" fill="#e4f2ef" stroke="#0d7f78" stroke-width="1.8"/>
+<circle cx="450" cy="227.9" r="10" fill="#e4f2ef" stroke="#0d7f78" stroke-width="1.8"/>
+<text x="450" y="267.6" text-anchor="middle" font-size="16" fill="#60727a" font-family="Segoe UI,Yu Gothic UI,Meiryo,sans-serif">⋮</text>
+<circle cx="450" cy="299.3" r="10" fill="#e4f2ef" stroke="#0d7f78" stroke-width="1.8"/>
+<circle cx="450" cy="335.0" r="10" fill="#e4f2ef" stroke="#0d7f78" stroke-width="1.8"/>
+<circle cx="740" cy="60.0" r="9" fill="#fbeae4" stroke="#e2633b" stroke-width="1.6"/><text x="762" y="64.0" font-size="10" fill="#33464e" font-family="Consolas,monospace">0</text>
+<circle cx="740" cy="87.3" r="9" fill="#fbeae4" stroke="#e2633b" stroke-width="1.6"/><text x="762" y="91.3" font-size="10" fill="#33464e" font-family="Consolas,monospace">1</text>
+<circle cx="740" cy="114.5" r="9" fill="#fbeae4" stroke="#e2633b" stroke-width="1.6"/><text x="762" y="118.5" font-size="10" fill="#33464e" font-family="Consolas,monospace">2</text>
+<circle cx="740" cy="141.8" r="9" fill="#fbeae4" stroke="#e2633b" stroke-width="1.6"/><text x="762" y="145.8" font-size="10" fill="#33464e" font-family="Consolas,monospace">3</text>
+<circle cx="740" cy="169.1" r="9" fill="#fbeae4" stroke="#e2633b" stroke-width="1.6"/><text x="762" y="173.1" font-size="10" fill="#33464e" font-family="Consolas,monospace">4</text>
+<circle cx="740" cy="196.4" r="9" fill="#fbeae4" stroke="#e2633b" stroke-width="1.6"/><text x="762" y="200.4" font-size="10" fill="#33464e" font-family="Consolas,monospace">5</text>
+<circle cx="740" cy="223.6" r="9" fill="#fbeae4" stroke="#e2633b" stroke-width="1.6"/><text x="762" y="227.6" font-size="10" fill="#33464e" font-family="Consolas,monospace">6</text>
+<circle cx="740" cy="250.9" r="9" fill="#fbeae4" stroke="#e2633b" stroke-width="1.6"/><text x="762" y="254.9" font-size="10" fill="#33464e" font-family="Consolas,monospace">7</text>
+<circle cx="740" cy="278.2" r="9" fill="#fbeae4" stroke="#e2633b" stroke-width="1.6"/><text x="762" y="282.2" font-size="10" fill="#33464e" font-family="Consolas,monospace">8</text>
+<circle cx="740" cy="305.5" r="9" fill="#fbeae4" stroke="#e2633b" stroke-width="1.6"/><text x="762" y="309.5" font-size="10" fill="#33464e" font-family="Consolas,monospace">9</text>
+<circle cx="740" cy="332.7" r="9" fill="#fbeae4" stroke="#e2633b" stroke-width="1.6"/><text x="762" y="336.7" font-size="10" fill="#33464e" font-family="Consolas,monospace">10</text>
+<circle cx="740" cy="360.0" r="9" fill="#fbeae4" stroke="#e2633b" stroke-width="1.6"/><text x="762" y="364.0" font-size="10" fill="#33464e" font-family="Consolas,monospace">11</text>
+<text x="140" y="30" text-anchor="middle" font-size="14" font-weight="700" fill="#102733" font-family="Segoe UI,Yu Gothic UI,Meiryo,sans-serif">入力 x（128）</text>
+<text x="140" y="46" text-anchor="middle" font-size="11" fill="#60727a" font-family="Segoe UI,Yu Gothic UI,Meiryo,sans-serif">時間波形128点・標準化済み</text>
+<text x="450" y="30" text-anchor="middle" font-size="14" font-weight="700" fill="#0d7f78" font-family="Segoe UI,Yu Gothic UI,Meiryo,sans-serif">隠れ層 h（32）</text>
+<text x="450" y="46" text-anchor="middle" font-size="11" fill="#60727a" font-family="Segoe UI,Yu Gothic UI,Meiryo,sans-serif">hard sigmoid</text>
+<text x="740" y="30" text-anchor="middle" font-size="14" font-weight="700" fill="#e2633b" font-family="Segoe UI,Yu Gothic UI,Meiryo,sans-serif">出力 y（12）</text>
+<text x="740" y="46" text-anchor="middle" font-size="11" fill="#60727a" font-family="Segoe UI,Yu Gothic UI,Meiryo,sans-serif">エリア別スコア</text>
+<rect x="215" y="388" width="170" height="52" fill="#fff" stroke="#9aa9ad"/><text x="300" y="408" text-anchor="middle" font-size="12" font-weight="700" fill="#33464e" font-family="Segoe UI,Yu Gothic UI,Meiryo,sans-serif">α 固定（128×32）</text><text x="300" y="426" text-anchor="middle" font-size="10.5" fill="#60727a" font-family="Segoe UI,Yu Gothic UI,Meiryo,sans-serif">Simulator Seed 1 から採取</text>
+<rect x="515" y="388" width="170" height="52" fill="#fff" stroke="#0d7f78"/><text x="600" y="408" text-anchor="middle" font-size="12" font-weight="700" fill="#0d7f78" font-family="Segoe UI,Yu Gothic UI,Meiryo,sans-serif">β 学習（32×12）</text><text x="600" y="426" text-anchor="middle" font-size="10.5" fill="#60727a" font-family="Segoe UI,Yu Gothic UI,Meiryo,sans-serif">MSE・L2正則化／現場でODL更新</text>
+<rect x="805" y="190" width="88" height="80" fill="#102733"/><text x="849" y="224" text-anchor="middle" font-size="13" font-weight="700" fill="#fff" font-family="Consolas,monospace">argmax</text><text x="849" y="244" text-anchor="middle" font-size="10" fill="#d4e0e4" font-family="Segoe UI,Yu Gothic UI,Meiryo,sans-serif">CPU側</text><text x="849" y="258" text-anchor="middle" font-size="10" fill="#d4e0e4" font-family="Segoe UI,Yu Gothic UI,Meiryo,sans-serif">→ エリア番号</text>
+<line x1="774" y1="230" x2="803" y2="230" stroke="#102733" stroke-width="1.5"/>
+</svg>
+  </div>
+  <p class="note">灰色の線は固定のα、緑の線は学習するβです。判定は12個のスコアの最大値をCPUが選びます。</p>
+
+  <h2>推論の計算グラフ</h2>
+  <p>波形の入力からエリア番号の出力まで、実機の推論と同じ順序で並べた計算グラフです。黄色のヘッダは定数（重み・係数）、辺の文字はテンソルの形状です。</p>
+  <div class="diagram" style="max-width:760px">
+<svg viewBox="0 0 760 1160" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Netron風の推論計算グラフ"><rect width="100%" height="100%" fill="#f7f8f6"/><path d="M250 68 C250 84.0 180 84.0 180 100" fill="none" stroke="#7d8d93" stroke-width="1.3"/><path d="M176 94 L180 100 L184 94" fill="none" stroke="#7d8d93" stroke-width="1.3"/><path d="M330 68 C330 84.0 400 84.0 400 100" fill="none" stroke="#7d8d93" stroke-width="1.3"/><path d="M396 94 L400 100 L404 94" fill="none" stroke="#7d8d93" stroke-width="1.3"/><path d="M180 158 C180 166.5 180 166.5 180 175" fill="none" stroke="#7d8d93" stroke-width="1.3"/><path d="M176 169 L180 175 L184 169" fill="none" stroke="#7d8d93" stroke-width="1.3"/><path d="M180 218 C180 226.5 400 226.5 400 235" fill="none" stroke="#7d8d93" stroke-width="1.3"/><path d="M396 229 L400 235 L404 229" fill="none" stroke="#7d8d93" stroke-width="1.3"/><text x="298.0" y="229.5" font-size="10" fill="#0d7f78" font-family="Consolas,monospace">baseline</text><path d="M400 158 C400 196.5 400 196.5 400 235" fill="none" stroke="#7d8d93" stroke-width="1.3"/><path d="M396 229 L400 235 L404 229" fill="none" stroke="#7d8d93" stroke-width="1.3"/><text x="408.0" y="199.5" font-size="10" fill="#0d7f78" font-family="Consolas,monospace">float[448]</text><path d="M400 293 C400 311.5 290 311.5 290 330" fill="none" stroke="#7d8d93" stroke-width="1.3"/><path d="M286 324 L290 330 L294 324" fill="none" stroke="#7d8d93" stroke-width="1.3"/><path d="M290 388 C290 399.0 290 399.0 290 410" fill="none" stroke="#7d8d93" stroke-width="1.3"/><path d="M286 404 L290 410 L294 404" fill="none" stroke="#7d8d93" stroke-width="1.3"/><text x="298.0" y="402.0" font-size="10" fill="#0d7f78" font-family="Consolas,monospace">float[128]</text><path d="M290 468 C290 479.0 290 479.0 290 490" fill="none" stroke="#7d8d93" stroke-width="1.3"/><path d="M286 484 L290 490 L294 484" fill="none" stroke="#7d8d93" stroke-width="1.3"/><text x="298.0" y="482.0" font-size="10" fill="#0d7f78" font-family="Consolas,monospace">float[128]</text><path d="M290 548 C290 561.5 290 561.5 290 575" fill="none" stroke="#7d8d93" stroke-width="1.3"/><path d="M286 569 L290 575 L294 569" fill="none" stroke="#7d8d93" stroke-width="1.3"/><text x="298.0" y="564.5" font-size="10" fill="#0d7f78" font-family="Consolas,monospace">float[128]</text><path d="M290 633 C290 639.0 290 639.0 290 645" fill="none" stroke="#7d8d93" stroke-width="1.3"/><path d="M286 639 L290 645 L294 639" fill="none" stroke="#7d8d93" stroke-width="1.3"/><text x="298.0" y="642.0" font-size="10" fill="#0d7f78" font-family="Consolas,monospace">bf16[128]</text><path d="M290 718 C290 731.5 290 731.5 290 745" fill="none" stroke="#7d8d93" stroke-width="1.3"/><path d="M286 739 L290 745 L294 739" fill="none" stroke="#7d8d93" stroke-width="1.3"/><text x="298.0" y="734.5" font-size="10" fill="#0d7f78" font-family="Consolas,monospace">float32[32]</text><path d="M290 818 C290 824.0 290 824.0 290 830" fill="none" stroke="#7d8d93" stroke-width="1.3"/><path d="M286 824 L290 830 L294 824" fill="none" stroke="#7d8d93" stroke-width="1.3"/><text x="298.0" y="827.0" font-size="10" fill="#0d7f78" font-family="Consolas,monospace">float[32]</text><path d="M290 888 C290 894.0 290 894.0 290 900" fill="none" stroke="#7d8d93" stroke-width="1.3"/><path d="M286 894 L290 900 L294 894" fill="none" stroke="#7d8d93" stroke-width="1.3"/><text x="298.0" y="897.0" font-size="10" fill="#0d7f78" font-family="Consolas,monospace">bf16[32]</text><path d="M290 973 C290 986.5 290 986.5 290 1000" fill="none" stroke="#7d8d93" stroke-width="1.3"/><path d="M286 994 L290 1000 L294 994" fill="none" stroke="#7d8d93" stroke-width="1.3"/><text x="298.0" y="989.5" font-size="10" fill="#0d7f78" font-family="Consolas,monospace">bf16[12]</text><path d="M290 1058 C290 1066.5 290 1066.5 290 1075" fill="none" stroke="#7d8d93" stroke-width="1.3"/><path d="M286 1069 L290 1075 L294 1069" fill="none" stroke="#7d8d93" stroke-width="1.3"/><path d="M535 356.5 H405.0" fill="none" stroke="#c9a23a" stroke-width="1.2" stroke-dasharray="4 3"/><path d="M535 524.0 H405.0" fill="none" stroke="#c9a23a" stroke-width="1.2" stroke-dasharray="4 3"/><path d="M535 684.0 H405.0" fill="none" stroke="#c9a23a" stroke-width="1.2" stroke-dasharray="4 3"/><path d="M535 939.0 H405.0" fill="none" stroke="#c9a23a" stroke-width="1.2" stroke-dasharray="4 3"/><g><rect x="190.0" y="10" width="200" height="58" rx="4" fill="#fff" stroke="#8c9aa0"/><path d="M190.0 32 V14 Q190.0 10 194.0 10 H386.0 Q390.0 10 390.0 14 V32 Z" fill="#5b6b73"/><text x="290" y="25" text-anchor="middle" font-size="12" font-weight="700" fill="#fff" font-family="Segoe UI,Yu Gothic UI,Meiryo,sans-serif">Input</text><text x="198.0" y="45" font-size="10.5" fill="#60727a" font-family="Consolas,monospace">waveform</text><text x="382.0" y="45" text-anchor="end" font-size="10.5" fill="#102733" font-family="Consolas,monospace">float[512]</text><text x="198.0" y="60" font-size="10.5" fill="#60727a" font-family="Consolas,monospace">source</text><text x="382.0" y="60" text-anchor="end" font-size="10.5" fill="#102733" font-family="Consolas,monospace">KX134 Z 25.6kHz</text></g><g><rect x="95.0" y="100" width="170" height="58" rx="4" fill="#fff" stroke="#8c9aa0"/><path d="M95.0 122 V104 Q95.0 100 99.0 100 H261.0 Q265.0 100 265.0 104 V122 Z" fill="#4a7fb5"/><text x="180" y="115" text-anchor="middle" font-size="12" font-weight="700" fill="#fff" font-family="Segoe UI,Yu Gothic UI,Meiryo,sans-serif">Slice</text><text x="103.0" y="135" font-size="10.5" fill="#60727a" font-family="Consolas,monospace">range</text><text x="257.0" y="135" text-anchor="end" font-size="10.5" fill="#102733" font-family="Consolas,monospace">[0:64]</text><text x="103.0" y="150" font-size="10.5" fill="#60727a" font-family="Consolas,monospace">role</text><text x="257.0" y="150" text-anchor="end" font-size="10.5" fill="#102733" font-family="Consolas,monospace">プリトリガ</text></g><g><rect x="315.0" y="100" width="170" height="58" rx="4" fill="#fff" stroke="#8c9aa0"/><path d="M315.0 122 V104 Q315.0 100 319.0 100 H481.0 Q485.0 100 485.0 104 V122 Z" fill="#4a7fb5"/><text x="400" y="115" text-anchor="middle" font-size="12" font-weight="700" fill="#fff" font-family="Segoe UI,Yu Gothic UI,Meiryo,sans-serif">Slice</text><text x="323.0" y="135" font-size="10.5" fill="#60727a" font-family="Consolas,monospace">range</text><text x="477.0" y="135" text-anchor="end" font-size="10.5" fill="#102733" font-family="Consolas,monospace">[64:512]</text><text x="323.0" y="150" font-size="10.5" fill="#60727a" font-family="Consolas,monospace">role</text><text x="477.0" y="150" text-anchor="end" font-size="10.5" fill="#102733" font-family="Consolas,monospace">ポストトリガ</text></g><g><rect x="95.0" y="175" width="170" height="43" rx="4" fill="#fff" stroke="#8c9aa0"/><path d="M95.0 197 V179 Q95.0 175 99.0 175 H261.0 Q265.0 175 265.0 179 V197 Z" fill="#3f9c77"/><text x="180" y="190" text-anchor="middle" font-size="12" font-weight="700" fill="#fff" font-family="Segoe UI,Yu Gothic UI,Meiryo,sans-serif">ReduceMean</text><text x="103.0" y="210" font-size="10.5" fill="#60727a" font-family="Consolas,monospace">output</text><text x="257.0" y="210" text-anchor="end" font-size="10.5" fill="#102733" font-family="Consolas,monospace">baseline</text></g><g><rect x="315.0" y="235" width="170" height="58" rx="4" fill="#fff" stroke="#8c9aa0"/><path d="M315.0 257 V239 Q315.0 235 319.0 235 H481.0 Q485.0 235 485.0 239 V257 Z" fill="#3f9c77"/><text x="400" y="250" text-anchor="middle" font-size="12" font-weight="700" fill="#fff" font-family="Segoe UI,Yu Gothic UI,Meiryo,sans-serif">Sub</text><text x="323.0" y="270" font-size="10.5" fill="#60727a" font-family="Consolas,monospace">input</text><text x="477.0" y="270" text-anchor="end" font-size="10.5" fill="#102733" font-family="Consolas,monospace">x − baseline</text><text x="323.0" y="285" font-size="10.5" fill="#60727a" font-family="Consolas,monospace">output</text><text x="477.0" y="285" text-anchor="end" font-size="10.5" fill="#102733" font-family="Consolas,monospace">float[448]</text></g><g><rect x="175.0" y="330" width="230" height="58" rx="4" fill="#fff" stroke="#8c9aa0"/><path d="M175.0 352 V334 Q175.0 330 179.0 330 H401.0 Q405.0 330 405.0 334 V352 Z" fill="#4a7fb5"/><text x="290" y="345" text-anchor="middle" font-size="12" font-weight="700" fill="#fff" font-family="Segoe UI,Yu Gothic UI,Meiryo,sans-serif">Gather</text><text x="183.0" y="365" font-size="10.5" fill="#60727a" font-family="Consolas,monospace">indices</text><text x="397.0" y="365" text-anchor="end" font-size="10.5" fill="#102733" font-family="Consolas,monospace">int[128]</text><text x="183.0" y="380" font-size="10.5" fill="#60727a" font-family="Consolas,monospace">output</text><text x="397.0" y="380" text-anchor="end" font-size="10.5" fill="#102733" font-family="Consolas,monospace">float[128]</text></g><g><rect x="175.0" y="410" width="230" height="58" rx="4" fill="#fff" stroke="#8c9aa0"/><path d="M175.0 432 V414 Q175.0 410 179.0 410 H401.0 Q405.0 410 405.0 414 V432 Z" fill="#3f9c77"/><text x="290" y="425" text-anchor="middle" font-size="12" font-weight="700" fill="#fff" font-family="Segoe UI,Yu Gothic UI,Meiryo,sans-serif">Normalize</text><text x="183.0" y="445" font-size="10.5" fill="#60727a" font-family="Consolas,monospace">divisor</text><text x="397.0" y="445" text-anchor="end" font-size="10.5" fill="#102733" font-family="Consolas,monospace">max(|x|, 1)</text><text x="183.0" y="460" font-size="10.5" fill="#60727a" font-family="Consolas,monospace">output</text><text x="397.0" y="460" text-anchor="end" font-size="10.5" fill="#102733" font-family="Consolas,monospace">float[128]</text></g><g><rect x="175.0" y="490" width="230" height="58" rx="4" fill="#fff" stroke="#8c9aa0"/><path d="M175.0 512 V494 Q175.0 490 179.0 490 H401.0 Q405.0 490 405.0 494 V512 Z" fill="#3f9c77"/><text x="290" y="505" text-anchor="middle" font-size="12" font-weight="700" fill="#fff" font-family="Segoe UI,Yu Gothic UI,Meiryo,sans-serif">Standardize</text><text x="183.0" y="525" font-size="10.5" fill="#60727a" font-family="Consolas,monospace">(x−mean)/std</text><text x="397.0" y="525" text-anchor="end" font-size="10.5" fill="#102733" font-family="Consolas,monospace">列ごと</text><text x="183.0" y="540" font-size="10.5" fill="#60727a" font-family="Consolas,monospace">output</text><text x="397.0" y="540" text-anchor="end" font-size="10.5" fill="#102733" font-family="Consolas,monospace">float[128]</text></g><g><rect x="190.0" y="575" width="200" height="58" rx="4" fill="#fff" stroke="#8c9aa0"/><path d="M190.0 597 V579 Q190.0 575 194.0 575 H386.0 Q390.0 575 390.0 579 V597 Z" fill="#8a6bb5"/><text x="290" y="590" text-anchor="middle" font-size="12" font-weight="700" fill="#fff" font-family="Segoe UI,Yu Gothic UI,Meiryo,sans-serif">Cast</text><text x="198.0" y="610" font-size="10.5" fill="#60727a" font-family="Consolas,monospace">to</text><text x="382.0" y="610" text-anchor="end" font-size="10.5" fill="#102733" font-family="Consolas,monospace">bfloat16</text><text x="198.0" y="625" font-size="10.5" fill="#60727a" font-family="Consolas,monospace">output</text><text x="382.0" y="625" text-anchor="end" font-size="10.5" fill="#102733" font-family="Consolas,monospace">bf16[128]</text></g><g><rect x="175.0" y="645" width="230" height="73" rx="4" fill="#fff" stroke="#8c9aa0"/><path d="M175.0 667 V649 Q175.0 645 179.0 645 H401.0 Q405.0 645 405.0 649 V667 Z" fill="#2e6f9e"/><text x="290" y="660" text-anchor="middle" font-size="12" font-weight="700" fill="#fff" font-family="Segoe UI,Yu Gothic UI,Meiryo,sans-serif">MatMul</text><text x="183.0" y="680" font-size="10.5" fill="#60727a" font-family="Consolas,monospace">A</text><text x="397.0" y="680" text-anchor="end" font-size="10.5" fill="#102733" font-family="Consolas,monospace">bf16[128]</text><text x="183.0" y="695" font-size="10.5" fill="#60727a" font-family="Consolas,monospace">B</text><text x="397.0" y="695" text-anchor="end" font-size="10.5" fill="#102733" font-family="Consolas,monospace">α [128×32]</text><text x="183.0" y="710" font-size="10.5" fill="#60727a" font-family="Consolas,monospace">output</text><text x="397.0" y="710" text-anchor="end" font-size="10.5" fill="#102733" font-family="Consolas,monospace">float32[32]</text></g><g><rect x="175.0" y="745" width="230" height="73" rx="4" fill="#fff" stroke="#8c9aa0"/><path d="M175.0 767 V749 Q175.0 745 179.0 745 H401.0 Q405.0 745 405.0 749 V767 Z" fill="#c0552d"/><text x="290" y="760" text-anchor="middle" font-size="12" font-weight="700" fill="#fff" font-family="Segoe UI,Yu Gothic UI,Meiryo,sans-serif">HardSigmoid</text><text x="183.0" y="780" font-size="10.5" fill="#60727a" font-family="Consolas,monospace">slope</text><text x="397.0" y="780" text-anchor="end" font-size="10.5" fill="#102733" font-family="Consolas,monospace">0.2</text><text x="183.0" y="795" font-size="10.5" fill="#60727a" font-family="Consolas,monospace">offset</text><text x="397.0" y="795" text-anchor="end" font-size="10.5" fill="#102733" font-family="Consolas,monospace">0.5</text><text x="183.0" y="810" font-size="10.5" fill="#60727a" font-family="Consolas,monospace">clip</text><text x="397.0" y="810" text-anchor="end" font-size="10.5" fill="#102733" font-family="Consolas,monospace">[0, 1]</text></g><g><rect x="190.0" y="830" width="200" height="58" rx="4" fill="#fff" stroke="#8c9aa0"/><path d="M190.0 852 V834 Q190.0 830 194.0 830 H386.0 Q390.0 830 390.0 834 V852 Z" fill="#8a6bb5"/><text x="290" y="845" text-anchor="middle" font-size="12" font-weight="700" fill="#fff" font-family="Segoe UI,Yu Gothic UI,Meiryo,sans-serif">Cast</text><text x="198.0" y="865" font-size="10.5" fill="#60727a" font-family="Consolas,monospace">to</text><text x="382.0" y="865" text-anchor="end" font-size="10.5" fill="#102733" font-family="Consolas,monospace">bfloat16</text><text x="198.0" y="880" font-size="10.5" fill="#60727a" font-family="Consolas,monospace">output</text><text x="382.0" y="880" text-anchor="end" font-size="10.5" fill="#102733" font-family="Consolas,monospace">bf16[32]</text></g><g><rect x="175.0" y="900" width="230" height="73" rx="4" fill="#fff" stroke="#8c9aa0"/><path d="M175.0 922 V904 Q175.0 900 179.0 900 H401.0 Q405.0 900 405.0 904 V922 Z" fill="#2e6f9e"/><text x="290" y="915" text-anchor="middle" font-size="12" font-weight="700" fill="#fff" font-family="Segoe UI,Yu Gothic UI,Meiryo,sans-serif">MatMul</text><text x="183.0" y="935" font-size="10.5" fill="#60727a" font-family="Consolas,monospace">A</text><text x="397.0" y="935" text-anchor="end" font-size="10.5" fill="#102733" font-family="Consolas,monospace">bf16[32]</text><text x="183.0" y="950" font-size="10.5" fill="#60727a" font-family="Consolas,monospace">B</text><text x="397.0" y="950" text-anchor="end" font-size="10.5" fill="#102733" font-family="Consolas,monospace">β [32×12]</text><text x="183.0" y="965" font-size="10.5" fill="#60727a" font-family="Consolas,monospace">output</text><text x="397.0" y="965" text-anchor="end" font-size="10.5" fill="#102733" font-family="Consolas,monospace">bf16[12]</text></g><g><rect x="190.0" y="1000" width="200" height="58" rx="4" fill="#fff" stroke="#8c9aa0"/><path d="M190.0 1022 V1004 Q190.0 1000 194.0 1000 H386.0 Q390.0 1000 390.0 1004 V1022 Z" fill="#102733"/><text x="290" y="1015" text-anchor="middle" font-size="12" font-weight="700" fill="#fff" font-family="Segoe UI,Yu Gothic UI,Meiryo,sans-serif">ArgMax</text><text x="198.0" y="1035" font-size="10.5" fill="#60727a" font-family="Consolas,monospace">axis</text><text x="382.0" y="1035" text-anchor="end" font-size="10.5" fill="#102733" font-family="Consolas,monospace">0</text><text x="198.0" y="1050" font-size="10.5" fill="#60727a" font-family="Consolas,monospace">runs on</text><text x="382.0" y="1050" text-anchor="end" font-size="10.5" fill="#102733" font-family="Consolas,monospace">CPU</text></g><g><rect x="190.0" y="1075" width="200" height="58" rx="4" fill="#fff" stroke="#8c9aa0"/><path d="M190.0 1097 V1079 Q190.0 1075 194.0 1075 H386.0 Q390.0 1075 390.0 1079 V1097 Z" fill="#5b6b73"/><text x="290" y="1090" text-anchor="middle" font-size="12" font-weight="700" fill="#fff" font-family="Segoe UI,Yu Gothic UI,Meiryo,sans-serif">Output</text><text x="198.0" y="1110" font-size="10.5" fill="#60727a" font-family="Consolas,monospace">scores</text><text x="382.0" y="1110" text-anchor="end" font-size="10.5" fill="#102733" font-family="Consolas,monospace">bf16[12]</text><text x="198.0" y="1125" font-size="10.5" fill="#60727a" font-family="Consolas,monospace">area</text><text x="382.0" y="1125" text-anchor="end" font-size="10.5" fill="#102733" font-family="Consolas,monospace">int 0..11</text></g><g><rect x="540.0" y="335" width="200" height="43" rx="4" fill="#fff" stroke="#8c9aa0"/><path d="M540.0 357 V339 Q540.0 335 544.0 335 H736.0 Q740.0 335 740.0 339 V357 Z" fill="#c9a23a"/><text x="640" y="350" text-anchor="middle" font-size="12" font-weight="700" fill="#fff" font-family="Segoe UI,Yu Gothic UI,Meiryo,sans-serif">Constant</text><text x="548.0" y="370" font-size="10.5" fill="#60727a" font-family="Consolas,monospace">time_sample_indices</text><text x="732.0" y="370" text-anchor="end" font-size="10.5" fill="#102733" font-family="Consolas,monospace">int[128]</text></g><g><rect x="540.0" y="495" width="200" height="58" rx="4" fill="#fff" stroke="#8c9aa0"/><path d="M540.0 517 V499 Q540.0 495 544.0 495 H736.0 Q740.0 495 740.0 499 V517 Z" fill="#c9a23a"/><text x="640" y="510" text-anchor="middle" font-size="12" font-weight="700" fill="#fff" font-family="Segoe UI,Yu Gothic UI,Meiryo,sans-serif">Constant</text><text x="548.0" y="530" font-size="10.5" fill="#60727a" font-family="Consolas,monospace">mean</text><text x="732.0" y="530" text-anchor="end" font-size="10.5" fill="#102733" font-family="Consolas,monospace">float[128]</text><text x="548.0" y="545" font-size="10.5" fill="#60727a" font-family="Consolas,monospace">std</text><text x="732.0" y="545" text-anchor="end" font-size="10.5" fill="#102733" font-family="Consolas,monospace">float[128]</text></g><g><rect x="540.0" y="655" width="200" height="58" rx="4" fill="#fff" stroke="#8c9aa0"/><path d="M540.0 677 V659 Q540.0 655 544.0 655 H736.0 Q740.0 655 740.0 659 V677 Z" fill="#c9a23a"/><text x="640" y="670" text-anchor="middle" font-size="12" font-weight="700" fill="#fff" font-family="Segoe UI,Yu Gothic UI,Meiryo,sans-serif">Constant α</text><text x="548.0" y="690" font-size="10.5" fill="#60727a" font-family="Consolas,monospace">shape</text><text x="732.0" y="690" text-anchor="end" font-size="10.5" fill="#102733" font-family="Consolas,monospace">[128, 32]</text><text x="548.0" y="705" font-size="10.5" fill="#60727a" font-family="Consolas,monospace">origin</text><text x="732.0" y="705" text-anchor="end" font-size="10.5" fill="#102733" font-family="Consolas,monospace">Sim Seed 1</text></g><g><rect x="540.0" y="910" width="200" height="58" rx="4" fill="#fff" stroke="#8c9aa0"/><path d="M540.0 932 V914 Q540.0 910 544.0 910 H736.0 Q740.0 910 740.0 914 V932 Z" fill="#c9a23a"/><text x="640" y="925" text-anchor="middle" font-size="12" font-weight="700" fill="#fff" font-family="Segoe UI,Yu Gothic UI,Meiryo,sans-serif">Constant β</text><text x="548.0" y="945" font-size="10.5" fill="#60727a" font-family="Consolas,monospace">shape</text><text x="732.0" y="945" text-anchor="end" font-size="10.5" fill="#102733" font-family="Consolas,monospace">[32, 12]</text><text x="548.0" y="960" font-size="10.5" fill="#60727a" font-family="Consolas,monospace">trained</text><text x="732.0" y="960" text-anchor="end" font-size="10.5" fill="#102733" font-family="Consolas,monospace">PC / ODL</text></g></svg>
+  </div>
+
   <h2>最終的な学習環境</h2>
   <div class="grid two">
     <div class="card"><span class="tag">DATA</span><h3>実測の収録データ</h3><p>400 × 300 × 5 mmアクリル板、KX134-1211 1個、12打点。検証済み11セッション・7,132打点（中央点4、四隅7）。ラベルは収録UIが付与し、NGイベントは削除。</p></div>
