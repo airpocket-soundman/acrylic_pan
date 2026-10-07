@@ -398,8 +398,11 @@
   <p class="note">この数値はIchiPing（能動音響による扉・窓の開閉判定）のデータでの結果で、Acrylic Panの精度ではありません。Acrylic Panでは、この検証済みの学習環境とαを引き継ぎ、次節以降のとおり振動データで学習しています。</p>
 
   <h2>試作段階（8クラス）での学習環境の妥当性確認</h2>
-  <p>最終モデルへ進む前に、試作の8クラスモデル（入力128・隠れ32・出力8、hard sigmoid、MSE）で、自作の学習環境が実機のSolist-AIと同じ計算になっていることを確認しました。αには公式SimulatorのSeed 1を使い、βだけを自作環境で学習しています。</p>
+  <p>初期開発では、実測データがない段階から、パネルの振動シミュレーション結果に基づく<b>ダミーデータ</b>を使い、試作の8クラスモデル（入力128・隠れ32・出力8、hard sigmoid、MSE）で、モデル構成・特徴量・学習環境を検証しました。さらに、自作の学習環境で作ったダミーモデルを実機に書き込み、PC上の推論と同じ出力になることを確認しています。αには公式SimulatorのSeed 1を使い、βだけを自作環境で学習しています。</p>
   <table class="spec">
+    <tr><th>振動シミュレーション</th><td>板の固有モード解析</td><td>Kirchhoff-Love薄板のFDMと、3Dソリッド・CalculiXのFEMで、固定条件による固有モードと打点ごとの応答の違いを設計段階で比較（<code>sim/modal_plate.py</code>、<code>calculix/</code>）</td></tr>
+    <tr><th>ダミーデータ</th><td>合成データ</td><td>FEAの固有モード結合ベクトルに、打撃力のスケールとノイズを加えて生成（<code>sim/solist_feasibility.py</code>）。8クラスの実現可能性を事前に確認し、Simulator用CSVも生成（<code>sim.solist_dataset</code>）。実機の合格基準は実測データで確認</td></tr>
+    <tr><th>ダミーモデル</th><td>決定的な合成8ケース</td><td>各クラス1件の合成入力で学習・照合し、実機でPC推論と比較するための検証用モデル（<code>data/dummy_model/</code>）</td></tr>
     <tr><th>学習</th><td>自作環境</td><td>公式Simulator由来の固定α、PC側（NumPy）でβを学習し、bfloat16のヘッダを出力</td></tr>
     <tr><th>実機への組込み</th><td>ML63Q2557</td><td>生成したヘッダをファームへ組み込み、MCU-LinkとOpenOCDで書込み・全バイト検証</td></tr>
     <tr><th>PC推論との照合</th><td><strong>8 / 8 一致</strong></td><td>固定の検定用入力8件（各クラス1件）を、PC上の推論（bfloat16参照計算）と実機（デバイス上の推論）の両方に通して比較。クラス判定が8/8、スコア64個がすべて合格基準内（最大絶対誤差0.03125、基準は絶対誤差0.035または相対誤差5%）</td></tr>
