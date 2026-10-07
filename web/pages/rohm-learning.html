@@ -14,7 +14,7 @@
   <h2>審査確認への回答サマリ</h2>
   <table class="spec">
     <tr><th>① 教師あり学習</th><td><strong>Yes</strong></td><td>60測定位置を教師にした教師あり学習。教師は正解one-hot 75%とPC側モデルの確率25%の混合（蒸留）。モデルはSolist-AIと同じ1隠れ層ELM（α固定・β学習）</td></tr>
-    <tr><th>② 公式サンプルソフト</th><td><strong>Yes（Simulatorを使用）</strong></td><td>ROHMサイトから入手した <b>Solist-AI Sim 教師あり学習対応版 SLV1.00.04</b> を導入し、Simulatorを使って<b>PC上での学習環境の構築</b>と<b>学習済みモデルの評価</b>を行った。固定α（Seed 1）の採取、CSV形式とAI設定（活性化関数・Seedなど）の基準にも使用</td></tr>
+    <tr><th>② 公式サンプルソフト</th><td><strong>Yes（Simulatorを使用）</strong></td><td>ROHMサイトから入手した <b>Solist-AI Sim 教師あり学習対応版 SLV1.00.04</b> を導入し、Simulatorを使って<b>PC上での学習環境の構築</b>と<b>学習済みモデルの評価</b>を行った（先行プロジェクトIchiPingで、PC学習のβを読み込み推論のみで評価）。固定α（Seed 1）の採取、CSV形式とAI設定の基準にも使用</td></tr>
     <tr><th>③ その他の共有内容</th><td>下記すべて</td><td>学習コード、評価レポート、実機用ヘッダ、デバイス上の推論とオンデバイス学習（ODL）の実装を本リポジトリで公開</td></tr>
   </table>
   <div class="status"><strong>学習の実行場所</strong>最終モデルのβは、公式Simulatorと同じ固定αのELM構造（hard sigmoid、bfloat16境界）をPython/NumPyで再現した<b>PC側の学習スクリプト</b>で求めています。Simulator GUIの学習ボタンで直接求めたβではない点は、以下の各節で区別して記載します。</div>
@@ -378,6 +378,24 @@
     <tr><th>操作手順</th><td><code>docs/solist-ai-simulator.md</code></td><td>画面設定、モデル保存（model1.xlsx / model1.h / model1.mat）、再読込みの手順を記録</td></tr>
   </table>
   <p class="note">公式Simulator SLV1.00.04には学習を自動実行するCLIがないため、セッション分離評価や蒸留の学習はPC側スクリプトで行い、Simulator用CSVは同じ条件の確認用に出力しています。</p>
+
+  <h2>公式Simulatorでの検証（先行プロジェクトIchiPing）</h2>
+  <p>自作の学習環境と固定αは、先行プロジェクト <a href="https://airpocket-soundman.github.io/IchiPing_solist_AI/" target="_blank" rel="noopener">IchiPing</a> のSimulator段階（2026-06）で、公式Simulatorを使って検証したものを引き継いでいます。</p>
+  <div class="flow">
+    <div><span class="tag">TRAIN (PC)</span><h3>PCでβを求める</h3><p>PC側のbatch最小二乗で、固定α（Seed 1）のELMのβを計算。</p></div>
+    <span>→</span>
+    <div><span class="tag">LOAD</span><h3>Simulatorへ読み込む</h3><p>βを焼き込んだ <code>model1.xlsx</code>（Seed 1、隠れ32）とテストCSVを、公式Simulator SLV1.00.04へ読み込み。</p></div>
+    <span>→</span>
+    <div><span class="tag">EVALUATE</span><h3>推論のみで評価</h3><p>「Using loaded AI model」と「Test only」で、Simulator上の精度と推論時間を確認。</p></div>
+  </div>
+  <table class="spec">
+    <tr><th>評価対象</th><td>IchiPingのELMモデル</td><td>入力167特徴・隠れ32のELM。14クラスと32クラス</td></tr>
+    <tr><th>Simulatorでの精度</th><td><strong>99.4% / 99.1%</strong></td><td>14クラスは固定βで99.4%、32クラスは少量の現地データをPCで追加学習して99.1%（フレーム単位）</td></tr>
+    <tr><th>Simulatorでの推論時間</th><td><strong>約3.4 ms</strong></td><td>1フレームあたり。AI RAM使用量は約11 KBで、実機の16 KBに収まる</td></tr>
+    <tr><th>自作環境の採用理由</th><td>PC側のbatch最小二乗</td><td>Simulatorの逐次学習（OS-ELM）は当時のデータで安定して収束しなかったため、βはPCで求め、Simulatorで推論を検証する方式にした</td></tr>
+    <tr><th>引き継いだもの</th><td>固定α・ELMの実装</td><td>Simulator Seed 1のα、<code>sim/solist_elm.py</code> のELM実装、PCで学習してSimulator互換のβを使う手順</td></tr>
+  </table>
+  <p class="note">この数値はIchiPing（能動音響による扉・窓の開閉判定）のデータでの結果で、Acrylic Panの精度ではありません。Acrylic Panでは、この検証済みの学習環境とαを引き継ぎ、次節以降のとおり振動データで学習しています。</p>
 
   <h2>試作段階（8クラス）での学習環境の妥当性確認</h2>
   <p>最終モデルへ進む前に、試作の8クラスモデル（入力128・隠れ32・出力8、hard sigmoid、MSE）で、自作の学習環境が実機のSolist-AIと同じ計算になっていることを確認しました。αには公式SimulatorのSeed 1を使い、βだけを自作環境で学習しています。</p>
