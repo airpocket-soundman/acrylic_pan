@@ -150,7 +150,7 @@
   </table>
 
   <h2>モデル構造</h2>
-  <p>Solist-AIのELMは、入力→隠れ層の重みαを乱数で固定し、隠れ層→出力の重みβだけを学習する1隠れ層ネットワークです。位置確率モデルは入力128（127特徴と定数1）・隠れ32・出力12で、βを5ヘッド分切り替えて60位置を出します。</p>
+  <p>Solist-AIのELMは、入力→隠れ層の重みαを乱数で固定し、隠れ層→出力の重みβだけを学習する1隠れ層ネットワークです。位置確率モデルは入力128（127特徴と定数1）・隠れ32・出力60です。βは32×60を一括で学習し、実機では12列ずつ5つ（32×12）に分けて切り替え、12出力のネットワークを5回実行して60位置を出します。</p>
   <div class="diagram">
 <svg viewBox="0 0 900 470" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="入力128・隠れ層32・出力12のELM構造図">
 <line x1="140" y1="70.0" x2="450" y2="85.0" stroke="#9aa9ad" stroke-width="0.7" opacity="0.55"/>
@@ -357,12 +357,12 @@
 <text x="740" y="30" text-anchor="middle" font-size="14" font-weight="700" fill="#e2633b" font-family="Segoe UI,Yu Gothic UI,Meiryo,sans-serif">出力（12 × 5ヘッド）</text>
 <text x="740" y="46" text-anchor="middle" font-size="11" fill="#60727a" font-family="Segoe UI,Yu Gothic UI,Meiryo,sans-serif">5ヘッドで60位置のロジット</text>
 <rect x="215" y="388" width="170" height="52" fill="#fff" stroke="#9aa9ad"/><text x="300" y="408" text-anchor="middle" font-size="12" font-weight="700" fill="#33464e" font-family="Segoe UI,Yu Gothic UI,Meiryo,sans-serif">α 固定（128×32）</text><text x="300" y="426" text-anchor="middle" font-size="10.5" fill="#60727a" font-family="Segoe UI,Yu Gothic UI,Meiryo,sans-serif">Simulator Seed 1 と同じ射影</text>
-<rect x="515" y="388" width="170" height="52" fill="#fff" stroke="#0d7f78"/><text x="600" y="408" text-anchor="middle" font-size="12" font-weight="700" fill="#0d7f78" font-family="Segoe UI,Yu Gothic UI,Meiryo,sans-serif">β 学習（32×12 × 5ヘッド）</text><text x="600" y="426" text-anchor="middle" font-size="10.5" fill="#60727a" font-family="Segoe UI,Yu Gothic UI,Meiryo,sans-serif">Adam・蒸留教師・bfloat16</text>
+<rect x="515" y="388" width="170" height="52" fill="#fff" stroke="#0d7f78"/><text x="600" y="408" text-anchor="middle" font-size="12" font-weight="700" fill="#0d7f78" font-family="Segoe UI,Yu Gothic UI,Meiryo,sans-serif">β 学習（32×60）</text><text x="600" y="426" text-anchor="middle" font-size="10.5" fill="#60727a" font-family="Segoe UI,Yu Gothic UI,Meiryo,sans-serif">実行時は32×12の5ヘッドに分割</text>
 <rect x="805" y="190" width="88" height="80" fill="#102733"/><text x="849" y="224" text-anchor="middle" font-size="13" font-weight="700" fill="#fff" font-family="Consolas,monospace">softmax</text><text x="849" y="244" text-anchor="middle" font-size="10" fill="#d4e0e4" font-family="Segoe UI,Yu Gothic UI,Meiryo,sans-serif">CPU側</text><text x="849" y="258" text-anchor="middle" font-size="10" fill="#d4e0e4" font-family="Segoe UI,Yu Gothic UI,Meiryo,sans-serif">→ softmax</text>
 <line x1="774" y1="230" x2="803" y2="230" stroke="#102733" stroke-width="1.5"/>
 </svg>
   </div>
-  <p class="note">灰色の線は固定のα、緑の線は学習するβです。5ヘッドの12出力を並べて60位置のロジットにします。</p>
+  <p class="note">灰色の線は固定のα、緑の線は学習するβです。学習は32×60のβ全体で行い、実行時は12出力ずつ5回に分けて60位置のロジットにします。</p>
 
   <h2>使用したROHM公式ツール・資料</h2>
   <table class="spec">
@@ -396,7 +396,7 @@
     <div class="card"><span class="tag">DATA</span><h3>実測の収録データ</h3><p>400 × 300 × 5 mmアクリル板、KX134-1211 1個、60測定位置。検証済み11セッション・7,132打点。ラベルは収録UIが付与し、NGイベントは削除。</p></div>
     <div class="card"><span class="tag">FEATURE</span><h3>127特徴＋定数1</h3><p>トリガ後の時間波形から127点を抽出して標準化し、定数1を加えた128入力。標準化係数はヘッダへ固定し、PCと実機で共用。</p></div>
     <div class="card"><span class="tag">TEACHER</span><h3>蒸留した教師確率</h3><p>PC側の714特徴・60クラスMLPアンサンブル（3 seed）の確率を25%、正解one-hotを75%で混ぜた60次元の教師分布を使用。</p></div>
-    <div class="card"><span class="tag">TRAIN</span><h3>PCでβを学習</h3><p>固定α（Simulator Seed 1）の隠れ層出力に対し、温度0.05のsoftmax出力が教師分布に近づくようβをAdamで学習。12出力 × 5ヘッドに分割してbfloat16ヘッダへ出力。</p></div>
+    <div class="card"><span class="tag">TRAIN</span><h3>PCでβを学習</h3><p>固定α（Simulator Seed 1）の隠れ層出力に対し、60位置にわたる温度0.05のsoftmax出力が教師分布に近づくよう、β（32×60）をAdamで一括学習。bfloat16にして12列ずつ5ヘッドに分割し、ヘッダへ出力。</p></div>
   </div>
   <table class="spec">
     <tr><th>学習スクリプト</th><td><code>sim/device_position_probability.py</code></td><td>蒸留教師の作成、βの学習、評価、実機用ヘッダ <code>apan_position_probability_model.h</code> の出力</td></tr>
