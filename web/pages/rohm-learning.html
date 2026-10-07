@@ -395,6 +395,16 @@
   </table>
   <p class="note">公式Simulator SLV1.00.04には学習を自動実行するCLIがないため、セッション分離評価や蒸留の学習はPC側スクリプトで行い、Simulator用CSVは同じ条件の確認用に出力しています。</p>
 
+  <h2>試作段階（8クラス）での学習環境の妥当性確認</h2>
+  <p>最終モデルへ進む前に、試作の8クラスモデル（入力128・隠れ32・出力8、hard sigmoid、MSE）で、自作の学習環境が実機のSolist-AIと同じ計算になっていることを確認しました。αには公式SimulatorのSeed 1を使い、βだけを自作環境で学習しています。</p>
+  <table class="spec">
+    <tr><th>学習</th><td>自作環境</td><td>公式Simulator由来の固定α、PC側（NumPy）でβを学習し、bfloat16のヘッダを出力</td></tr>
+    <tr><th>実機への組込み</th><td>ML63Q2557</td><td>生成したヘッダをファームへ組み込み、MCU-LinkとOpenOCDで書込み・全バイト検証</td></tr>
+    <tr><th>推論出力の照合</th><td><strong>8 / 8 一致</strong></td><td>固定の検定用入力8件（各クラス1件）を実機で推論。クラス判定が8/8、スコア64個がすべて合格基準内（最大絶対誤差0.03125、基準は絶対誤差0.035または相対誤差5%）</td></tr>
+    <tr><th>実測データでの試作モデル</th><td><strong>96.67%</strong></td><td>781件・2セッションのセッション分離2-fold平均（96.93%、96.41%）。実機統合用ヘッダにはgolden caseを同梱し、PCの参照計算と照合</td></tr>
+  </table>
+  <p class="note">PC側の参照計算は層の境界でbfloat16に丸めますが、実機のアクセラレータは積和の途中でも丸めるため、ビット単位の完全一致ではなく、クラス判定の一致とスコア誤差の上限で判定しています。詳細は <code>docs/ai-dummy-validation.md</code> と <code>docs/real-model-training.md</code> にあります。</p>
+
   <h2>最終的な学習環境（60位置確率モデル）</h2>
   <div class="grid two">
     <div class="card"><span class="tag">DATA</span><h3>実測の収録データ</h3><p>400 × 300 × 5 mmアクリル板、KX134-1211 1個、60測定位置。検証済み11セッション・7,132打点。ラベルは収録UIが付与し、NGイベントは削除。</p></div>
