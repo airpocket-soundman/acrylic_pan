@@ -48,6 +48,15 @@ static float fram_float(uint32_t address)
     return value;
 }
 
+/* Engine mode: the AxlCORE holds the working beta; the FRAM keeps only what is committed. */
+static int16_t engine_beta[32][12];
+
+static bool read_engine_row(uint16_t row_index, int16_t beta_bf16[12])
+{
+    memcpy(beta_bf16, engine_beta[row_index], sizeof(engine_beta[row_index]));
+    return true;
+}
+
 int main(void)
 {
     ApanCalibrationStatus status;
@@ -173,6 +182,43 @@ int main(void)
     ApanCalibrationGetStatus(&status);
     CHECK(status.source == APAN_CALIBRATION_SOURCE_FACTORY);
     CHECK(!status.saved_valid);
+
+    /* Engine mode: begin, count hits, commit the engine's beta, restart, discard. */
+    CHECK(ApanCalibrationInitialize(apan_model_beta));
+    CHECK(!ApanCalibrationCommitEngine(read_engine_row));            /* nothing working yet */
+    CHECK(ApanCalibrationBeginEngine());
+    ApanCalibrationGetStatus(&status);
+    CHECK(status.source == APAN_CALIBRATION_SOURCE_WORKING);
+    CHECK(status.work_count == 0U);
+    CHECK(!ApanCalibrationCommitEngine(read_engine_row));            /* no hit learned yet */
+    for (i = 0U; i < 32U; i++)
+    {
+        for (j = 0U; j < 12U; j++) { engine_beta[i][j] = (int16_t)(0x3C00 + (int)(i * 12U + j)); }
+    }
+    CHECK(ApanCalibrationNoteTrained());
+    CHECK(ApanCalibrationNoteTrained());
+    ApanCalibrationGetStatus(&status);
+    CHECK(status.work_count == 2U);
+    CHECK(ApanCalibrationCommitEngine(read_engine_row));
+    ApanCalibrationGetStatus(&status);
+    CHECK(status.source == APAN_CALIBRATION_SOURCE_SAVED);
+    CHECK(status.saved_valid);
+    CHECK(status.saved_count == 2U);
+    CHECK(ApanCalibrationInitialize(apan_model_beta));               /* survives a restart */
+    ApanCalibrationGetStatus(&status);
+    CHECK(status.source == APAN_CALIBRATION_SOURCE_SAVED);
+    CHECK(status.saved_count == 2U);
+    for (i = 0U; i < 32U; i++)
+    {
+        int16_t saved[12];
+        CHECK(ApanCalibrationActiveBetaRow((uint16_t)i, saved));
+        CHECK(memcmp(saved, engine_beta[i], sizeof(saved)) == 0);   /* bfloat16 -> float32 -> bfloat16 is exact */
+    }
+    CHECK(ApanCalibrationBeginEngine());
+    ApanCalibrationDiscard();                                        /* back to the saved beta */
+    ApanCalibrationGetStatus(&status);
+    CHECK(status.source == APAN_CALIBRATION_SOURCE_SAVED);
+    CHECK(status.work_count == 0U);
 
     printf("calibration host test passed\n");
     return 0;

@@ -56,10 +56,17 @@ little endianのuint16で0〜500 msの間隔を受け付ける。この間隔内
 1回の発音イベントに対応し、ブラウザ上のエリア、音、LCD、3ビットLED表示は同じ
 受理済み打撃を指す。
 
+### UART速度
+
+`SET_CONFIG`（`0x12`）のペイロードが3バイトで、先頭が`0xB1`のとき、続くuint16（little endian）をUARTの分周値として受け付ける。
+速度は 48 MHz × (24 / 25) / (16 × 分周値) で、起動時は分周値25（115200 bit/s）、分周値3は960 kbit/sである。
+範囲外の値には`NACK`（理由2）を返す。`ACK`を現在の速度で送り、約30 ms後に分周値を切り替える。電源を入れ直すと起動時の速度に戻る。
+PC側は、接続の直後にこの要求で960 kbit/sへ切り替える（[レイテンシ](../../docs/latency.md)）。
+
 ### 位置確率（mode 3）
 
 mode 3は128-32-60のSolist-AIモデルを12出力ヘッド5つとして実行し、MCU上で温度0.05の
-60通りsoftmaxを計算する。αは`ODL_Initialize`が生成する固定のseed-1射影であり、
+60通りsoftmaxを、整数演算(Q27のロジットと3つの指数テーブル、`include/apan_position_softmax.h`)で計算する。αは`ODL_Initialize`が生成する固定のseed-1射影であり、
 配備するのは蒸留したβの重みだけである。
 
 送信するのは`POSITION_RESULT`（`0x24`）で、正規化したfloat32の確率と、実測した
@@ -157,9 +164,10 @@ LCDバックライトを有効にする。
 
 キャリブレーションモード（`SET_MODE` 4）は、誘導に従って数打するだけで12エリア用βを
 取り付け済みのパネルへ適応させる（`../../docs/odl-calibration-experiment-20260927.md`）。
-OS-ELMの更新はAxlCOREのbfloat16による`ODL_StartTrain`ではなく、CPU上のfloat32で行う。
-P（32 × 32）とβ（32 × 12）はfloat32の行としてボードのFRAMのアドレス100000以降に置く。
-1打ごとにβをbfloat16へ丸めてAxlCOREへ書き戻す。追加するRAMは316バイトだけである。
+OS-ELMの更新は、AxlCOREの`ODL_StartTrain`で行う（1打約2 ms）。PとβはAxlCOREが持ち、開始時に工場βとP0を書き込む。
+FRAMのアドレス100000以降には、確定したβ（32 × 12、float32）とヘッダーだけを置く。CPU上のfloat32で計算する方式は、
+`APAN_CALIBRATION_ENGINE`を0にしたビルドで使える（実験の結果は[odl-engine-experiment-20261020.md](../../docs/odl-engine-experiment-20261020.md)）。
+追加で使うRAMはない(CPU方式では316バイト)。
 
 `generated/apan_calibration_prior.h`は配備中のβに対する`P0 = 30 (G + I)^-1`を与える。
 キャリブレーション1打は工場データ30イベント分に相当する。`apan_12class_model.h`を
@@ -192,6 +200,19 @@ NACKの理由は1 busy、2 未対応の操作、3 不正な状態または引数
 
 保存済みキャリブレーションは推論モードとインストゥルメントモード（1と2）で使う。
 位置確率モデル（mode 3）は別モデルであり、キャリブレーションの対象外である。
+
+### 12エリアモデルの固定入力試験
+
+`AI_SELFTEST`（`0x14`）のケース`0x90`〜`0x9B`は、12エリアモデルの固定入力n（0〜11）を、現在のβでAxlCOREに通し、
+`POSITION_DIAGNOSTIC`（`0x26`）のフレームに12個の出力を入れて返す。コレクタ停止中で、位置確率モード以外のときだけ受け付ける。
+`python -m sim.check_class_model_selftest --port COM3`が、PCの参照との差を表示する(作業用キャリブレーションを開始して、工場βで比べ、あとで破棄する。保存済みのキャリブレーションには触れない)。
+
+### AxlCORE ODLの実験用操作
+
+`include/apan_odl_experiment.h`の`APAN_ODL_EXPERIMENT`を1にしたビルドだけが、mode 4の`CALIBRATION`に操作6〜9を持つ
+(6 BEGIN、7 RUN(引数: 学習する打数)、8 DUMP_ENGINE(引数: 部分0〜3)、9 DUMP_CPU(引数: 部分0〜7))。
+同じ打撃をAxlCOREの`ODL_StartTrain`とCPUのfloat32のOS-ELMで学習し、結果は`ODL_EXPERIMENT_RESULT`（`0x28`）で返す。
+通常のビルド(0)には入らない。手順と結果は[odl-engine-experiment-20261020.md](../../docs/odl-engine-experiment-20261020.md)。
 
 ## ホストテスト
 

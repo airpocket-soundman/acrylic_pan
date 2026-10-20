@@ -14,6 +14,8 @@
 
 static bfloat16 model_input[APAN_POSITION_INPUT_SIZE];
 static bool initialized;
+/* Head whose beta is currently loaded in the accelerator. */
+static uint8_t loaded_head;
 
 static void set_beta_head(uint8_t head)
 {
@@ -34,6 +36,7 @@ static void set_beta_head(uint8_t head)
                           (uint32_t)row * APAN_POSITION_ENGINE_OUTPUT_SIZE * 2U,
                           APAN_POSITION_ENGINE_OUTPUT_SIZE * 2U);
     }
+    loaded_head = head;
 }
 
 static void initialize_head(uint8_t head)
@@ -77,13 +80,18 @@ static bool predict_prepared(float logits[APAN_POSITION_OUTPUT_COUNT],
 {
     bfloat16 raw_output[APAN_POSITION_ENGINE_OUTPUT_SIZE];
     uint16_t index;
-    uint8_t head;
+    uint8_t step;
     uint8_t best = 0U;
+    const uint8_t first_head = loaded_head;
 
-    for (head = 0U; head < APAN_POSITION_HEAD_COUNT; head++)
+    /* Alpha is identical for every head and was generated when the mode was entered
+       (ApanPositionInferenceInitialize), so only beta changes between heads.  The heads run
+       starting from the one already loaded, which saves one beta transfer per strike. */
+    for (step = 0U; step < APAN_POSITION_HEAD_COUNT; step++)
     {
         uint32_t busy_count = 0UL;
-        initialize_head(head);
+        uint8_t head = (uint8_t)((first_head + step) % APAN_POSITION_HEAD_COUNT);
+        if (head != loaded_head) { set_beta_head(head); }
         ODL_StartPredict(AI_INSTANCE, model_input, NULL);
         while (ODL_IsBusy() != 0UL)
         {
@@ -96,11 +104,12 @@ static bool predict_prepared(float logits[APAN_POSITION_OUTPUT_COUNT],
             uint16_t output_index = (uint16_t)(
                 (uint16_t)head * APAN_POSITION_ENGINE_OUTPUT_SIZE + index);
             logits[output_index] = bfloat16_to_float(raw_output[index]);
-            if ((output_index > 0U) && (logits[output_index] > logits[best]))
-            {
-                best = (uint8_t)output_index;
-            }
         }
+    }
+    /* First maximum in output order, as before. */
+    for (index = 1U; index < APAN_POSITION_OUTPUT_COUNT; index++)
+    {
+        if (logits[index] > logits[best]) { best = (uint8_t)index; }
     }
     *position_id = best;
     return true;
@@ -174,7 +183,19 @@ bool ApanPositionInferenceSelfTest(uint8_t case_id,
     {
         model_input[index] = (bfloat16)apan_position_golden_inputs[offset + index];
     }
-    return predict_prepared(logits, position_id);
+    if (!predict_prepared(logits, position_id)) { return false; }
+    {
+        /* A strike runs the heads starting from the one left loaded by the previous strike.  Run
+           the same input again so that this rotated order is checked against the first pass. */
+        float repeat[APAN_POSITION_OUTPUT_COUNT];
+        uint8_t repeat_id;
+        if (!predict_prepared(repeat, &repeat_id) || (repeat_id != *position_id)) { return false; }
+        for (index = 0U; index < APAN_POSITION_OUTPUT_COUNT; index++)
+        {
+            if (repeat[index] != logits[index]) { return false; }
+        }
+    }
+    return true;
 }
 
 void ApanPositionInferenceSupport(uint8_t position_id, uint16_t *x_mm,

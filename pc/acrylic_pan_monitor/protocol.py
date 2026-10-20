@@ -47,6 +47,7 @@ class MessageType(IntEnum):
     POSITION_RESULT = 0x24
     POSITION_DIAGNOSTIC = 0x26
     CALIBRATION_RESULT = 0x27
+    ODL_EXPERIMENT_RESULT = 0x28
     ACK = 0x70
     NACK = 0x71
 
@@ -358,7 +359,7 @@ def decode_inference_event(frame: Frame) -> InferenceEvent:
 
 
 def decode_position_result(frame: Frame) -> PositionResult:
-    """Decode 60 device-inferred position logits and timing metadata."""
+    """Decode 60 device-inferred position probabilities and timing metadata."""
     if frame.message_type != MessageType.POSITION_RESULT:
         raise ProtocolError("frame is not POSITION_RESULT")
     if len(frame.payload) != POSITION_RESULT_PAYLOAD.size:
@@ -396,6 +397,20 @@ def decode_position_diagnostic(frame: Frame) -> PositionDiagnostic:
     return PositionDiagnostic(
         case_id, position_id, tuple(logits), frame.sequence, frame.timestamp_us
     )
+
+
+BOOT_BAUDRATE = 115_200
+FAST_BAUDRATE = 960_000
+SET_BAUD_KEY = 0xB1
+# Firmware divisor for each speed: baud = 48 MHz * (24 / 25) / (16 * divisor).
+BAUD_DIVISORS = {115_200: 25, 960_000: 3}
+
+
+def encode_set_baud(sequence: int, baudrate: int) -> bytes:
+    """Ask the firmware to switch its UART speed (SET_CONFIG with key 0xB1 and the divisor)."""
+    divisor = BAUD_DIVISORS[baudrate]
+    return encode_frame(Frame(MessageType.SET_CONFIG, sequence,
+                              bytes([SET_BAUD_KEY, divisor & 0xFF, divisor >> 8])))
 
 
 def encode_calibration_request(sequence: int, operation: CalibrationOp,

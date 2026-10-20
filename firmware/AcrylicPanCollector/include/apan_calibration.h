@@ -6,6 +6,14 @@
 #include <stdint.h>
 
 #include "apan_calibration_prior.h"
+#include "apan_odl_experiment.h"
+
+/* 1: the AxlCORE's ODL_StartTrain learns the calibration hits and keeps P and beta (the FRAM only stores the
+   committed beta).  0: float32 OS-ELM on the CPU with P and beta in the FRAM (docs/odl-calibration-experiment-
+   20260927.md).  The ODL experiment build keeps both paths so it can compare them. */
+#ifndef APAN_CALIBRATION_ENGINE
+#define APAN_CALIBRATION_ENGINE (!APAN_ODL_EXPERIMENT)
+#endif
 
 /* Which beta the 12-area model uses. */
 #define APAN_CALIBRATION_SOURCE_FACTORY (0U)
@@ -35,11 +43,21 @@ void ApanCalibrationGetStatus(ApanCalibrationStatus *status);
 bool ApanCalibrationActiveBetaRow(uint16_t row,
                                   int16_t beta_bf16[APAN_CALIBRATION_OUTPUT_SIZE]);
 
+/* Working float32 beta row (experiment and diagnostics).  Returns false when no working calibration exists. */
+bool ApanCalibrationWorkingBeta(uint16_t row, float out[APAN_CALIBRATION_OUTPUT_SIZE]);
+
 /* Solist-AI hidden layer on the CPU: hard sigmoid of input . alpha, rounded
    to bfloat16 like the accelerator. */
 void ApanCalibrationHidden(const int16_t *input_bf16, const int16_t *alpha_bf16,
                            uint16_t input_size,
                            float hidden[APAN_CALIBRATION_HIDDEN_SIZE]);
+
+/* Engine mode: a working calibration starts (the caller loads the factory beta and P0 into the AxlCORE), counts
+   trained hits, and is committed by reading the engine's beta row by row. */
+typedef bool (*ApanCalibrationRowReader)(uint16_t row, int16_t beta_bf16[APAN_CALIBRATION_OUTPUT_SIZE]);
+bool ApanCalibrationBeginEngine(void);
+bool ApanCalibrationNoteTrained(void);
+bool ApanCalibrationCommitEngine(ApanCalibrationRowReader read_row);
 
 /* Working calibration: factory beta and P0, then one OS-ELM step per hit. */
 bool ApanCalibrationBegin(void);

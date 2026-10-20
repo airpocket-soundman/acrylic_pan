@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import queue
 import threading
 from typing import Callable
 
@@ -30,7 +29,7 @@ class SerialLink:
         self._thread: threading.Thread | None = None
         self._stop = threading.Event()
         self._decoder = FrameStreamDecoder()
-        self._outgoing: queue.Queue[bytes] = queue.Queue()
+        self._write_lock = threading.Lock()
 
     @property
     def connected(self) -> bool:
@@ -58,21 +57,35 @@ class SerialLink:
             self._serial.close()
         self._serial = None
 
+    def set_baudrate(self, baudrate: int) -> None:
+        """Change the host side speed of the open port (the firmware is switched separately)."""
+        if self._serial is None:
+            raise OSError("serial port is not connected")
+        self._serial.baudrate = baudrate
+        self._serial.reset_input_buffer()
+        self._decoder = FrameStreamDecoder()
+
     def send(self, packet: bytes) -> None:
-        self._outgoing.put(packet)
+        """Write at once from the caller's thread; the reader never delays a request."""
+        serial_port = self._serial
+        if serial_port is None or not serial_port.is_open:
+            raise OSError("serial port is not connected")
+        with self._write_lock:
+            serial_port.write(packet)
 
     def _run(self) -> None:
         try:
             assert self._serial is not None
             while not self._stop.is_set():
-                data = self._serial.read(4096)
+                # Block for the first byte only: read(4096) would hold a short frame
+                # until the 50 ms timeout, which is the largest delay on the path.
+                data = self._serial.read(1)
+                if data:
+                    waiting = self._serial.in_waiting
+                    if waiting:
+                        data += self._serial.read(waiting)
                 for frame in self._decoder.feed(data):
                     self.on_frame(frame)
-                try:
-                    packet = self._outgoing.get_nowait()
-                except queue.Empty:
-                    continue
-                self._serial.write(packet)
         except Exception as error:  # delivered to the GUI thread through a queue
             if not self._stop.is_set():
                 self.on_error(error)

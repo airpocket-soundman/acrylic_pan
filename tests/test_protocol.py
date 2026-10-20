@@ -175,3 +175,21 @@ class ProtocolTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class FastUartRequestTests(unittest.TestCase):
+    def test_set_baud_frame_carries_the_key_and_divisor(self):
+        from pc.acrylic_pan_monitor.protocol import (
+            BAUD_DIVISORS, FAST_BAUDRATE, SET_BAUD_KEY, MessageType, decode_frame, encode_set_baud,
+        )
+
+        frame = decode_frame(encode_set_baud(7, FAST_BAUDRATE))
+        self.assertEqual(frame.message_type, MessageType.SET_CONFIG)
+        self.assertEqual(frame.sequence, 7)
+        self.assertEqual(frame.payload, bytes([SET_BAUD_KEY, BAUD_DIVISORS[FAST_BAUDRATE], 0]))
+
+    def test_divisors_reproduce_the_documented_speeds(self):
+        from pc.acrylic_pan_monitor.protocol import BAUD_DIVISORS
+
+        for baudrate, divisor in BAUD_DIVISORS.items():
+            self.assertAlmostEqual(48_000_000 * 24 / 25 / (16 * divisor), baudrate, delta=1)

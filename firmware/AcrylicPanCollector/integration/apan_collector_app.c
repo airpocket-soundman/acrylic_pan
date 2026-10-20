@@ -15,8 +15,10 @@
 #include "apan_ai_selftest.h"
 #include "apan_calibration.h"
 #include "apan_inference.h"
+#include "apan_odl_experiment.h"
 #include "apan_position_inference.h"
 #include "apan_position_probability_model.h"
+#include "apan_position_softmax.h"
 #include "apan_capture.h"
 #include "apan_protocol.h"
 #include "mcu.h"
@@ -45,6 +47,15 @@ static volatile uint8_t pending_request_type;
 static volatile uint8_t pending_case_id;
 static volatile uint8_t pending_mode;
 static volatile uint16_t pending_retrigger_guard_ms;
+static volatile uint16_t pending_baud_divisor;
+static volatile uint16_t baud_divisor_to_apply;
+static volatile uint32_t baud_apply_tick;
+static volatile bool baud_apply_pending;
+#define APAN_SET_BAUD_KEY 0xB1U
+/* Baud rate = 48 MHz * (24 / 25) / (16 * divisor).  Divisor 25 is the 115200 bit/s boot rate. */
+#define APAN_BAUD_DIVISOR_MIN 3U
+#define APAN_BAUD_DIVISOR_MAX 25U
+#define APAN_BAUD_SWITCH_DELAY_TICKS 3UL
 static volatile uint8_t pending_calibration_op;
 static volatile uint8_t pending_calibration_argument;
 static uint8_t calibration_target = APAN_CALIBRATION_CHECK_ONLY;
@@ -249,8 +260,18 @@ static void queue_binary_command(const ApanCommandFrame *frame)
             break;
         case APAN_MESSAGE_SET_CONFIG:
             command = COMMAND_SET_CONFIG;
-            pending_retrigger_guard_ms = (frame->payload_size == 2U) ?
-                (uint16_t)(frame->payload[0] | ((uint16_t)frame->payload[1] << 8)) : 0xFFFFU;
+            pending_baud_divisor = 0U;
+            if ((frame->payload_size == 3U) && (frame->payload[0] == APAN_SET_BAUD_KEY))
+            {
+                pending_baud_divisor =
+                    (uint16_t)(frame->payload[1] | ((uint16_t)frame->payload[2] << 8));
+                pending_retrigger_guard_ms = 0U;
+            }
+            else
+            {
+                pending_retrigger_guard_ms = (frame->payload_size == 2U) ?
+                    (uint16_t)(frame->payload[0] | ((uint16_t)frame->payload[1] << 8)) : 0xFFFFU;
+            }
             break;
         case APAN_MESSAGE_CALIBRATION:
             command = COMMAND_CALIBRATION;
@@ -489,8 +510,6 @@ static void send_position_result(void)
     uint16_t x_mm;
     uint16_t y_mm;
     uint16_t index;
-    float maximum;
-    float total = 0.0F;
     size_t encoded_size;
     uint32_t inference_start;
     uint32_t inference_end;
@@ -511,22 +530,15 @@ static void send_position_result(void)
         return;
     }
     inference_end = SysTick->VAL;
-    probability[0] *= APAN_POSITION_SOFTMAX_INVERSE_TEMPERATURE;
-    maximum = probability[0];
-    for (index = 1U; index < APAN_POSITION_OUTPUT_COUNT; index++)
+    /* softmax(20 x logit) in integer arithmetic: float expf took about 13 ms on this core. */
+    if (!apan_position_softmax(probability, APAN_POSITION_OUTPUT_COUNT, position_id, probability))
     {
-        probability[index] *= APAN_POSITION_SOFTMAX_INVERSE_TEMPERATURE;
-        if (probability[index] > maximum) { maximum = probability[index]; }
-    }
-    for (index = 0U; index < APAN_POSITION_OUTPUT_COUNT; index++)
-    {
-        probability[index] = expf(probability[index] - maximum);
-        total += probability[index];
-    }
-    if (total <= 0.0F) { total = 1.0F; }
-    for (index = 0U; index < APAN_POSITION_OUTPUT_COUNT; index++)
-    {
-        probability[index] /= total;
+        payload[0] = APAN_MESSAGE_POSITION_RESULT;
+        payload[1] = 4U;
+        write_protocol(APAN_MESSAGE_NACK, sequence++, payload, 2U);
+        ApanCaptureReleaseEvent(&capture);
+        collector_stopped = true;
+        return;
     }
     softmax_end = SysTick->VAL;
     inference_us = elapsed_systick_us(inference_start, inference_end);
@@ -677,6 +689,48 @@ static void acknowledge_calibration(uint32_t request_sequence, uint8_t operation
     write_protocol(APAN_MESSAGE_ACK, request_sequence, payload, sizeof(payload));
 }
 
+#if APAN_ODL_EXPERIMENT
+static uint8_t experiment_payload[2U + 256U];
+
+/* Engine-ODL experiment: replies with ODL_EXPERIMENT_RESULT (operation, status, data). */
+static uint8_t handle_experiment(uint32_t request_sequence, uint8_t operation, uint8_t argument)
+{
+    uint16_t size = 2U;
+    uint8_t status = 0U;
+    experiment_payload[0] = operation;
+    if (operation == APAN_CALIBRATION_OP_EXPERIMENT_BEGIN)
+    {
+        if (!ApanOdlExperimentBegin()) { return 4U; }
+    }
+    else if (operation == APAN_CALIBRATION_OP_EXPERIMENT_RUN)
+    {
+        uint16_t updates = 0U;
+        uint32_t cycles = 0UL;
+        if (!ApanOdlExperimentRun(argument, &updates, &cycles)) { status = 1U; }
+        put_u16(&experiment_payload[2], updates);
+        put_u32(&experiment_payload[4], (cycles + (APAN_CPU_CLOCK_HZ / 2000000UL)) /
+                                          (APAN_CPU_CLOCK_HZ / 1000000UL));
+        size = 8U;
+    }
+    else if (operation == APAN_CALIBRATION_OP_EXPERIMENT_DUMP_INPUT)
+    {
+        memcpy(&experiment_payload[2], ApanInferenceLastInput(), 256U);
+        size = 2U + 256U;
+    }
+    else
+    {
+        uint8_t bytes = (operation == APAN_CALIBRATION_OP_EXPERIMENT_DUMP_ENGINE) ?
+            ApanOdlExperimentDumpEngine(argument, &experiment_payload[2]) :
+            ApanOdlExperimentDumpCpu(argument, &experiment_payload[2]);
+        if (bytes == 0U) { return 3U; }
+        size = (uint16_t)(2U + bytes);
+    }
+    experiment_payload[1] = status;
+    write_protocol(APAN_MESSAGE_ODL_EXPERIMENT_RESULT, request_sequence, experiment_payload, size);
+    return 0U;
+}
+#endif
+
 /* Returns the NACK reason, or zero after sending the ACK. */
 static uint8_t handle_calibration(uint32_t request_sequence, uint8_t operation,
                                   uint8_t argument)
@@ -691,6 +745,14 @@ static uint8_t handle_calibration(uint32_t request_sequence, uint8_t operation,
         acknowledge_calibration(request_sequence, operation);
         return 0U;
     }
+#if APAN_ODL_EXPERIMENT
+    if ((operation >= APAN_CALIBRATION_OP_EXPERIMENT_BEGIN) && (operation <= APAN_CALIBRATION_OP_EXPERIMENT_DUMP_INPUT))
+    {
+        if (!collector_stopped) { return 1U; }
+        if (operating_mode != APAN_MODE_CALIBRATION) { return 3U; }
+        return handle_experiment(request_sequence, operation, argument);
+    }
+#endif
     if (operation > APAN_CALIBRATION_OP_FACTORY_RESET) { return 2U; }
     if (!collector_stopped) { return 1U; }
     switch (operation)
@@ -713,7 +775,7 @@ static uint8_t handle_calibration(uint32_t request_sequence, uint8_t operation,
             SensorStart();
             break;
         case APAN_CALIBRATION_OP_COMMIT:
-            if (!ApanCalibrationCommit()) { return 3U; }
+            if (!ApanInferenceCalibrationCommit()) { return 3U; }
             break;
         case APAN_CALIBRATION_OP_DISCARD:
             ApanCalibrationDiscard();
@@ -807,6 +869,14 @@ void ApanCollectorAppProcess(void)
     uint8_t request_type;
     uint8_t payload[4U + (APAN_POSITION_OUTPUT_COUNT * 4U)];
 
+    if (baud_apply_pending && !transmit_busy &&
+        ((int32_t)(app_tick_10ms - baud_apply_tick) >= 0))
+    {
+        baud_apply_pending = false;
+        UARTF1->UAF0MOD |= (1UL << 7);                 /* DLR access on */
+        UARTF1->UAF0BUF = (uint32_t)baud_divisor_to_apply;
+        UARTF1->UAF0MOD &= ~(1UL << 7);                /* DLR access off */
+    }
     if (inference_rearm_pending)
     {
         inference_rearm_pending = false;
@@ -945,15 +1015,52 @@ void ApanCollectorAppProcess(void)
             uint8_t class_id;
             uint8_t index;
             bool result_ok = false;
+            if (pending_case_id >= 0x90U)
+            {
+                /* Cases 0x90-0x9B: golden input n of the 12-area model; the reply reuses the
+                   POSITION_DIAGNOSTIC frame with 12 outputs. */
+                float model_output[APAN_INFERENCE_OUTPUT_COUNT];
+                uint8_t model_class = 0U;
+                bool model_ok = collector_stopped && (operating_mode != APAN_MODE_POSITION) &&
+                    ApanInferenceSelfTest((uint8_t)(pending_case_id - 0x90U), model_output, &model_class);
+                if (!model_ok)
+                {
+                    payload[0] = request_type;
+                    payload[1] = 3U;
+                    write_protocol(APAN_MESSAGE_NACK, request_sequence, payload, 2U);
+                    break;
+                }
+                payload[0] = pending_case_id;
+                payload[1] = model_class;
+                payload[2] = 0U; payload[3] = 0U;
+                for (index = 0U; index < APAN_INFERENCE_OUTPUT_COUNT; index++)
+                {
+                    union { float value; uint32_t bits; } packed;
+                    packed.value = model_output[index];
+                    put_u32(&payload[4U + index * 4U], packed.bits);
+                }
+                write_protocol(APAN_MESSAGE_POSITION_DIAGNOSTIC, request_sequence,
+                               payload, 4U + APAN_INFERENCE_OUTPUT_COUNT * 4U);
+                break;
+            }
             if (pending_case_id >= 0x80U)
             {
                 float position_output[APAN_POSITION_OUTPUT_COUNT];
                 uint8_t position_id;
                 uint8_t position_case = (uint8_t)(pending_case_id - 0x80U);
+                /* Cases GOLDEN_COUNT.. return the on-board softmax of the matching golden case, so
+                   the host can compare the integer softmax with a float64 reference. */
+                bool softmax_case = position_case >= APAN_POSITION_GOLDEN_COUNT;
+                if (softmax_case) { position_case = (uint8_t)(position_case - APAN_POSITION_GOLDEN_COUNT); }
                 if (collector_stopped)
                 {
                     result_ok = ApanPositionInferenceSelfTest(
                         position_case, position_output, &position_id);
+                    if (result_ok && softmax_case)
+                    {
+                        result_ok = apan_position_softmax(position_output, APAN_POSITION_OUTPUT_COUNT,
+                                                          position_id, position_output);
+                    }
                 }
                 if (operating_mode == APAN_MODE_POSITION)
                 {
@@ -967,7 +1074,7 @@ void ApanCollectorAppProcess(void)
                     write_protocol(APAN_MESSAGE_NACK, request_sequence, payload, 2U);
                     break;
                 }
-                payload[0] = position_case;
+                payload[0] = (uint8_t)(position_case + (softmax_case ? APAN_POSITION_GOLDEN_COUNT : 0U));
                 payload[1] = position_id;
                 payload[2] = 0U; payload[3] = 0U;
                 for (index = 0U; index < APAN_POSITION_OUTPUT_COUNT; index++)
@@ -1060,7 +1167,29 @@ void ApanCollectorAppProcess(void)
             }
             break;
         case COMMAND_SET_CONFIG:
-            if (pending_retrigger_guard_ms > 500U)
+            if (pending_baud_divisor != 0U)
+            {
+                if ((pending_baud_divisor < APAN_BAUD_DIVISOR_MIN) ||
+                    (pending_baud_divisor > APAN_BAUD_DIVISOR_MAX))
+                {
+                    payload[0] = request_type;
+                    payload[1] = 2U;
+                    write_protocol(APAN_MESSAGE_NACK, request_sequence, payload, 2U);
+                }
+                else
+                {
+                    /* ACK at the current speed; the divisor changes a few ticks later,
+                       after the ACK has left the shift register. */
+                    baud_divisor_to_apply = pending_baud_divisor;
+                    baud_apply_tick = app_tick_10ms + APAN_BAUD_SWITCH_DELAY_TICKS;
+                    baud_apply_pending = true;
+                    payload[0] = request_type;
+                    payload[1] = (uint8_t)pending_baud_divisor;
+                    payload[2] = (uint8_t)(pending_baud_divisor >> 8);
+                    write_protocol(APAN_MESSAGE_ACK, request_sequence, payload, 3U);
+                }
+            }
+            else if (pending_retrigger_guard_ms > 500U)
             {
                 payload[0] = request_type;
                 payload[1] = 2U;

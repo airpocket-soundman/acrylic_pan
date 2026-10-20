@@ -136,13 +136,23 @@ bool ApanCalibrationActiveBetaRow(uint16_t row_index, int16_t beta_bf16[OUTPUTS]
     uint32_t base;
     uint16_t k;
     if ((beta_bf16 == NULL) || (row_index >= HIDDEN) ||
-        (source == APAN_CALIBRATION_SOURCE_FACTORY))
+        (source == APAN_CALIBRATION_SOURCE_FACTORY) ||
+        (APAN_CALIBRATION_ENGINE && (source == APAN_CALIBRATION_SOURCE_WORKING)))
     {
-        return false;
+        return false;   /* the working beta of engine mode lives in the AxlCORE, not in the FRAM */
     }
     base = (source == APAN_CALIBRATION_SOURCE_SAVED) ? FRAM_SAVED_BETA : FRAM_WORK_BETA;
     FramReadBlock(fram_row(base, row_index, BETA_ROW_BYTES), row, (int)BETA_ROW_BYTES);
     for (k = 0U; k < OUTPUTS; k++) { beta_bf16[k] = float_to_bf16(row[k]); }
+    return true;
+}
+
+bool ApanCalibrationWorkingBeta(uint16_t row_index, float out[OUTPUTS])
+{
+    uint16_t k;
+    if ((out == NULL) || (row_index >= HIDDEN) || (source != APAN_CALIBRATION_SOURCE_WORKING)) { return false; }
+    FramReadBlock(fram_row(FRAM_WORK_BETA, row_index, BETA_ROW_BYTES), row, (int)BETA_ROW_BYTES);
+    for (k = 0U; k < OUTPUTS; k++) { out[k] = row[k]; }
     return true;
 }
 
@@ -232,20 +242,11 @@ bool ApanCalibrationUpdate(const float hidden[HIDDEN], uint8_t target)
     return true;
 }
 
-bool ApanCalibrationCommit(void)
+/* Header last: a power loss before it leaves the previous saved beta (or none) in force. */
+static bool finish_commit(void)
 {
     SavedHeader header;
-    uint16_t r;
-    if ((source != APAN_CALIBRATION_SOURCE_WORKING) || (work_count == 0U)) { return false; }
-    /* Invalidate first so a power loss mid-copy never leaves a mixed beta valid. */
     memset(&header, 0, sizeof(header));
-    FramWriteBlock(FRAM_SAVED_HEADER, &header, (int)sizeof(header));
-    for (r = 0U; r < HIDDEN; r++)
-    {
-        FramReadBlock(fram_row(FRAM_WORK_BETA, r, BETA_ROW_BYTES), row, (int)BETA_ROW_BYTES);
-        FramWriteBlock(fram_row(FRAM_SAVED_BETA, r, BETA_ROW_BYTES), row, (int)BETA_ROW_BYTES);
-        wdt_clear();
-    }
     header.magic = HEADER_MAGIC;
     header.model_crc32 = APAN_CALIBRATION_MODEL_CRC32;
     header.count = work_count;
@@ -256,6 +257,60 @@ bool ApanCalibrationCommit(void)
     source = APAN_CALIBRATION_SOURCE_SAVED;
     work_count = 0U;
     return true;
+}
+
+static void invalidate_saved(void)
+{
+    SavedHeader header;
+    /* Invalidate first so a power loss mid-copy never leaves a mixed beta valid. */
+    memset(&header, 0, sizeof(header));
+    FramWriteBlock(FRAM_SAVED_HEADER, &header, (int)sizeof(header));
+}
+
+bool ApanCalibrationCommit(void)
+{
+    uint16_t r;
+    if ((source != APAN_CALIBRATION_SOURCE_WORKING) || (work_count == 0U)) { return false; }
+    invalidate_saved();
+    for (r = 0U; r < HIDDEN; r++)
+    {
+        FramReadBlock(fram_row(FRAM_WORK_BETA, r, BETA_ROW_BYTES), row, (int)BETA_ROW_BYTES);
+        FramWriteBlock(fram_row(FRAM_SAVED_BETA, r, BETA_ROW_BYTES), row, (int)BETA_ROW_BYTES);
+        wdt_clear();
+    }
+    return finish_commit();
+}
+
+bool ApanCalibrationBeginEngine(void)
+{
+    if (!enabled) { return false; }
+    work_count = 0U;
+    source = APAN_CALIBRATION_SOURCE_WORKING;
+    return true;
+}
+
+bool ApanCalibrationNoteTrained(void)
+{
+    if ((source != APAN_CALIBRATION_SOURCE_WORKING) || (work_count == 0xFFFFU)) { return false; }
+    work_count++;
+    return true;
+}
+
+bool ApanCalibrationCommitEngine(ApanCalibrationRowReader read_row)
+{
+    int16_t beta_bf16[OUTPUTS];
+    uint16_t r;
+    uint16_t k;
+    if ((read_row == NULL) || (source != APAN_CALIBRATION_SOURCE_WORKING) || (work_count == 0U)) { return false; }
+    invalidate_saved();
+    for (r = 0U; r < HIDDEN; r++)
+    {
+        if (!read_row(r, beta_bf16)) { return false; }
+        for (k = 0U; k < OUTPUTS; k++) { row[k] = bf16_to_float(beta_bf16[k]); }
+        FramWriteBlock(fram_row(FRAM_SAVED_BETA, r, BETA_ROW_BYTES), row, (int)BETA_ROW_BYTES);
+        wdt_clear();
+    }
+    return finish_commit();
 }
 
 void ApanCalibrationDiscard(void)

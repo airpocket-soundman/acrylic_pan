@@ -21,7 +21,7 @@ if ($LASTEXITCODE -ne 0) { throw "Host C build failed: $LASTEXITCODE" }
 if ($LASTEXITCODE -ne 0) { throw "Host capture test failed: $LASTEXITCODE" }
 
 $calibrationExe = Join-Path $build 'test_calibration.exe'
-$compile = 'call "' + $vcvars + '" >nul && cl /nologo /W4 /WX /D_CRT_SECURE_NO_WARNINGS /std:c11 /I"' + $include + '" /I"' + `
+$compile = 'call "' + $vcvars + '" >nul && cl /nologo /W4 /WX /D_CRT_SECURE_NO_WARNINGS /DAPAN_CALIBRATION_ENGINE=0 /std:c11 /I"' + $include + '" /I"' + `
     (Join-Path $root 'generated') + '" /I"' + (Join-Path $root 'tests\stubs') + '" "' + `
     (Join-Path $root 'tests\test_calibration.c') + '" "' + (Join-Path $root 'src\apan_calibration.c') + `
     '" /Fo:"' + $build + '\\" /Fe:"' + $calibrationExe + '"'

@@ -24,6 +24,7 @@
 #define APAN_MESSAGE_POSITION_RESULT (0x24U)
 #define APAN_MESSAGE_POSITION_DIAGNOSTIC (0x26U)
 #define APAN_MESSAGE_CALIBRATION_RESULT (0x27U)
+#define APAN_MESSAGE_ODL_EXPERIMENT_RESULT (0x28U)
 #define APAN_MESSAGE_ACK        (0x70U)
 #define APAN_MESSAGE_NACK       (0x71U)
 #define APAN_ENCODED_FRAME_CAPACITY (1120U)
@@ -41,6 +42,12 @@
 #define APAN_CALIBRATION_OP_COMMIT        (3U)
 #define APAN_CALIBRATION_OP_DISCARD       (4U)
 #define APAN_CALIBRATION_OP_FACTORY_RESET (5U)
+/* Engine-ODL experiment (apan_odl_experiment.h; only in the experiment build). */
+#define APAN_CALIBRATION_OP_EXPERIMENT_BEGIN       (6U)
+#define APAN_CALIBRATION_OP_EXPERIMENT_RUN         (7U) /* argument: hits to learn */
+#define APAN_CALIBRATION_OP_EXPERIMENT_DUMP_ENGINE (8U) /* argument: part */
+#define APAN_CALIBRATION_OP_EXPERIMENT_DUMP_CPU    (9U) /* argument: part */
+#define APAN_CALIBRATION_OP_EXPERIMENT_DUMP_INPUT  (10U) /* the last model input */
 #define APAN_CALIBRATION_CHECK_ONLY       (0xFFU)
 
 typedef struct
