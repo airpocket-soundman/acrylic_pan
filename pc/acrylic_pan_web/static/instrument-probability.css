@@ -19,7 +19,10 @@ body.fit .card{margin-bottom:0}
 /* With the camera overlay the heat-map card is hidden, so use two columns: area bars | camera. */
 body.fit.camera-overlay-mode .probability-layout{grid-template-columns:minmax(0,.5fr) minmax(0,1.5fr);align-items:stretch}
 body.fit.camera-overlay-mode .probability-main>.card,body.fit.camera-overlay-mode .camera-card{height:auto}
-body.fit.camera-overlay-mode .camera-viewport{min-height:650px}
+/* The camera picture must not stretch the card: the frame has a fixed height and the video fills it (letterboxed). */
+body.fit .camera-viewport{height:560px;min-height:560px;flex:none}
+body.fit .camera-viewport video{position:absolute;inset:0;width:100%;height:100%;min-height:0}
+body.fit.camera-overlay-mode .camera-viewport{height:630px;min-height:630px}
 /* Camera focus (the deck shows only the camera picture): the fit overlay (grid, handles, labels, heat map), every
    other panel and the backgrounds are hidden; they fade in together once the deck has finished moving the picture. */
 :root,body.embed,body.embed .camera-card,body.embed .camera-viewport{transition:background-color .9s ease,border-color .9s ease,box-shadow .9s ease}
