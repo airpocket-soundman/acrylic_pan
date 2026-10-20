@@ -67,6 +67,8 @@ def _build_models(torch, kind: str, length: int):
             nn.Conv1d(32, 64, 9, stride=2, padding=4), nn.BatchNorm1d(64), nn.ReLU(),
             nn.Conv1d(64, 64, 9, stride=2, padding=4), nn.BatchNorm1d(64), nn.ReLU(),
             nn.Flatten(), nn.Linear(64 * (length // 8), 96), nn.ReLU(), nn.Linear(96, POSITION_COUNT))
+    if kind == "mlp_elm_shape":   # the ELM's 128-32-60 with every layer trained
+        return nn.Sequential(nn.Flatten(), nn.Linear(length, 32), nn.ReLU(), nn.Linear(32, POSITION_COUNT))
     if kind == "mlp_time":
         return nn.Sequential(
             nn.Flatten(), nn.Linear(length, 384), nn.ReLU(), nn.Linear(384, 192), nn.ReLU(),
@@ -139,19 +141,23 @@ def _evaluate(torch, dataset, labels: np.ndarray, support: np.ndarray, edge: np.
         ("cnn_s", "Conv(1-8,s2) - Conv(8-16,s2) - Conv(16-16,s2) - Pool - Linear 60"),
         ("cnn_l", "Conv(1-32,s2) - Conv(32-64,s2) - Conv(64-64,s2) - Linear 96 - Linear 60 (BatchNorm)"),
         ("mlp_time", "448-384-192-96-60 (the same layers as the PC MLP, time series only)"),
+        ("mlp_elm_shape", "128-32-60, all layers trained (the ELM's shape and inputs)"),
     ):
         runs = []
         parameters = 0
         seconds = 0.0
         for seed in SEEDS:
-            probability, parameters, elapsed = _train_torch(torch, kind, series, labels, train, test, seed)
+            inputs_for_kind = inputs.astype(np.float32) if kind == "mlp_elm_shape" else series
+            probability, parameters, elapsed = _train_torch(torch, kind, inputs_for_kind, labels, train, test, seed)
             runs.append(_top1_and_distance(probability, labels_test, support, xy_test))
             seconds += elapsed
             if verbose:
                 print(f"{kind} seed={seed}: top1={runs[-1]['top1_position_accuracy']:.4f} "
                       f"mean={runs[-1]['mean_distance_mm']:.2f} mm ({elapsed:.0f}s)", flush=True)
         models[kind] = {
-            "structure": structure, "input": "448 time samples after the trigger, peak-normalised",
+            "structure": structure,
+            "input": ("the ELM's 128 inputs" if kind == "mlp_elm_shape"
+                      else "448 time samples after the trigger, peak-normalised"),
             "parameters": int(parameters), "bytes": int(parameters * 4), "dtype": "float32",
             "epochs": EPOCHS, "seeds": list(SEEDS), "runs": runs, "train_seconds": round(seconds, 1),
         }
