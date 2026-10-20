@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>プレゼンター - Solistpan</title>
+<link rel="stylesheet" href="deck.css?v=20261020-7">
+<link rel="stylesheet" href="presenter.css?v=20261020-5">
+</head>
+<body class="presenter">
+<main class="p-grid">
+  <section class="p-current">
+    <div class="p-label"><span>現在</span><b id="curTitle"></b></div>
+    <div class="thumb big" id="current"></div>
+    <div class="p-controls">
+      <button id="prev">◀ 前へ</button>
+      <button id="next" class="primary">次へ ▶</button>
+      <button id="black">黒画面 (B)</button>
+      <button id="reset">最初から (R)</button>
+    </div>
+  </section>
+
+  <section class="p-side">
+    <div class="p-timer">
+      <div class="clock" id="clock">0:00</div>
+      <div class="remain" id="remain">残り 5:00</div>
+      <div class="pace" id="pace"></div>
+      <div class="timebar"><i id="timeFill"></i><u id="timeMark"></u></div>
+      <div class="slide-clock">
+        <div><small>このスライド</small><b id="slideRemain">0:00</b><span id="slideTarget"></span></div>
+        <div id="stepClock" hidden><small>ステップ</small><b id="stepRemain">0:00</b><span id="stepName"></span></div>
+      </div>
+      <div class="timebar slim"><i id="slideFill"></i></div>
+      <div class="p-controls small">
+        <button id="tStart">開始 / 再開</button><button id="tPause">一時停止</button><button id="tReset">リセット</button>
+      </div>
+    </div>
+    <div class="p-label"><span>次</span><b id="nextTitle"></b></div>
+    <div class="thumb" id="next-thumb"></div>
+  </section>
+
+  <section class="p-notes">
+    <div class="p-label"><span>台詞</span><b id="slideTime"></b></div>
+    <div id="notes" class="notes"></div>
+    <div class="p-controls small" id="stepControls" hidden>
+      <button id="stepPrev">◀ 前のステップ</button><button id="stepNext" class="primary">次のステップ (N) ▶</button>
+    </div>
+  </section>
+
+  <section class="p-list">
+    <div class="p-label"><span>スライド一覧</span><b>クリックで移動</b></div>
+    <ol id="list"></ol>
+    <div class="demo-set">
+      <div class="p-label"><span>デモ表示</span></div>
+      <div class="seg" id="demoMode"><button data-mode="live">ライブ(WebUI)</button><button data-mode="video">PV動画</button></div>
+      <div class="remote">
+        <div class="seg"><button id="rStart" class="primary">演奏開始</button><button id="rStop">演奏停止</button><button id="rGuide">手本演奏</button></div>
+        <label>音色 <select id="rInstrument"></select></label>
+        <label>曲 <select id="rSong"></select></label>
+        <label>音量 <output id="rVolumeValue">70%</output><input id="rVolume" type="range" min="0" max="200" step="5" value="70"></label>
+        <label class="check"><input id="rAuto" type="checkbox"> スライドに入ったら自動で演奏開始・ステップの操作を実行</label>
+        <div id="rStatus" class="remote-status"></div>
+      </div>
+      <label>WebUIのURL<input id="demoUrl" type="url" spellcheck="false"></label>
+      <label>発表時間(秒)<input id="total" type="number" min="60" step="30"></label>
+    </div>
+  </section>
+</main>
+<script src="slides.js?v=20261020-7"></script>
+<script src="sync.js?v=20261020-5"></script>
+<script src="deck.js?v=20261020-5"></script>
+<script src="presenter.js?v=20261020-5"></script>
+</body>
+</html>
