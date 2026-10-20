@@ -7,7 +7,8 @@
 
 | パス | 内容 |
 |---|---|
-| `data/raw/sessions/` | 打撃位置の学習・評価に使う収録セッション。1セッション1ディレクトリ |
+| `data/raw/sessions_2point/` | 現行の2点支持の収録セッション(12エリア中心と四隅)。モデルの学習・評価に使う。1セッション1ディレクトリ |
+| `data/raw/sessions/` | 1点支持だった時期の収録セッション(旧モデル `models/support-1point/` の学習データ) |
 | `data/raw/verification/` | 収録系の動作確認用セッション |
 | `data/raw/verification-guided/` | ガイド付き収録の動作確認用セッション |
 | `data/raw/verification-threshold2000/` | トリガーしきい値2000での動作確認用セッション |

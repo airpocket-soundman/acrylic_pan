@@ -11,7 +11,10 @@ Acrylic Pan の開発に必要なドキュメントを目的別にまとめる�
 | [収録システム・実機Web UIクイックスタート](collector-quickstart.md) | Python環境の確認、ファームのビルド・書き込み、Web UIでの収録と演奏 |
 | [Solist-AI Simulator](solist-ai-simulator.md) | 公式Simulatorの導入、CSV形式、8クラスモデルの作成手順 |
 | [シミュレーション環境](simulation-environment.md) | Docker・CalculiX など振動解析で使うソフトと実行条件 |
-| [KX134-1211-EVK-001 変換配線](kx134-evk-adapter.md) | 交換用センサ評価基板の配線 |
+| [KX134-1211-EVK-001 変換配線](kx134-evk-adapter.md) | 交換用センサ評価基板の配線(実機確認済み) |
+| [Web UIの機能](webui-improvements.md) | 音色、8点フィット、ODL、接続模式図、プレゼン用の埋め込み |
+| [決勝審査会プレゼン資料](final-presentation-plan.md) | 決勝審査会用のスライド型Webアプリ(メイン画面・プレゼンター画面)の構成と使い方 |
+| [レイテンシ](latency.md) | 打撃から発音までの経路、遅延の内訳、短縮の対策、FTDIのLatency Timer設定 |
 
 ## 仕様
 
@@ -22,7 +25,6 @@ Acrylic Pan の開発に必要なドキュメントを目的別にまとめる�
 | [ファームウェア実装と通信プロトコル](../firmware/AcrylicPanCollector/README.md) | 動作モード、APANプロトコル、現場キャリブレーション、ビルド手順 |
 | [中央センサ時間波形・FFT仕様](sensor-response.md) | 波形の切り出しとFFTの定義 |
 | [PC側・確率分布型位置推定](position-inference.md) | 60座標の確率分布による位置推定と評価 |
-| [Solist-AI向け座標推論モデルの実施計画](device-xy-distillation-plan.md) | PCモデルの知識蒸留を含むデバイス向け座標推論の検討・学習手順 |
 | [データ配置](../data/README.md) | 収録データとダミーモデルの置き場所 |
 
 ## 振動シミュレーション
@@ -55,12 +57,10 @@ Acrylic Pan の開発に必要なドキュメントを目的別にまとめる�
 | 2026-08-28 | [疑似XY回帰と直接XY回帰](pc-pseudo-vs-direct-xy-20260828.md) | 既知座標では60クラス確率方式が有利 |
 | 2026-08-29 | [MPU9250代替評価](mpu9250-substitution-experiment-20260829.md) | 4 kHz・20 ms相当でも平均距離誤差6.63 mmでKX134と同等 |
 | 2026-09-27 | [オンデバイス学習による現場キャリブレーション](odl-calibration-experiment-20260927.md) | 60打の校正で未知セッション精度が87.9% → 90.2%、ファームウェアに実装 |
-
-## ロードマップ
-
-| ドキュメント | 内容 |
-|---|---|
-| [今後のタスク](future-tasks.md) | データ追加、PCとデバイスの座標推論比較、UNO Q移植、Tab5連携 |
+| 2026-10-19 | [2点支持の学習](support-2point-training-20261019.md) | 2点支持の5セッション(3,600打)で、デバイス・PCのモデルを学習し直した。60位置の正解率97.9%(同一セッション内) |
+| 2026-10-20 | [CNN・MLP・ELMの比較](cnn-comparison-20261020.md) | 同じ分割で、ELM 97.9%、PC版MLP 99.2%、CNN 99.5%。ELMは学習するパラメータが約1/580 |
+| 2026-10-20 | [AxlCORE ODLの安定性の実機実験](odl-engine-experiment-20261020.md) | ODLのエンジン方式が960回の更新で発散せず、現場キャリブレーションの既定にした |
+| 2026-10-20 | [ODLでマレットの違いを吸収できるか](odl-mallet-experiment-20261020.md) | サインペンに替えた実機で、60打のODLにより正解率 60.0% → 95.0% |
 
 ## 外部資料
 

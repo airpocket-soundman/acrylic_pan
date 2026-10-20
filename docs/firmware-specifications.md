@@ -24,9 +24,10 @@
 |---|---|
 | `apan_capture.c` | 連続サンプルからの打撃検出と波形切り出し |
 | `apan_protocol.c` | APANフレームの符号化・復号 |
-| `apan_inference.c` | 12クラス分類の前処理と Solist-AI 推論 |
-| `apan_position_inference.c` | 60座標位置確率の推論 |
-| `apan_calibration.c` | OS-ELMによるβの逐次学習とFRAM保存 |
+| `apan_inference.c` | 12クラス分類の前処理、Solist-AI 推論、現場キャリブレーションのODL学習(AxlCORE) |
+| `apan_position_inference.c` | 60座標位置確率の推論(12出力のヘッドをβだけ切り替えて5回、整数softmax) |
+| `apan_calibration.c` | 確定したβのFRAM保存(CRC32付き)と、工場βとの照合 |
+| `apan_odl_experiment.c` | AxlCORE ODLとCPUのOS-ELMの比較実験(通常のビルドでは空。`APAN_ODL_EXPERIMENT` = 1 のとき有効) |
 | `apan_ai_selftest.c` | 固定8クラスモデルによる Solist-AI の自己試験 |
 | `integration/apan_collector_app.c` | モード管理、コマンド処理、送信、LCD・LED表示 |
 
@@ -34,9 +35,9 @@
 
 - MCU: ML63Q2557、Cortex-M0+ 48 MHz、Flash 256 KB、ワークRAM 16 KB、Solist-AI（AxlCORE-ODL）
 - センサ: KX134-1211、Z軸、±32 g（1024 LSB/g）、ODR 25.6 kHz
-- FRAM: MB85RS2MTA（256 KB、ソフトウェアSPI）。現場キャリブレーションのPとβを保持する
-- 通信: UARTF1、115200 bps、8-N-1、フロー制御なし
-- センサ位置: パネル中央
+- FRAM: MB85RS2MTA（256 KB、ソフトウェアSPI）。確定した現場キャリブレーションのβを保持する
+- 通信: UARTF1、8-N-1、フロー制御なし。起動時は 115200 bps で、`SET_CONFIG` の要求で 960 kbps へ切り替える([レイテンシ](latency.md))
+- センサ位置: パネル中央(交換用の評価基板 KX134-1211-EVK-001 の配線は[変換配線](kx134-evk-adapter.md))
 - 表示: 16文字×2行LCD、LED 3個
 
 ## 3. 通信フレーム
@@ -88,21 +89,27 @@ crc32            : uint32
 | 位置確率 | 入力128・隠れ32・出力12 × 5ヘッド | 60座標のロジット、温度0.05のsoftmax | `apan_position_probability_model.h` |
 | 自己試験 | 入力128・隠れ32・出力8 | 固定入力8件の出力 | `apan_dummy_model.h` |
 
-α は公式 Simulator の seed-1 射影で、学習するのは β だけである。α・β・入力・出力は
+α は公式 Simulator の seed-1 射影で、学習するのは β だけである。α は AxlCORE が `ODL_Initialize` の seed と範囲から
+生成するので、通常のビルドは α の配列を持たない(位置確率のヘッダーも β だけを持つ)。α・β・入力・出力は
 bfloat16 で扱う。PC 側の参照計算（`sim.dummy_model_pipeline.mcu_reference`）は
 同じ bfloat16 の丸め位置を再現する。
+
+位置確率は、12出力のネットワークを β だけ切り替えて5回実行し、12 × 5 = 60 のロジットを並べて、温度0.05のsoftmaxで確率にする。
+softmax はボード上の整数演算(Q27のロジット、3つの指数テーブル、64ビット整数の乗算)で、float32の `expf` との最大絶対誤差は約3e-8 である。
 
 ## 6. 現場キャリブレーション
 
 12クラス分類の β を、設置後の数十打で現場の固定状態に合わせる。
 
-- 更新: 忘却係数1の OS-ELM を CPU の float32 で計算し、更新後の β を bfloat16 へ丸めて
-  AxlCORE へ書き込む。AxlCORE の `ODL_StartTrain` は P と β を bfloat16 で保持するため使わない。
+- 更新: AxlCORE の `ODL_StartTrain`（忘却係数1）で、1打ごとに学習する。P と β は AxlCORE が bfloat16 で保持する。
+  開始時に、工場 β と P0（bfloat16へ丸めたもの）を AxlCORE へ書く。更新は 1 打あたり約 2 ms。
+  CPU の float32 で OS-ELM を計算する方式は、`APAN_CALIBRATION_ENGINE` を 0 にしたビルドで使える
+  （[AxlCORE ODL の実機実験](odl-engine-experiment-20261020.md)）。
 - 初期値: 工場 β と `P0 = 30 (G + I)⁻¹`（`generated/apan_calibration_prior.h`）。
   校正1打は工場データ30打分の重みを持つ。
-- 記憶域: FRAM のアドレス 100000 以降に、作業用 P（32 × 32）・作業用 β（32 × 12）・
-  保存済み β・ヘッダーを float32 で置き、1行ずつ読み書きする。
-- 保存: 確定時に保存済み β を書き、CRC32 付きヘッダーを最後に書く。起動時は、ヘッダーの
+- 記憶域: 作業中の P と β は AxlCORE にある。FRAM のアドレス 100000 以降には、確定した β（32 × 12、float32）と
+  ヘッダーだけを置く。
+- 保存: 確定時に、AxlCORE の β を1行ずつ読み出して保存済み β を書き、CRC32 付きヘッダーを最後に書く。起動時は、ヘッダーの
   工場モデル CRC32 と β の CRC32 が一致した場合だけ保存済み β を使う。
 - 適用範囲: mode 1・2・4。位置確率（mode 3）は対象外。
 
@@ -112,15 +119,16 @@ bfloat16 で扱う。PC 側の参照計算（`sim.dummy_model_pipeline.mcu_refer
 
 | 項目 | 値 |
 |---|---|
-| Flash（text） | 約64.7 KB / 256 KB |
-| RAM（data + bss） | 12,116 B、スタック 1,280 B、空き約2.9 KB / 16 KB |
-| 現場キャリブレーションの追加RAM | 316 B |
-| FRAM使用量 | 約7.2 KB（アドレス 100000〜） |
+| Flash（text） | 約62.0 KB（61,976 B） / 256 KB |
+| RAM（data + bss） | 13,280 B、スタック 1,280 B、空き約1.8 KB / 16 KB |
+| 現場キャリブレーションの追加RAM | 0 B（エンジン方式。CPU方式は316 B） |
+| FRAM使用量 | 約1.6 KB（確定したβ 32 × 12 のfloat32 と ヘッダー。アドレス 100000〜） |
 
 ## 8. 検証
 
 - `firmware/AcrylicPanCollector/tools/test-host.ps1`: 打撃検出、APANフレーム、
   現場キャリブレーションの数値計算を Visual C++ でホスト実行して検証する。
-- `AI_SELFTEST`: 固定入力に対する Solist-AI の出力を PC の参照値と比較する
-  （[ダミーモデルによる検証](ai-dummy-validation.md)）。
+- `AI_SELFTEST`: 固定入力に対する Solist-AI の出力を PC の参照値と比較する。ケース 0〜7 は固定8クラスモデル
+  （[ダミーモデルによる検証](ai-dummy-validation.md)）、0x80〜0x87 は位置確率モデルとそのsoftmax、0x90〜0x9B は12クラスモデルの固定入力
+  （`python -m sim.check_class_model_selftest --port COM3`）である。
 - `python -m pytest tests`: PC 側のプロトコル、学習パイプライン、ヘッダーの整合性を検証する。

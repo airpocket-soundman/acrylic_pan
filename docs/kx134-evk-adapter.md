@@ -32,6 +32,12 @@ DT-EBML63Q2557 CN3                 ROHM KX134-1211-EVK-001 J1
  13 GND      14 CS                  13 NC       14 NC
 ```
 
+## 接続の模式図
+
+![CN3とJ1のピンレイアウトと配線](../web/assets/hardware/kx134-evk-wiring.svg)
+
+同じ図を公開ページの[ハードウェア](../web/pages/hardware.html)に載せている。
+
 ## SPI変換配線
 
 ```mermaid
@@ -107,6 +113,88 @@ SPI動作では使用しません。
 - [ROHM EVK Hardware User's Guide](https://fscdn.rohm.com/jp/products/databook/applinote/ic/sensor/rohm-evk-hw_ug-j.pdf)
 - [ROHM 14ピンJ1の信号配置資料](https://fscdn.rohm.com/en/products/databook/applinote/ic/sensor/kx134acr-evk-001_ug-e.pdf)
 
-KX134-1211-EVK-001の資料ではJ1の全ピン表が明記されていない版があるため、
-ROHM EVK共通の14ピン物理配線および現行KX134ACR評価基板のJ1配置も照合しています。
-購入品が到着したら、基板リビジョン、1番ピン表示、VDD/GNDの導通を実物で再確認してください。
+## 実機での確認結果(派生プロジェクト acrylic_pan_uno_q)
+
+元のセンサボード(DT-EBML63Q2557 付属のKX134ブレークアウト)は故障したため、
+派生プロジェクト [acrylic_pan_uno_q](https://github.com/airpocket-soundman/acrylic_pan_uno_q)
+では、ROHM製の **KX134-1211-EVK-001**(別基板・同じKX134-1211)に交換して動作を確認した。
+センサICは同じROHM製だが、**ボード上のコネクタのIO並びが元のCN3と異なる**ため、
+上記の変換配線が必要になる。
+
+| 上面(ROHMロゴ、KX134-1211表記) | 下面(14ピンJ1、IDCケーブル接続) |
+|---|---|
+| ![KX134-1211-EVK-001 上面](assets/kx134-evk-top.jpg) | ![KX134-1211-EVK-001 下面](assets/kx134-evk-bottom.jpg) |
+
+確認した内容(Arduino UNO Q + STM32U585、3.3 V SPI):
+
+- 上の「SPI変換配線」のJ1ピン配置で `WHO_AM_I = 0x46` を読み出せた。
+- 25.6 kHz・±32 g で 127,992〜128,000 サンプルを連続取得し、取りこぼし(missed)は0だった。
+- J1の1/6がVDD/IO_VDD、2がnCS、5がSCLK、7がSDI、9がSDO、11がINT1、12がINT2、8がGNDである。
+
+今回使った基板のJ1(2列7ピン、2.54 mmピッチ)の全ピン並びは次のとおり。
+部品面を上から見て、センサを上・J1を下に置くと、センサ側の列が偶数、基板端側の列が奇数になり、
+左端が1/2、右端が13/14になる。
+
+```text
+              KX134-1211
+                  ^
+ J1   2   4   6   8  10  12  14   (センサ側)
+      1   3   5   7   9  11  13   (基板端側)
+```
+
+| J1 | 信号 | 備考 | J1 | 信号 | 備考 |
+|---:|---|---|---:|---|---|
+| 1 | VDD | 3.3 V | 2 | nCS | SPIチップセレクト |
+| 3 | - | 未割り当て | 4 | - | 未割り当て |
+| 5 | SCLK / SCL | SPIクロック | 6 | IO_VDD | 3.3 V |
+| 7 | SDI / SDA | MOSI | 8 | GND | GND |
+| 9 | SDO / ADDR | MISO | 10 | SYNC / TRIG | 未接続 |
+| 11 | INT1 | DRDY | 12 | INT2 | 任意 |
+| 13 | - | 未割り当て | 14 | - | 未割り当て |
+
+### J1のピンの物理配置とUNO Qへの結線図
+
+J1を部品面から見た物理配置は、下図の左上のとおり。**上段が偶数(2〜14)、下段が奇数(1〜13)**で、
+左端が1/2、右端が13/14になる。色はUNO Q側への結線の色と対応する。
+
+![J1のピン配置とUNO Qへの結線](assets/kx134-evk-j1-uno-q-pin-layout.svg)
+
+> 図のタイトルは派生側の資料に合わせて`KX132-1211-EVK-001`となっているが、
+> J1のピン配置はKX134-1211-EVK-001と同じである。
+
+**物理配置の根拠:** ROHMの使い方資料
+[KX134-1211-EVK-001 Manual](https://fscdn.rohm.com/kionix/en/document/kx134-1211-evk-001_ug-e.pdf)
+(No. 63UG087E Rev.002)のボード写真(部品面)で、J1が基板下辺の2×7ピン箱型ヘッダであり、
+シルクが上段の左端`2`・右端`14`、下段の左端`1`(▼印)・右端`13`であることを確認した。
+この資料にはJ1のピンごとの信号表は載っていない(使い方、写真、部品表のみ)。信号の割り当ては
+下記「根拠資料」のROHM資料と、実機動作(`WHO_AM_I = 0x46`)で確認したものである。
+
+基板上のその他の特徴(下面の写真で確認):
+
+- J1は基板の長辺の一方に並ぶ2×7ピンのヘッダで、角形ソケットとフラットケーブルが基板の外側へ出る。
+- 部品面側から見てJ1側を手前にすると、ケーブル端のテープ書き込みは左が`2`、右が`14`である。
+- J1と反対側の長辺に`VDD` `GND`の電源パッド、左上に緑色の電源LEDがある。
+- 反対面(ROHMロゴ面、パネルに接する側)にはセンサのパターンがU1〜U6の3×2配置で印刷されており、
+  KX134-1211を実装して使う。四隅に取付穴がある。
+
+UNO Q側の接続は次のとおり(元プロジェクトのDT-EBML63Q2557 CN3側に読み替えて使う)。
+
+| KX134-1211-EVK-001 J1 | 信号 | UNO Q |
+|---:|---|---|
+| 1, 6 | VDD, IO_VDD | 3.3 V |
+| 8 | GND | GND |
+| 2 | nCS | D10 / SS |
+| 7 | SDI | D11 / COPI |
+| 9 | SDO | D12 / CIPO |
+| 5 | SCLK | D13 / SCK |
+| 11 | INT1 / DRDY | D2(診断用) |
+| 12 | INT2 | D3(任意) |
+
+詳細な配線図・電源投入前チェックは派生側の
+[uno-q-sensor-wiring.md](https://github.com/airpocket-soundman/acrylic_pan_uno_q/blob/main/docs/uno-q-sensor-wiring.md)
+と
+[kx132-1211-evk-wiring.md](https://github.com/airpocket-soundman/acrylic_pan_uno_q/blob/main/docs/kx132-1211-evk-wiring.md)
+を参照する。
+
+> 注意: 購入品によって基板リビジョンが異なる可能性があるため、電源投入前に
+> 1番ピン表示とVDD/GNDの導通を実物で確認すること。

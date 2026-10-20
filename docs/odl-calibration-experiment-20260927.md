@@ -4,7 +4,7 @@
 
 Solist-AIのオンデバイス学習（ODL、OS-ELM）を使い、設置後に各エリアを数回ずつ叩くだけで
 配備済み12クラス分類モデルを現場に合わせられるかを、実機実装の前にPCで確認する。
-狙いは、[今後のタスク](future-tasks.md)の「同一条件では良いが別セッションで悪い」
+狙いは、「同一条件では良いが別セッションで悪い」
 （固定し直し・打撃条件への過適合）を、PCで再学習せずデバイス上で補正することである。
 
 ## 方法
@@ -90,6 +90,8 @@ float32とfloat64の結果は全条件で一致した。w = 30、10打でのbflo
 6. ラベル不要の入力平均補正は全条件で悪化したため採用しない。
 
 ## ファームウェア実装
+
+(注) この節は、CPUのfloat32で更新する実装(`APAN_CALIBRATION_ENGINE` = 0)の記録である。現在の既定は、AxlCOREの`ODL_StartTrain`で更新する方式で、[odl-engine-experiment-20261020.md](odl-engine-experiment-20261020.md)に実機の安定性実験を記した。
 
 この結果を受けて、12クラス分類モデルに現場キャリブレーションを実装した
 （`firmware/AcrylicPanCollector/src/apan_calibration.c`、通信仕様は
