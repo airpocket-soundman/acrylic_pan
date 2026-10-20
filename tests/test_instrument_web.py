@@ -95,10 +95,9 @@ class InstrumentWebTests(unittest.TestCase):
 
         self.assertIn("/api/inference/start", script)
         self.assertIn("/api/inference/stop", script)
-        self.assertIn("/api/ai/latest", script)
+        self.assertIn("/api/ai/wait", script)
         self.assertIn("mode:'instrument'", script)
         self.assertIn("/api/status", script)
-        self.assertNotIn("/api/ai/wait", script)
         self.assertIn("latest_ai", script)
         self.assertIn("lastPlayedSequence", script)
         self.assertIn("displayArea(area)", script)

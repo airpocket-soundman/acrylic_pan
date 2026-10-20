@@ -46,7 +46,7 @@ function validNotes(notes){return Array.isArray(notes)&&notes.length>=1&&notes.l
 function notesForCount(notes){return Array.from({length:panelClassCount},(_,index)=>notes[index]||DEFAULT_NOTES[index]);}
 function activeProfile(){return settings.mappingProfiles.find(profile=>profile.id===settings.activeMappingProfileId)||settings.mappingProfiles[0];}
 function syncActiveProfile(){const profile=activeProfile();if(profile)profile.notes=[...settings.notes];}
-function saveSettings() { syncActiveProfile();localStorage.setItem(STORAGE_KEY, JSON.stringify(settings)); }
+function saveSettings() { syncActiveProfile();localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));scheduleAudioPrime(); }
 function newProfileId(){return `mapping-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,7)}`;}
 function noteOptions() {
   const notes=[];
@@ -64,7 +64,7 @@ class AudioEngine {
   constructor() {
     const AudioContext=window.AudioContext||window.webkitAudioContext;
     if(!AudioContext) throw new Error('このブラウザはWeb Audioに対応していません。');
-    this.context=new AudioContext({latencyHint:'interactive'});
+    this.context=new AudioContext(ServerSampler.contextOptions);
     this.bus=this.context.createGain();
     this.dry=this.context.createGain();
     this.delay=this.context.createDelay(1.0);
@@ -76,9 +76,12 @@ class AudioEngine {
     this.bus.connect(this.dry).connect(this.master);
     this.bus.connect(this.delay); this.delay.connect(this.wet).connect(this.master);
     this.delay.connect(this.feedback).connect(this.delay);
-    this.master.connect(this.compressor).connect(this.context.destination);
+    this.master.connect(ServerSampler.softClipper(this.context)).connect(this.context.destination);
+    this.sampler=new ServerSampler(this.context);
     this.update();
   }
+  noteUrl(note,area){return ServerSampler.url(note,area,{instrument:settings.instrument,transpose:settings.transpose,brightness:settings.brightness,attack:settings.attack,decay:settings.decay,sustain:settings.sustain,release:settings.release,echoMix:settings.echoMix,echoDelay:settings.echoDelay,echoFeedback:settings.echoFeedback});}
+  async prime(notes){await this.sampler.prime(notes.map((note,area)=>this.noteUrl(note,area)));}
   async resume(){if(this.context.state!=='running') await this.context.resume();}
   update(){const t=this.context.currentTime;this.master.gain.setTargetAtTime(settings.masterVolume,t,.015);this.dry.gain.setTargetAtTime(1-settings.echoMix*.3,t,.015);this.wet.gain.setTargetAtTime(settings.echoMix,t,.015);this.delay.delayTime.setTargetAtTime(settings.echoDelay,t,.015);this.feedback.gain.setTargetAtTime(settings.echoFeedback,t,.015);}
   envelope(gain, now, level, durationScale=1){
@@ -106,10 +109,12 @@ class AudioEngine {
     const now=this.context.currentTime, gain=this.context.createGain(), osc=this.context.createOscillator();osc.type=area%3===2?'square':'sine';osc.frequency.setValueAtTime(freq*(area<2?.5:1),now);osc.frequency.exponentialRampToValueAtTime(Math.max(45,freq*.35),now+.18);osc.connect(gain).connect(this.bus);gain.gain.setValueAtTime(Math.max(.001,velocity),now);gain.gain.exponentialRampToValueAtTime(.0001,now+.12+settings.release*.35);osc.start(now);osc.stop(now+.18+settings.release*.35);
     if(area%3!==0){const b=this.context.createBuffer(1,Math.floor(this.context.sampleRate*.14),this.context.sampleRate),d=b.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;const n=this.context.createBufferSource(),f=this.context.createBiquadFilter(),ng=this.context.createGain();n.buffer=b;f.type='highpass';f.frequency.value=900+settings.brightness*5000;ng.gain.setValueAtTime(velocity*.35,now);ng.gain.exponentialRampToValueAtTime(.0001,now+.12);n.connect(f).connect(ng).connect(this.bus);n.start(now);}
   }
-  play(note,velocity,area){this.update();const freq=noteFrequency(note,Number(settings.transpose));const v=Math.min(.95,Math.max(.08,velocity));if(settings.instrument==='steel_drum')this.steel(freq,v);else if(settings.instrument==='harpsichord')this.oscillatorVoice(freq,v,'sawtooth',[1,2,3,4],[.55,.22,.12,.06],.35);else if(settings.instrument==='piano')this.oscillatorVoice(freq,v,'triangle',[1,2,3.01],[.72,.20,.08],1.05);else if(settings.instrument==='guitar')this.guitar(freq,v);else this.drums(freq,v,area);}
+  play(note,velocity,area){this.update();const url=this.noteUrl(note,area),sample=this.sampler.cached(url);if(sample){this.sampler.start(sample,velocity,this.master);return;}this.sampler.load(url).catch(()=>{});const freq=noteFrequency(note,Number(settings.transpose));const v=Math.min(.95,Math.max(.08,velocity));if(settings.instrument==='steel_drum')this.steel(freq,v);else if(settings.instrument==='harpsichord')this.oscillatorVoice(freq,v,'sawtooth',[1,2,3,4],[.55,.22,.12,.06],.35);else if(settings.instrument==='piano')this.oscillatorVoice(freq,v,'triangle',[1,2,3.01],[.72,.20,.08],1.05);else if(settings.instrument==='guitar')this.guitar(freq,v);else this.drums(freq,v,area);}
 }
 
-async function ensureAudio(){if(!audio)audio=new AudioEngine();await audio.resume();audio.update();}
+async function ensureAudio(){if(!audio)audio=new AudioEngine();await audio.resume();audio.update();await audio.prime(settings.notes.slice(0,panelClassCount));}
+function scheduleAudioPrime(){if(!audio)return;if(audioPrimeTimer)clearTimeout(audioPrimeTimer);audioPrimeTimer=setTimeout(()=>audio.prime(settings.notes.slice(0,panelClassCount)).catch(()=>{}),180);}
+let audioPrimeTimer=null;
 function outputValue(id,value){const el=$(id);if(el)el.value=value;}
 function renderSettings(){
   $('instrumentSelect').value=settings.instrument;
@@ -239,7 +244,7 @@ function setButtonState(id,disabled,running=false){const button=$(id);button.dis
 function updateActionState(data){const connected=Boolean(data.connected),deviceRunning=Boolean(data.inference_active),playing=deviceRunning&&performanceEnabled;setButtonState('connect',connected,connected);setButtonState('disconnect',!connected);setButtonState('instrumentStart',!connected||playing,playing);setButtonState('instrumentStop',!connected||!deviceRunning);$('port').disabled=connected;}
 async function refreshStatus(){
   if(pollBusy)return;pollBusy=true;
-  try{const data=await api('/api/status');if(!data.inference_active)performanceEnabled=false;const audible=Boolean(data.inference_active&&performanceEnabled);$('connection').textContent=data.connected?`接続中 ${data.port}`:'未接続';$('connection').classList.toggle('online',data.connected);$('firmwareMode').textContent=data.device_mode==='instrument'?(audible?'高速演奏中':(data.inference_active?'演奏再開待ち':'楽器高速モード')):(data.device_mode==='inference'?'通常推論モード':(data.device_mode==='collection'?'データ採取モード':'モード不明'));$('firmwareMode').classList.toggle('online',audible);
+  try{const data=await api('/api/status');if(!data.inference_active)performanceEnabled=false;const audible=Boolean(data.inference_active&&performanceEnabled);$('connection').textContent=data.connected?`接続中 ${data.port}`:'未接続';$('connection').classList.toggle('online',data.connected);$('firmwareMode').textContent=data.device_mode==='instrument'?(audible?'高速演奏中':(data.inference_active?'演奏再開待ち':'楽器高速モード')):(data.device_mode==='inference'?'通常推論モード':(data.device_mode==='collection'?'データ採取モード':(data.device_mode==='calibration'?'キャリブレーション':'モード不明')));$('firmwareMode').classList.toggle('online',audible);
     // latest_ai remains part of /api/status for the inference and collector pages.
     if(data.latest_ai&&!performanceEnabled&&data.latest_ai.sequence!==lastPlayedSequence){lastPlayedSequence=data.latest_ai.sequence;renderScores(data.latest_ai.outputs);displayArea(Number(data.latest_ai.predicted_class));}
     updateActionState(data);if(data.last_error)$('error').textContent=data.last_error;
@@ -249,9 +254,8 @@ async function inferenceLoop(){
   if(inferenceLoopRunning)return;inferenceLoopRunning=true;
   while(inferenceLoopRunning){
     if(!performanceEnabled){await new Promise(resolve=>setTimeout(resolve,50));continue;}
-    try{const result=await api('/api/ai/latest');if(result.sequence!==undefined&&result.sequence!==lastPlayedSequence){lastPlayedSequence=result.sequence;const area=Number(result.predicted_class),score=Math.max(...result.outputs.map(Number));renderScores(result.outputs);playArea(area,score,false);$('error').textContent='';}}
-    catch(error){$('error').textContent=error.message;}
-    await new Promise(resolve=>setTimeout(resolve,20));
+    try{const result=await api(`/api/ai/wait?after=${lastPlayedSequence===null||lastPlayedSequence===undefined?'none':lastPlayedSequence}&timeout=1.0`);if(result.sequence!==undefined&&result.sequence!==lastPlayedSequence){lastPlayedSequence=result.sequence;const area=Number(result.predicted_class),score=Math.max(...result.outputs.map(Number));playArea(area,score,false);renderScores(result.outputs);$('error').textContent='';}}
+    catch(error){$('error').textContent=error.message;await new Promise(resolve=>setTimeout(resolve,200));}
   }
 }
 async function startPerformance(){try{await ensureAudio();const current=await api('/api/status');lastPlayedSequence=current.latest_ai?current.latest_ai.sequence:null;await api('/api/inference/retrigger',{milliseconds:Number(settings.retriggerGuardMs)});await api('/api/inference/start',{mode:'instrument'});performanceEnabled=true;$('instrumentStatus').textContent='高速演奏中です。アクリル板を連続してたたけます。';$('instrumentStatus').classList.add('playing');$('error').textContent='';await refreshStatus();}catch(error){$('error').textContent=error.message;}}

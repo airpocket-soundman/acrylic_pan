@@ -18,6 +18,7 @@ from urllib.parse import parse_qs, urlparse
 
 import numpy as np
 
+from pc.acrylic_pan_web.audio_synth import audio_backend_name, synthesize_note
 from pc.acrylic_pan_monitor.ai_validation import (
     DEFAULT_GOLDEN_PATH,
     compare_ai_result,
@@ -26,16 +27,25 @@ from pc.acrylic_pan_monitor.ai_validation import (
 from pc.acrylic_pan_monitor.library import Library, LibraryError
 from pc.acrylic_pan_monitor.protocol import (
     EventData,
+    CALIBRATION_CHECK_ONLY,
+    CalibrationOp,
     EventAssembler,
     Frame,
     MessageType,
+    ProtocolError,
     decode_ai_result,
+    decode_calibration_ack,
+    decode_calibration_result,
     decode_event,
     decode_event_chunk,
     decode_inference_event,
     decode_position_result,
     decode_position_diagnostic,
+    encode_calibration_request,
     encode_frame,
+    BOOT_BAUDRATE,
+    FAST_BAUDRATE,
+    encode_set_baud,
 )
 from pc.acrylic_pan_monitor.recorder import Recorder, ReceiveStats, make_demo_event
 from pc.acrylic_pan_monitor.serial_link import SerialLink, available_ports
@@ -369,6 +379,10 @@ class AcquisitionController:
         self.inference_active = False
         self.event_assembler = EventAssembler(timeout_seconds=2.0)
         self.assembly_retry_required = False
+        self._hello_seen = threading.Event()
+        self.calibration: dict[str, Any] = {
+            "pending": False, "result_count": 0, "result": None, "error": None, "status": None,
+        }
         self._control_waiters: dict[int, tuple[threading.Event, dict[str, Any]]] = {}
         self._command_sequence = 1
         self._queue: queue.Queue[Frame | Exception] = queue.Queue()
@@ -404,8 +418,53 @@ class AcquisitionController:
             self.class_id = None
         return self.status()
 
-    def connect(self, port: str, baudrate: int = 115_200) -> None:
+    def _board_answers(self, timeout: float = 0.4) -> bool:
+        """True when the firmware answers a HELLO at the current port speed."""
+        self._hello_seen.clear()
+        with self._lock:
+            sequence = self._command_sequence
+            self._command_sequence += 1
+        self.link.send(encode_frame(Frame(MessageType.HELLO, sequence)))
+        return self._hello_seen.wait(timeout)
+
+    def _negotiate_fast_uart(self) -> int:
+        """Switch the link to 960 kbit/s when the firmware supports it; return the speed in use.
+
+        The boot speed is 115200 bit/s.  At that speed a 256-byte position result needs about
+        24 ms on the wire, so the faster link removes most of the transmission delay.  A board
+        left at the fast speed (the server restarted without a power cycle) is found by probing it.
+        """
+        if not self._board_answers():
+            self.link.set_baudrate(FAST_BAUDRATE)
+            if self._board_answers():
+                return FAST_BAUDRATE
+            self.link.set_baudrate(BOOT_BAUDRATE)
+            return BOOT_BAUDRATE
+        with self._lock:
+            sequence = self._command_sequence
+            self._command_sequence += 1
+            completed = threading.Event()
+            response: dict[str, Any] = {}
+            self._control_waiters[sequence] = (completed, response)
+        self.link.send(encode_set_baud(sequence, FAST_BAUDRATE))
+        if not completed.wait(0.6) or response.get("type") != "ack":
+            with self._lock:
+                self._control_waiters.pop(sequence, None)
+            return BOOT_BAUDRATE  # older firmware: stay at the boot speed
+        time.sleep(0.08)  # the firmware changes its divisor about 30 ms after the ACK
+        self.link.set_baudrate(FAST_BAUDRATE)
+        if self._board_answers(0.6):
+            return FAST_BAUDRATE
+        self.link.set_baudrate(BOOT_BAUDRATE)
+        return BOOT_BAUDRATE
+
+    def connect(self, port: str, baudrate: int = 115_200, fast: bool = True) -> None:
         self.link.connect(port, baudrate)
+        if fast and baudrate == BOOT_BAUDRATE:
+            try:
+                baudrate = self._negotiate_fast_uart()
+            except (OSError, ValueError):
+                baudrate = BOOT_BAUDRATE
         with self._lock:
             self.event_assembler.reset()
             self.assembly_retry_required = False
@@ -424,9 +483,12 @@ class AcquisitionController:
 
     def set_mode(self, mode: str) -> dict[str, Any]:
         """Set and confirm the firmware operating mode through its ACK."""
-        values = {"collection": 0, "inference": 1, "instrument": 2, "device_position": 3}
+        values = {"collection": 0, "inference": 1, "instrument": 2, "device_position": 3,
+                  "calibration": 4}
         if mode not in values:
-            raise ValueError("mode must be collection, inference, instrument, or device_position")
+            raise ValueError(
+                "mode must be collection, inference, instrument, device_position, or calibration"
+            )
         with self._lock:
             if self.collection.active or self.inference_active:
                 raise ValueError("動作中はモードを切り替えられません。先に停止してください。")
@@ -508,6 +570,49 @@ class AcquisitionController:
                 "state": "confirmed",
             }
         return {"milliseconds": milliseconds, "confirmed": True, "sequence": sequence}
+
+    def calibration_state(self) -> dict[str, Any]:
+        with self._lock:
+            return {**self.calibration, "device_mode": self.device_mode}
+
+    def calibration_request(self, operation: CalibrationOp, argument: int = 0) -> dict[str, Any]:
+        """Send one CALIBRATION request and return the status carried by its ACK."""
+        if not self.link.connected:
+            raise OSError("serial port is not connected")
+        with self._lock:
+            if self.collection.active or self.inference_active:
+                raise ValueError("動作中はキャリブレーションできません。先に停止してください。")
+            if operation != CalibrationOp.STATUS and self.device_mode != "calibration":
+                raise ValueError("キャリブレーションモードではありません")
+            sequence = self._command_sequence
+            self._command_sequence += 1
+            completed = threading.Event()
+            response: dict[str, Any] = {}
+            self._control_waiters[sequence] = (completed, response)
+            if operation == CalibrationOp.ARM:
+                self.calibration["pending"] = True
+                self.calibration["error"] = None
+        self.link.send(encode_calibration_request(sequence, operation, argument))
+        if not completed.wait(3.0):
+            with self._lock:
+                self._control_waiters.pop(sequence, None)
+                self.calibration["pending"] = False
+            raise TimeoutError("ファームからキャリブレーションの応答がありません")
+        if response.get("type") != "ack":
+            with self._lock:
+                self.calibration["pending"] = False
+            raise ValueError("ファームがキャリブレーション操作を拒否しました")
+        status = decode_calibration_ack(Frame(MessageType.ACK, sequence, response["payload"]))
+        info = {
+            "operation": status.operation.name.lower(),
+            "source": status.source.name.lower(),
+            "saved_valid": status.saved_valid,
+            "saved_count": status.saved_count,
+            "work_count": status.work_count,
+        }
+        with self._lock:
+            self.calibration["status"] = info
+        return info
 
     def stop_inference(self) -> dict[str, Any]:
         with self._lock:
@@ -1165,6 +1270,7 @@ class AcquisitionController:
                 with self._lock:
                     self.identity = item.payload.decode("ascii", errors="replace")
                     self.last_control = {"response": "hello", "payload": self.identity, "sequence": item.sequence}
+                self._hello_seen.set()
             elif item.message_type == MessageType.AI_RESULT:
                 try:
                     result = decode_ai_result(item)
@@ -1309,12 +1415,33 @@ class AcquisitionController:
                 except Exception as error:
                     with self._lock:
                         self.last_error = f"Position diagnostic error: {error}"
+            elif item.message_type == MessageType.CALIBRATION_RESULT:
+                try:
+                    result = decode_calibration_result(item)
+                    with self._lock:
+                        self.calibration["result_count"] += 1
+                        self.calibration["pending"] = False
+                        self.calibration["result"] = {
+                            "target": result.target,
+                            "predicted_class": result.predicted_class,
+                            "trained": result.trained,
+                            "training_failed": result.training_failed,
+                            "source": result.source.name.lower(),
+                            "work_count": result.work_count,
+                            "inference_ms": result.inference_us / 1000.0,
+                            "train_ms": result.train_us / 1000.0,
+                            "outputs": list(result.outputs),
+                        }
+                except ProtocolError as error:
+                    with self._lock:
+                        self.calibration["pending"] = False
+                        self.calibration["error"] = f"キャリブレーション結果の解析エラー: {error}"
             elif item.message_type == MessageType.STATUS:
                 with self._lock:
-                    if len(item.payload) >= 11 and item.payload[10] in (0, 1, 2, 3):
+                    if len(item.payload) >= 11 and item.payload[10] in (0, 1, 2, 3, 4):
                         self.device_mode = {
                             0: "collection", 1: "inference", 2: "instrument",
-                            3: "device_position",
+                            3: "device_position", 4: "calibration",
                         }[item.payload[10]]
                     self.last_control = {
                         "response": "status", "payload_hex": item.payload.hex(),
@@ -1323,6 +1450,10 @@ class AcquisitionController:
             elif item.message_type in (MessageType.ACK, MessageType.NACK):
                 with self._lock:
                     waiter = self._control_waiters.pop(item.sequence, None)
+                    if (waiter is None and item.message_type == MessageType.NACK
+                            and self.calibration["pending"]):
+                        self.calibration["pending"] = False
+                        self.calibration["error"] = "打撃を推論できませんでした。もう一度叩いてください。"
                     if waiter is not None:
                         waiter[1].update({"type": item.message_type.name.lower(),
                                           "payload": item.payload})
@@ -1336,12 +1467,44 @@ class AcquisitionController:
 
 class ApiHandler(BaseHTTPRequestHandler):
     controller: AcquisitionController
+    audio_cache: dict[tuple[tuple[str, str], ...], bytes] = {}
+    audio_cache_lock = threading.RLock()
+
+    def _note_wav(self, query: str) -> None:
+        options = {name: values[-1] for name, values in parse_qs(query).items()}
+        key = tuple(sorted(options.items()))
+        with self.audio_cache_lock:
+            body = self.audio_cache.get(key)
+        cache_hit = body is not None
+        if body is None:
+            body = synthesize_note(options)
+            with self.audio_cache_lock:
+                self.audio_cache[key] = body
+                # Notes up to 5x longer are about 1 MB each, so bound the cache by size.
+                while sum(map(len, self.audio_cache.values())) > 96_000_000 and len(self.audio_cache) > 1:
+                    self.audio_cache.pop(next(iter(self.audio_cache)))
+        self.send_response(HTTPStatus.OK)
+        self.send_header("Content-Type", "audio/wav")
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Cache-Control", "public, max-age=3600")
+        self.send_header("X-Audio-Synth", audio_backend_name())
+        self.send_header("X-Audio-Cache", "hit" if cache_hit else "miss")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
 
     def do_GET(self) -> None:
         parsed = urlparse(self.path)
         path = parsed.path
         if path == "/api/status":
             return self._json(self.controller.status())
+        if path == "/api/calibration/state":
+            return self._json(self.controller.calibration_state())
+        if path == "/api/audio/note.wav":
+            try:
+                return self._note_wav(parsed.query)
+            except (KeyError, TypeError, ValueError, RuntimeError) as error:
+                return self._json({"error": str(error)}, HTTPStatus.BAD_REQUEST)
         if path == "/api/ports":
             return self._json({"ports": available_ports()})
         if path == "/api/events/latest":
@@ -1400,12 +1563,35 @@ class ApiHandler(BaseHTTPRequestHandler):
         except (KeyError, TypeError, ValueError, OSError) as error:
             self._json({"error": str(error)}, HTTPStatus.BAD_REQUEST)
 
+    def _calibration_post(self, action: str, body: dict[str, Any]) -> dict[str, Any]:
+        controller = self.controller
+        operations = {
+            "status": CalibrationOp.STATUS, "begin": CalibrationOp.BEGIN,
+            "commit": CalibrationOp.COMMIT, "discard": CalibrationOp.DISCARD,
+            "factory_reset": CalibrationOp.FACTORY_RESET,
+        }
+        if action == "enter":
+            controller.set_mode("calibration")
+            return controller.calibration_request(CalibrationOp.STATUS)
+        if action == "arm":
+            target = body.get("target")
+            argument = CALIBRATION_CHECK_ONLY if target is None else int(target)
+            if target is not None and not 0 <= argument < 12:
+                raise ValueError("target must be an area from 0 to 11")
+            return controller.calibration_request(CalibrationOp.ARM, argument)
+        if action in operations:
+            return controller.calibration_request(operations[action])
+        raise KeyError(action)
+
     def do_POST(self) -> None:
         path = urlparse(self.path).path
         try:
             body = self._request_json()
+            if path.startswith("/api/calibration/"):
+                return self._json(self._calibration_post(path.rsplit("/", 1)[1], body))
             if path == "/api/connect":
-                self.controller.connect(str(body["port"]), int(body.get("baudrate", 115_200)))
+                self.controller.connect(str(body["port"]), int(body.get("baudrate", 115_200)),
+                                        bool(body.get("fast", True)))
                 return self._json(self.controller.status())
             if path == "/api/disconnect":
                 self.controller.disconnect()
@@ -1495,6 +1681,9 @@ class ApiHandler(BaseHTTPRequestHandler):
             "/instrument-probability.js": "instrument-probability.js",
             "/position.js": "position.js",
             "/panel-profile.js": "panel-profile.js",
+            "/server-audio.js": "server-audio.js",
+            "/calibration.js": "calibration.js",
+            "/song.js": "song.js",
             "/panel-profile.css": "panel-profile.css",
             "/app.js": "app.js",
             "/style.css": "style.css",

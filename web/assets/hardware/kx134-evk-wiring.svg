@@ -1,0 +1,183 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="940" viewBox="0 0 1200 940" role="img" aria-labelledby="t d">
+<title id="t">Solist-AI ボード CN3 と KX134-1211-EVK-001 J1 の接続図</title>
+<desc id="d">CN3の5と8番(3.3V)がJ1の1と6番、GNDの2番が8番、CSの14番が2番、SCKの12番が5番、MOSIの9番が7番、MISOの10番が9番、INT1の7番が11番、INT2の6番が12番へつながる。</desc>
+<style>text{font-family:"Yu Gothic UI","Noto Sans JP",Meiryo,Arial,sans-serif;fill:#10212b}.h{font-size:26px;font-weight:700}.s{font-size:15px;fill:#60727a}.b{font-size:17px;font-weight:700}.m{font-size:13px}.p{font-size:14px;font-weight:700;fill:#fff}.pn{font-size:12px;fill:#60727a}.w{font-size:15px;font-weight:700}</style>
+<rect width="1200" height="940" fill="#f5f6f2"/>
+<text x="600" y="44" text-anchor="middle" class="h">センサ接続: Solist-AI ボード CN3 → KX134-1211-EVK-001 J1</text>
+<text x="600" y="72" text-anchor="middle" class="s">SPI接続(3.3 V)。ストレートの14ピンケーブルは使えません。必ず「ピン番号」で配線します。</text>
+<text x="60" y="92" class="b">Solist-AI ボード DT-EBML63Q2557  CN3</text>
+<text x="60" y="114" class="m" fill="#60727a">デジタルセンサーコネクタ(14ピン)</text>
+<rect x="46" y="130" width="438" height="158" rx="8" fill="#102733" stroke="#557078" stroke-width="3"/>
+<circle cx="84" cy="166" r="17" fill="#1f272a" stroke="#fff" stroke-width="3"/>
+<text x="84" y="171" text-anchor="middle" class="p">2</text>
+<text x="84" y="142" text-anchor="middle" font-size="10.5" font-weight="700" fill="#e6f0ee" style="fill:#e6f0ee">GND</text>
+<circle cx="84" cy="242" r="17" fill="#3c4d55" stroke="#fff" stroke-width="1"/>
+<text x="84" y="247" text-anchor="middle" class="p">1</text>
+<text x="84" y="276" text-anchor="middle" font-size="10.5" font-weight="700" fill="#e6f0ee" style="fill:#e6f0ee">SCL</text>
+<circle cx="146" cy="166" r="17" fill="#3c4d55" stroke="#fff" stroke-width="1"/>
+<text x="146" y="171" text-anchor="middle" class="p">4</text>
+<text x="146" y="142" text-anchor="middle" font-size="10.5" font-weight="700" fill="#e6f0ee" style="fill:#e6f0ee">GND</text>
+<circle cx="146" cy="242" r="17" fill="#3c4d55" stroke="#fff" stroke-width="1"/>
+<text x="146" y="247" text-anchor="middle" class="p">3</text>
+<text x="146" y="276" text-anchor="middle" font-size="10.5" font-weight="700" fill="#e6f0ee" style="fill:#e6f0ee">SDA</text>
+<circle cx="208" cy="166" r="17" fill="#008da3" stroke="#fff" stroke-width="3"/>
+<text x="208" y="171" text-anchor="middle" class="p">6</text>
+<text x="208" y="142" text-anchor="middle" font-size="10.5" font-weight="700" fill="#e6f0ee" style="fill:#e6f0ee">INT2</text>
+<circle cx="208" cy="242" r="17" fill="#d84437" stroke="#fff" stroke-width="3"/>
+<text x="208" y="247" text-anchor="middle" class="p">5</text>
+<text x="208" y="276" text-anchor="middle" font-size="10.5" font-weight="700" fill="#e6f0ee" style="fill:#e6f0ee">3.3V</text>
+<circle cx="270" cy="166" r="17" fill="#d84437" stroke="#fff" stroke-width="3"/>
+<text x="270" y="171" text-anchor="middle" class="p">8</text>
+<text x="270" y="142" text-anchor="middle" font-size="10.5" font-weight="700" fill="#e6f0ee" style="fill:#e6f0ee">3.3V</text>
+<circle cx="270" cy="242" r="17" fill="#b88a00" stroke="#fff" stroke-width="3"/>
+<text x="270" y="247" text-anchor="middle" class="p">7</text>
+<text x="270" y="276" text-anchor="middle" font-size="10.5" font-weight="700" fill="#e6f0ee" style="fill:#e6f0ee">INT1</text>
+<circle cx="332" cy="166" r="17" fill="#15936f" stroke="#fff" stroke-width="3"/>
+<text x="332" y="171" text-anchor="middle" class="p">10</text>
+<text x="332" y="142" text-anchor="middle" font-size="10.5" font-weight="700" fill="#e6f0ee" style="fill:#e6f0ee">MISO</text>
+<circle cx="332" cy="242" r="17" fill="#e27b23" stroke="#fff" stroke-width="3"/>
+<text x="332" y="247" text-anchor="middle" class="p">9</text>
+<text x="332" y="276" text-anchor="middle" font-size="10.5" font-weight="700" fill="#e6f0ee" style="fill:#e6f0ee">MOSI</text>
+<circle cx="394" cy="166" r="17" fill="#2877c7" stroke="#fff" stroke-width="3"/>
+<text x="394" y="171" text-anchor="middle" class="p">12</text>
+<text x="394" y="142" text-anchor="middle" font-size="10.5" font-weight="700" fill="#e6f0ee" style="fill:#e6f0ee">SCK</text>
+<circle cx="394" cy="242" r="17" fill="#3c4d55" stroke="#fff" stroke-width="1"/>
+<text x="394" y="247" text-anchor="middle" class="p">11</text>
+<text x="394" y="276" text-anchor="middle" font-size="10.5" font-weight="700" fill="#e6f0ee" style="fill:#e6f0ee">GND</text>
+<circle cx="456" cy="166" r="17" fill="#854fc6" stroke="#fff" stroke-width="3"/>
+<text x="456" y="171" text-anchor="middle" class="p">14</text>
+<text x="456" y="142" text-anchor="middle" font-size="10.5" font-weight="700" fill="#e6f0ee" style="fill:#e6f0ee">CS</text>
+<circle cx="456" cy="242" r="17" fill="#3c4d55" stroke="#fff" stroke-width="1"/>
+<text x="456" y="247" text-anchor="middle" class="p">13</text>
+<text x="456" y="276" text-anchor="middle" font-size="10.5" font-weight="700" fill="#e6f0ee" style="fill:#e6f0ee">GND</text>
+<path d="M54 280 l-10 8 l10 8 z" fill="#ffd54a"/>
+<text x="54" y="312" class="pn" style="fill:#d49a2c">▲ 1番ピン側</text>
+<text x="700" y="92" class="b">KX134-1211-EVK-001  J1</text>
+<text x="700" y="114" class="m" fill="#60727a">センサ評価基板のヘッダ(14ピン、2.54 mm)</text>
+<rect x="686" y="130" width="438" height="158" rx="8" fill="#102733" stroke="#557078" stroke-width="3"/>
+<circle cx="724" cy="166" r="17" fill="#854fc6" stroke="#fff" stroke-width="3"/>
+<text x="724" y="171" text-anchor="middle" class="p">2</text>
+<text x="724" y="142" text-anchor="middle" font-size="10.5" font-weight="700" fill="#e6f0ee" style="fill:#e6f0ee">nCS</text>
+<circle cx="724" cy="242" r="17" fill="#d84437" stroke="#fff" stroke-width="3"/>
+<text x="724" y="247" text-anchor="middle" class="p">1</text>
+<text x="724" y="276" text-anchor="middle" font-size="10.5" font-weight="700" fill="#e6f0ee" style="fill:#e6f0ee">VDD</text>
+<circle cx="786" cy="166" r="17" fill="#3c4d55" stroke="#fff" stroke-width="1"/>
+<text x="786" y="171" text-anchor="middle" class="p">4</text>
+<text x="786" y="142" text-anchor="middle" font-size="10.5" font-weight="700" fill="#e6f0ee" style="fill:#e6f0ee">-</text>
+<circle cx="786" cy="242" r="17" fill="#3c4d55" stroke="#fff" stroke-width="1"/>
+<text x="786" y="247" text-anchor="middle" class="p">3</text>
+<text x="786" y="276" text-anchor="middle" font-size="10.5" font-weight="700" fill="#e6f0ee" style="fill:#e6f0ee">-</text>
+<circle cx="848" cy="166" r="17" fill="#d84437" stroke="#fff" stroke-width="3"/>
+<text x="848" y="171" text-anchor="middle" class="p">6</text>
+<text x="848" y="142" text-anchor="middle" font-size="10.5" font-weight="700" fill="#e6f0ee" style="fill:#e6f0ee">IO_VDD</text>
+<circle cx="848" cy="242" r="17" fill="#2877c7" stroke="#fff" stroke-width="3"/>
+<text x="848" y="247" text-anchor="middle" class="p">5</text>
+<text x="848" y="276" text-anchor="middle" font-size="10.5" font-weight="700" fill="#e6f0ee" style="fill:#e6f0ee">SCLK</text>
+<circle cx="910" cy="166" r="17" fill="#1f272a" stroke="#fff" stroke-width="3"/>
+<text x="910" y="171" text-anchor="middle" class="p">8</text>
+<text x="910" y="142" text-anchor="middle" font-size="10.5" font-weight="700" fill="#e6f0ee" style="fill:#e6f0ee">GND</text>
+<circle cx="910" cy="242" r="17" fill="#e27b23" stroke="#fff" stroke-width="3"/>
+<text x="910" y="247" text-anchor="middle" class="p">7</text>
+<text x="910" y="276" text-anchor="middle" font-size="10.5" font-weight="700" fill="#e6f0ee" style="fill:#e6f0ee">SDI</text>
+<circle cx="972" cy="166" r="17" fill="#3c4d55" stroke="#fff" stroke-width="1"/>
+<text x="972" y="171" text-anchor="middle" class="p">10</text>
+<text x="972" y="142" text-anchor="middle" font-size="10.5" font-weight="700" fill="#e6f0ee" style="fill:#e6f0ee">TRIG</text>
+<circle cx="972" cy="242" r="17" fill="#15936f" stroke="#fff" stroke-width="3"/>
+<text x="972" y="247" text-anchor="middle" class="p">9</text>
+<text x="972" y="276" text-anchor="middle" font-size="10.5" font-weight="700" fill="#e6f0ee" style="fill:#e6f0ee">SDO</text>
+<circle cx="1034" cy="166" r="17" fill="#008da3" stroke="#fff" stroke-width="3"/>
+<text x="1034" y="171" text-anchor="middle" class="p">12</text>
+<text x="1034" y="142" text-anchor="middle" font-size="10.5" font-weight="700" fill="#e6f0ee" style="fill:#e6f0ee">INT2</text>
+<circle cx="1034" cy="242" r="17" fill="#b88a00" stroke="#fff" stroke-width="3"/>
+<text x="1034" y="247" text-anchor="middle" class="p">11</text>
+<text x="1034" y="276" text-anchor="middle" font-size="10.5" font-weight="700" fill="#e6f0ee" style="fill:#e6f0ee">INT1</text>
+<circle cx="1096" cy="166" r="17" fill="#3c4d55" stroke="#fff" stroke-width="1"/>
+<text x="1096" y="171" text-anchor="middle" class="p">14</text>
+<text x="1096" y="142" text-anchor="middle" font-size="10.5" font-weight="700" fill="#e6f0ee" style="fill:#e6f0ee">-</text>
+<circle cx="1096" cy="242" r="17" fill="#3c4d55" stroke="#fff" stroke-width="1"/>
+<text x="1096" y="247" text-anchor="middle" class="p">13</text>
+<text x="1096" y="276" text-anchor="middle" font-size="10.5" font-weight="700" fill="#e6f0ee" style="fill:#e6f0ee">-</text>
+<path d="M694 280 l-10 8 l10 8 z" fill="#ffd54a"/>
+<text x="694" y="312" class="pn" style="fill:#d49a2c">▲ 1番ピン側</text>
+<text x="600" y="388" text-anchor="middle" class="b">配線(ピン番号どうしを1対1で接続)</text>
+<circle cx="250" cy="410" r="17" fill="#d84437" stroke="#fff" stroke-width="3"/>
+<text x="250" y="415" text-anchor="middle" class="p">5</text>
+<text x="226" y="415" text-anchor="end" class="w">CN3-5  Power Out</text>
+<line x1="267" y1="410" x2="933" y2="410" stroke="#d84437" stroke-width="6" stroke-linecap="round"/>
+<text x="600" y="401" text-anchor="middle" class="m">3.3 V → VDD</text>
+<circle cx="950" cy="410" r="17" fill="#d84437" stroke="#fff" stroke-width="3"/>
+<text x="950" y="415" text-anchor="middle" class="p">1</text>
+<text x="974" y="415" class="w">J1-1  VDD</text>
+<circle cx="250" cy="456" r="17" fill="#d84437" stroke="#fff" stroke-width="3"/>
+<text x="250" y="461" text-anchor="middle" class="p">8</text>
+<text x="226" y="461" text-anchor="end" class="w">CN3-8  Power Out</text>
+<line x1="267" y1="456" x2="933" y2="456" stroke="#d84437" stroke-width="6" stroke-linecap="round"/>
+<text x="600" y="447" text-anchor="middle" class="m">3.3 V → IO_VDD</text>
+<circle cx="950" cy="456" r="17" fill="#d84437" stroke="#fff" stroke-width="3"/>
+<text x="950" y="461" text-anchor="middle" class="p">6</text>
+<text x="974" y="461" class="w">J1-6  IO_VDD</text>
+<circle cx="250" cy="502" r="17" fill="#1f272a" stroke="#fff" stroke-width="3"/>
+<text x="250" y="507" text-anchor="middle" class="p">2</text>
+<text x="226" y="507" text-anchor="end" class="w">CN3-2  GND</text>
+<line x1="267" y1="502" x2="933" y2="502" stroke="#1f272a" stroke-width="7" stroke-linecap="round"/>
+<text x="600" y="493" text-anchor="middle" class="m">GND</text>
+<circle cx="950" cy="502" r="17" fill="#1f272a" stroke="#fff" stroke-width="3"/>
+<text x="950" y="507" text-anchor="middle" class="p">8</text>
+<text x="974" y="507" class="w">J1-8  GND</text>
+<circle cx="250" cy="548" r="17" fill="#854fc6" stroke="#fff" stroke-width="3"/>
+<text x="250" y="553" text-anchor="middle" class="p">14</text>
+<text x="226" y="553" text-anchor="end" class="w">CN3-14  CS</text>
+<line x1="267" y1="548" x2="933" y2="548" stroke="#854fc6" stroke-width="6" stroke-linecap="round"/>
+<text x="600" y="539" text-anchor="middle" class="m">CS → nCS</text>
+<circle cx="950" cy="548" r="17" fill="#854fc6" stroke="#fff" stroke-width="3"/>
+<text x="950" y="553" text-anchor="middle" class="p">2</text>
+<text x="974" y="553" class="w">J1-2  nCS</text>
+<circle cx="250" cy="594" r="17" fill="#2877c7" stroke="#fff" stroke-width="3"/>
+<text x="250" y="599" text-anchor="middle" class="p">12</text>
+<text x="226" y="599" text-anchor="end" class="w">CN3-12  SCK</text>
+<line x1="267" y1="594" x2="933" y2="594" stroke="#2877c7" stroke-width="6" stroke-linecap="round"/>
+<text x="600" y="585" text-anchor="middle" class="m">SCK → SCLK</text>
+<circle cx="950" cy="594" r="17" fill="#2877c7" stroke="#fff" stroke-width="3"/>
+<text x="950" y="599" text-anchor="middle" class="p">5</text>
+<text x="974" y="599" class="w">J1-5  SCLK</text>
+<circle cx="250" cy="640" r="17" fill="#e27b23" stroke="#fff" stroke-width="3"/>
+<text x="250" y="645" text-anchor="middle" class="p">9</text>
+<text x="226" y="645" text-anchor="end" class="w">CN3-9  MOSI</text>
+<line x1="267" y1="640" x2="933" y2="640" stroke="#e27b23" stroke-width="6" stroke-linecap="round"/>
+<text x="600" y="631" text-anchor="middle" class="m">MOSI → SDI</text>
+<circle cx="950" cy="640" r="17" fill="#e27b23" stroke="#fff" stroke-width="3"/>
+<text x="950" y="645" text-anchor="middle" class="p">7</text>
+<text x="974" y="645" class="w">J1-7  SDI</text>
+<circle cx="250" cy="686" r="17" fill="#15936f" stroke="#fff" stroke-width="3"/>
+<text x="250" y="691" text-anchor="middle" class="p">10</text>
+<text x="226" y="691" text-anchor="end" class="w">CN3-10  MISO</text>
+<line x1="267" y1="686" x2="933" y2="686" stroke="#15936f" stroke-width="6" stroke-linecap="round"/>
+<text x="600" y="677" text-anchor="middle" class="m">MISO ← SDO</text>
+<circle cx="950" cy="686" r="17" fill="#15936f" stroke="#fff" stroke-width="3"/>
+<text x="950" y="691" text-anchor="middle" class="p">9</text>
+<text x="974" y="691" class="w">J1-9  SDO</text>
+<circle cx="250" cy="732" r="17" fill="#b88a00" stroke="#fff" stroke-width="3"/>
+<text x="250" y="737" text-anchor="middle" class="p">7</text>
+<text x="226" y="737" text-anchor="end" class="w">CN3-7  INT1</text>
+<line x1="267" y1="732" x2="933" y2="732" stroke="#b88a00" stroke-width="6" stroke-linecap="round"/>
+<text x="600" y="723" text-anchor="middle" class="m">INT1 ← INT1 (DRDY)</text>
+<circle cx="950" cy="732" r="17" fill="#b88a00" stroke="#fff" stroke-width="3"/>
+<text x="950" y="737" text-anchor="middle" class="p">11</text>
+<text x="974" y="737" class="w">J1-11  INT1</text>
+<circle cx="250" cy="778" r="17" fill="#008da3" stroke="#fff" stroke-width="3"/>
+<text x="250" y="783" text-anchor="middle" class="p">6</text>
+<text x="226" y="783" text-anchor="end" class="w">CN3-6  INT2</text>
+<line x1="267" y1="778" x2="933" y2="778" stroke="#008da3" stroke-width="6" stroke-linecap="round"/>
+<text x="600" y="769" text-anchor="middle" class="m">INT2 ← INT2 (任意)</text>
+<circle cx="950" cy="778" r="17" fill="#008da3" stroke="#fff" stroke-width="3"/>
+<text x="950" y="783" text-anchor="middle" class="p">12</text>
+<text x="974" y="783" class="w">J1-12  INT2</text>
+<rect x="60" y="834" width="1080" height="150" rx="10" fill="#fff" stroke="#d7dfdd" stroke-width="2"/>
+<text x="80" y="864" class="m">・CN3の1・3番(SCL/SDA)はSPIでは使いません。J1の3・4・13・14番(未割り当て)と10番(TRIG、基板上で10 kΩプルダウン)は接続しません。</text>
+<text x="80" y="890" class="m">・CN3の4・11・13番もGNDです。必要なら追加のGND線として使えます。</text>
+<text x="80" y="916" class="m">・DT-EBML63Q2557の JP1 は 3.3 V にします。デジタル入力の最大定格は3.6 Vで、5 Vを接続してはいけません。</text>
+<text x="80" y="942" class="m">・EVK上にプルアップ(nCS 10 kΩ、SCLK/SDI 2.1 kΩ、SDO 10 kΩ)があります。IO_VDD(J1-6)に3.3 Vが無いとSPIが動きません。</text>
+<text x="80" y="968" class="m">・コネクタの向きはこの図の見た目ではなく、基板の「1」表示(三角印・角パッド)で確認します。</text>
+<rect x="60" y="1000" width="1080" height="46" rx="10" fill="#fff0f0" stroke="#d74040" stroke-width="2"/>
+<text x="600" y="1030" text-anchor="middle" font-size="19" font-weight="700" style="fill:#b32323">VDD と IO_VDD は両方とも 3.3 V。どちらも 5 V に接続しない。</text>
+</svg>

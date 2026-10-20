@@ -20,3 +20,15 @@ main{width:100%;max-width:none}
 @media(max-width:900px){.mapping-dialog .profile-toolbar{grid-template-columns:1fr 1fr}.mapping-dialog .profile-toolbar button{min-height:38px}}
 @media(max-width:600px){.mapping-dialog .profile-toolbar{grid-template-columns:1fr}.mapping-dialog .profile-toolbar label{grid-column:auto}}
 .instrument-main{min-width:0}.instrument-controls-row{display:grid;grid-template-columns:1fr;gap:12px}.instrument-controls-row .card{margin-bottom:0}.instrument-side{display:block;min-width:0}.instrument-side>.camera-card{height:100%;margin-bottom:0}
+
+/* ODL calibration */
+.calibration-card{background:#fff}.calibration-card .section-heading{margin-bottom:6px}.calibration-note{margin:0 0 10px;color:#526474;font-size:12px;line-height:1.6}
+.calibration-controls{display:flex;flex-wrap:wrap;align-items:center;gap:8px}.calibration-controls label{display:flex;align-items:center;gap:6px;color:#526474;font-size:12px;font-weight:700}
+.calibration-progress{margin-top:10px;font-weight:700;color:#8c4700;min-height:1.4em}.calibration-message{color:#526474;font-size:12px;min-height:1.4em}
+.hit-grid [data-class].calibration-target{outline:4px solid #e48000;background:#fff0c9}
+/* Guided song */
+.song-card{background:#fff}.song-card .section-heading{margin-bottom:8px}.song-card strong{color:#8c4700}
+.song-controls{display:flex;flex-wrap:wrap;align-items:center;gap:8px}.song-controls label{display:flex;align-items:center;gap:6px;color:#526474;font-size:12px;font-weight:700}
+.song-note{color:#526474;font-size:12px;flex:1;min-width:220px}
+.hit-grid [data-class].next-note{outline:4px solid #ff91b8;background:#ffe3ee}
+.hit-grid [data-class].second-next-note{outline:3px solid #ffc8dc;background:#fff3f8}

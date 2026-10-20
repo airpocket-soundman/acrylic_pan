@@ -3,3 +3,53 @@ main{width:100%;max-width:none}.language-actions{display:flex;align-items:center
 .camera-heading-actions{display:flex;align-items:center;gap:8px}.camera-heading-actions button{padding:4px 9px;font-size:12px;font-weight:700;white-space:nowrap}
 .song-assist{display:grid;grid-template-columns:minmax(220px,1.2fr) minmax(150px,.75fr) minmax(180px,1fr) auto;align-items:end;gap:8px;margin-top:8px;padding:9px 10px;border-radius:8px;background:#fff0f5}.song-assist label{display:flex;flex-direction:column;gap:4px;color:#7f3651;font-size:12px;font-weight:800}.song-assist select{width:100%}.song-assist strong{align-self:center;color:#7f3651;font:800 14px Consolas,monospace}.song-assist .note-length-control{display:grid;grid-template-columns:1fr auto;align-items:center;column-gap:6px}.note-length-control output{font:800 12px Consolas,monospace}.note-length-control input{grid-column:1/-1;width:100%;accent-color:#e56b98}.song-actions{display:flex;gap:6px}.song-actions button{white-space:nowrap}.song-actions #guidePlay.is-playing{background:#e56b98;color:#fff;border-color:#bd4772}.area-selection-cell.next-note{border-color:#ff91b8;background:#ff91b852;box-shadow:inset 0 0 20px #ff91b899}.probability-area-bars .area-probability.next-note{background:#ffe0eb;color:#8b274c;outline:2px solid #ff91b8}.probability-area-bars .area-probability span{display:flex;align-items:baseline;gap:7px}.probability-area-bars .area-probability span small{font:800 13px Consolas,monospace;color:#7b5b68}@media(max-width:760px){.song-assist{grid-template-columns:1fr 1fr}.song-assist label{grid-column:1/-1}.song-actions{justify-content:flex-end}}
 .area-selection-cell.second-next-note{border-color:#ffd1e1;background:#ffd1e124;box-shadow:inset 0 0 14px #ffd1e14d}.probability-area-bars .area-probability.second-next-note{background:#fff3f7;color:#9b6277;outline:1px solid #ffd1e1}
+/* Bare embedding (?bare=1): hide the page header and the mode tabs so the stage stays on this page. */
+body.bare header,body.bare .app-tabs{display:none}body.bare main{padding-top:10px}
+/* Fit layout (embedded in the deck): the whole page fits a 1920 x 1080 screen without scrolling.
+   Header text, mode tabs and the status bar are folded away and the cards sit in three columns. */
+body.fit header p{display:none}
+body.fit header{padding:0;margin:0}
+body.fit header h1{font-size:20px;margin:0}
+body.fit .app-tabs{display:none}
+body.fit main{padding:8px 12px}
+body.fit #performanceStatus{display:none}
+body.fit .probability-layout{grid-template-columns:minmax(0,.9fr) minmax(0,.8fr) minmax(0,1.5fr);gap:10px;align-items:start}
+body.fit .probability-main{display:contents}
+body.fit .card{margin-bottom:0}
+/* With the camera overlay the heat-map card is hidden, so use two columns: area bars | camera. */
+body.fit.camera-overlay-mode .probability-layout{grid-template-columns:minmax(0,.5fr) minmax(0,1.5fr);align-items:stretch}
+body.fit.camera-overlay-mode .probability-main>.card,body.fit.camera-overlay-mode .camera-card{height:auto}
+body.fit.camera-overlay-mode .camera-viewport{min-height:650px}
+/* Camera focus (the deck shows only the camera picture): the fit overlay (grid, handles, labels, heat map), every
+   other panel and the backgrounds are hidden; they fade in together once the deck has finished moving the picture. */
+:root,body.embed,body.embed .camera-card,body.embed .camera-viewport{transition:background-color .9s ease,border-color .9s ease,box-shadow .9s ease}
+body.embed header,body.embed .app-tabs,body.embed .controls,body.embed #error,body.embed .probability-main>*,
+body.embed .camera-card>*:not(.camera-viewport),body.embed #cameraHeatmapOverlay,body.embed #cameraPlaceholder{transition:opacity .9s ease}
+body.cam-focus header,body.cam-focus .app-tabs,body.cam-focus .controls,body.cam-focus #error,body.cam-focus .probability-main>*,
+body.cam-focus .camera-card>*:not(.camera-viewport),body.cam-focus #cameraHeatmapOverlay,body.cam-focus #cameraPlaceholder{opacity:0;pointer-events:none}
+:root:has(body.cam-focus),body.cam-focus{background:transparent}
+body.cam-focus .camera-card{background:transparent;border-color:transparent;box-shadow:none}
+body.cam-focus .camera-viewport{background:transparent;border-color:transparent}
+/* The performance card holds the instrument, volume, song, note length and the example buttons in two rows. */
+.song-assist{grid-template-columns:repeat(4,minmax(0,1fr))}
+.song-assist>strong{grid-column:span 2}.song-assist>.song-actions{grid-column:span 2;justify-self:end}
+/* Spotlight (the deck explains one card at a time): the card is raised a little, the others are dimmed. */
+header,.camera-card,.controls,.probability-main>.card,.song-assist,.camera-viewport,.camera-card>.position-heading,.camera-card>.camera-controls{transition:opacity .6s ease,transform .6s ease,box-shadow .6s ease,filter .6s ease}
+/* Everything but the card in focus gets darker: the page, the header and every other card. */
+:root:has(body[data-spot]){background:#5e6469}
+body[data-spot] header,body[data-spot] .controls,body[data-spot] .probability-main>.card{filter:brightness(.4) saturate(.8)}
+body[data-spot=controls] .camera-card,body[data-spot=areas] .camera-card{filter:brightness(.4) saturate(.8)}
+body[data-spot=player] .camera-card,body[data-spot=camera] .camera-card{background:#666;border-color:#3f4a4c;box-shadow:none}
+body[data-spot=player] .camera-card>.position-heading,body[data-spot=player] .camera-card>.camera-controls,body[data-spot=player] .camera-viewport,
+body[data-spot=camera] .camera-card>.position-heading,body[data-spot=camera] .camera-card>.camera-controls,body[data-spot=camera] .song-assist{filter:brightness(.4) saturate(.8)}
+body[data-spot=controls] .controls,body[data-spot=areas] .probability-main>.card:last-child,body[data-spot=player] .song-assist,
+body[data-spot=camera] .camera-viewport{filter:none;transform:scale(1.035);position:relative;z-index:5;box-shadow:0 14px 40px #0006}
+body[data-spot=player] .song-assist{transform-origin:50% 100%}
+/* When the camera picture has finished moving, everything that was hidden fades in. */
+@keyframes apan-reveal{from{opacity:0}to{opacity:1}}
+body.cam-reveal header,body.cam-reveal .app-tabs,body.cam-reveal .controls,body.cam-reveal #error,body.cam-reveal .probability-main>*,
+body.cam-reveal .camera-card>*:not(.camera-viewport),body.cam-reveal #cameraHeatmapOverlay,body.cam-reveal #cameraPlaceholder{animation:apan-reveal 1s ease both}
+/* The spotlight fades: brightness, size, shadow and the card colours all change smoothly (this must win over the
+   opacity-only transitions of the camera focus above). */
+body.embed header,body.embed .camera-card,body.embed .controls,body.embed .probability-main>*,body.embed .song-assist,body.embed .camera-viewport,
+body.embed .camera-card>.position-heading,body.embed .camera-card>.camera-controls{transition:opacity .9s ease,filter .7s ease,transform .7s ease,box-shadow .7s ease,background-color .7s ease,border-color .7s ease}
