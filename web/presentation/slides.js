@@ -176,33 +176,40 @@
         </div>`,
     },
     {
-      id: 'elm', title: 'ELMだから小さい', seconds: 30,
+      id: 'elm', title: 'ELMで学習するのはβだけ', seconds: 30,
       notes: [
-        'ここで、SolistAIのELMに実装した意味をお話しします。PC版で使っている、通常のニューラルネットワークは、パラメータが、3つ合わせて約112万個。float32で、約4.3メガバイトあります。',
-        'SolistAIのELMは、パラメータが約6千個、約12キロバイトです。個数で、約186分の1。1つ同士で比べても、約62分の1です。',
-        'それなのに、60か所の正解率は、PC版が98.75パーセント、SolistAIが97.9パーセントで、ほとんど落ちていません。',
+        'ここで、SolistAIのELMの特徴をお話しします。同じ形、入力128・隠れ層32・出力60のネットワークを、全部学習すると、学習するパラメータは約6千個です。小さめの畳み込みのネットワーク、CNNは、約7千個です。',
+        'SolistAIのELMは、入力側の重みが固定の乱数で、シードから生成されるので、学習するのは出力側のβだけです。約1,900個で、全部学習する場合の約3分の1。サイズは約3.75キロバイトです。',
+        'そのぶん、60か所の正解率は、全部学習する場合が99.2パーセント、CNNが99.5パーセント、SolistAIが97.9パーセントで、1ポイント余りの差です。学習する部分が小さいので、ボード上でのODLもできます。',
       ],
       render: () => `
-        ${head('WHY ELM', 'ELMで実装すると、ここまで小さくなる')}
+        ${head('WHY ELM', 'ELMで学習するのは、出力側のβだけ')}
         <div class="elm-grid">
           <section class="card elm-card">
-            <p class="sub">PC版: 通常のニューラルネット(全結合MLP)</p>
-            <p class="elm-struct">714 − 384 − 192 − 96 − 60 <small>× 3つのアンサンブル</small></p>
-            <div class="elm-size"><b>1,118,484</b><span>パラメータ</span></div>
-            <div class="elm-size"><b>約 4.3 MB</b><span>float32</span></div>
+            <p class="sub">同じ形で、全部を学習</p>
+            <p class="elm-struct">128 − 32 − 60 <small>入力側も出力側も学習する</small></p>
+            <div class="elm-size"><b>6,108</b><span>学習するパラメータ</span></div>
+            <div class="elm-size"><b>約 24 KB</b><span>float32</span></div>
           </section>
-          <div class="elm-arrow"><b>約 1/186</b><span>1つ同士でも 1/62</span></div>
+          <section class="card elm-card">
+            <p class="sub">CNN(小): 1次元の畳み込み</p>
+            <p class="elm-struct">Conv − Conv − 全結合 60 <small>入力は波形448点</small></p>
+            <div class="elm-size"><b>7,116</b><span>学習するパラメータ</span></div>
+            <div class="elm-size"><b>約 28 KB</b><span>float32</span></div>
+          </section>
           <section class="card teal-card elm-card">
             <p class="sub">Solist-AI: ELM(ボード上で推論)</p>
-            <p class="elm-struct">128 − 32 − 60 <small>固定の入力重み + 学習する出力重み</small></p>
-            <div class="elm-size"><b>6,016</b><span>パラメータ(学習するのは出力側の1,920)</span></div>
-            <div class="elm-size"><b>約 12 KB</b><span>bfloat16</span></div>
+            <p class="elm-struct">128 − 32 − 60 <small>入力側は固定(seedから生成)</small></p>
+            <div class="elm-size"><b>1,920</b><span>学習するパラメータ(β)</span></div>
+            <div class="elm-size"><b>約 3.75 KB</b><span>bfloat16</span></div>
           </section>
         </div>
+        <p class="elm-ratio">学習するパラメータは、全部を学習する場合の約 <b>1/3</b>、CNN(小)の約 <b>1/4</b></p>
         <div class="elm-acc">
-          <div class="elm-bar"><span>PC版</span><i style="width:98.75%"></i><b>98.75%</b></div>
+          <div class="elm-bar"><span>全部を学習</span><i style="width:99.2%"></i><b>99.2%</b></div>
+          <div class="elm-bar"><span>CNN(小)</span><i style="width:99.5%"></i><b>99.5%</b></div>
           <div class="elm-bar teal"><span>Solist-AI</span><i style="width:97.9%"></i><b>97.9%</b></div>
-          <p class="small">60か所の正解率(Top-1)。どちらも、2点支持の5セッション・3,600打で学習し、反復番号が5の倍数の打撃を除いた、同一セッション内の分割で評価(未知の条件での値ではない)</p>
+          <p class="small">60か所の正解率(Top-1)。2点支持の5セッション・3,600打。同一セッション内の分割で評価(全部を学習する場合とCNNはPC上)</p>
         </div>`,
     },
     {
@@ -227,7 +234,7 @@
       id: 'accuracy', title: '学習データと精度', seconds: 15,
       notes: [
         '60か所は、エリア中心の12点と、中心から25ミリ離れた四隅の48点です。5セッションで、合計3,600回叩いてデータを集めました。',
-        '実機に載せたモデルの評価は、60か所の正解率が97.9パーセント、期待座標の平均誤差が5.5ミリです。ただし、同じ収録セッション内での分割評価なので、未知の条件での値ではありません。',
+        '実機に載せたモデルの評価は、60か所の正解率が97.9パーセント、期待座標の平均誤差が5.5ミリです。評価は、同じ収録セッション内での分割です。',
       ],
       render: () => `
         ${head('DATA &amp; RESULTS', '学習データと精度')}
