@@ -31,3 +31,6 @@ web/assets/simulation/calculix-xy-grid/spooles.out
 
 # Local Solist-AI vendor software and documentation.
 solist-ai/
+
+# Saved model snapshots: the PC-side models are large; the manifest and firmware headers are tracked.
+models/*/artifacts/

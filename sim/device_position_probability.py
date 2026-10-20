@@ -15,7 +15,7 @@ from .dummy_model_pipeline import (
     load_official_sim_alpha, quantize_bfloat16, to_bfloat16_bits,
 )
 from .pc_position_grid_runtime import (
-    DEFAULT_SESSION_IDS, _balanced_density_indices, _density_model,
+    DEFAULT_SESSION_IDS, _balanced_density_indices, parse_session_ids, _density_model,
     extract_grid_features, load_position_dataset,
 )
 from .real_model_pipeline import extract_hybrid_features, time_sample_indices
@@ -162,8 +162,9 @@ def write_header(path: Path, scaler: StandardScaler, alpha: np.ndarray,
     path.write_text(content, encoding="utf-8")
 
 
-def run(sessions_root: Path, output_dir: Path, header: Path) -> dict:
-    dataset = load_position_dataset(sessions_root, DEFAULT_SESSION_IDS)
+def run(sessions_root: Path, output_dir: Path, header: Path,
+        session_ids: tuple[str, ...] = DEFAULT_SESSION_IDS) -> dict:
+    dataset = load_position_dataset(sessions_root, session_ids)
     edge = np.stack([extract_hybrid_features(row) for row in dataset.samples])
     rich = np.stack([extract_grid_features(row) for row in dataset.samples])
     support = np.unique(dataset.xy_mm, axis=0)
@@ -213,7 +214,7 @@ def run(sessions_root: Path, output_dir: Path, header: Path) -> dict:
     report = {
         "model": "solist_fixed_alpha_distilled_beta_128x32x60_v3",
         "dataset_sha256": dataset.dataset_sha256,
-        "session_ids": list(DEFAULT_SESSION_IDS), "sample_count": int(len(dataset.samples)),
+        "session_ids": list(session_ids), "sample_count": int(len(dataset.samples)),
         "train_count": int(train.sum()), "test_count": int(test.sum()),
         "holdout_rule": "repetition_modulo_5_equals_0",
         "architecture": [ENGINE_INPUT_COUNT, ENGINE_HIDDEN_COUNT, POSITION_COUNT],
@@ -240,8 +241,11 @@ def main() -> None:
                         default=Path("artifacts/device_position_probability_400x300x5"))
     parser.add_argument("--header", type=Path,
                         default=Path("firmware/AcrylicPanCollector/generated/apan_position_probability_model.h"))
+    parser.add_argument("--session-ids", default="default",
+                        help="default, all (every finished session under --sessions) or a comma list")
     args = parser.parse_args()
-    report = run(args.sessions, args.output_dir, args.header)
+    report = run(args.sessions, args.output_dir, args.header,
+                 parse_session_ids(args.session_ids, args.sessions))
     print(json.dumps(report["validation_comparison"], ensure_ascii=False))
 
 

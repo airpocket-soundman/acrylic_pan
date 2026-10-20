@@ -10,7 +10,7 @@ from pathlib import Path
 import numpy as np
 
 from .dummy_model_pipeline import load_official_sim_alpha, mcu_reference, to_bfloat16_bits
-from .pc_position_grid_runtime import DEFAULT_SESSION_IDS, load_position_dataset
+from .pc_position_grid_runtime import DEFAULT_SESSION_IDS, load_position_dataset, parse_session_ids
 from .real_model_pipeline import (
     DEFAULT_ALPHA,
     FeatureScaler,
@@ -41,8 +41,9 @@ def _predict(features: np.ndarray, scaler: FeatureScaler, alpha: np.ndarray,
 
 
 def run(sessions_root: Path, output_dir: Path, header: Path,
-        current_model: Path, ridges: tuple[float, ...] = DEFAULT_RIDGES) -> dict:
-    dataset = load_position_dataset(sessions_root, DEFAULT_SESSION_IDS)
+        current_model: Path, ridges: tuple[float, ...] = DEFAULT_RIDGES,
+        session_ids: tuple[str, ...] = DEFAULT_SESSION_IDS) -> dict:
+    dataset = load_position_dataset(sessions_root, session_ids)
     features = np.stack([extract_hybrid_features(row) for row in dataset.samples])
     labels = np.asarray(dataset.labels, dtype=np.int64)
     train = dataset.repetitions % 5 != 0
@@ -96,7 +97,7 @@ def run(sessions_root: Path, output_dir: Path, header: Path,
     export_header(header, alpha, final_beta, final_scaler, golden_inputs, CLASS_COUNT)
     report = {
         "model": "acrylic_pan_time128_h32_12class_max_data_v2",
-        "session_ids": list(DEFAULT_SESSION_IDS),
+        "session_ids": list(session_ids),
         "sample_count": int(len(labels)),
         "class_counts": np.bincount(labels, minlength=CLASS_COUNT).astype(int).tolist(),
         "dataset_sha256": dataset.dataset_sha256,
@@ -155,10 +156,13 @@ def main() -> None:
         default=Path("artifacts/real_model_300x400x5_12class_4sessions_20260821/model.npz"),
     )
     parser.add_argument("--ridge", type=float, action="append", default=[])
+    parser.add_argument("--session-ids", default="default",
+                        help="default, all (every finished session under --sessions) or a comma list")
     args = parser.parse_args()
     report = run(
         args.sessions, args.output_dir, args.header, args.current_model,
         tuple(args.ridge) if args.ridge else DEFAULT_RIDGES,
+        parse_session_ids(args.session_ids, args.sessions),
     )
     selected = report["validation"]["selected"]
     print(f"samples={report['sample_count']}; class_counts={report['class_counts']}")

@@ -124,8 +124,9 @@ def _accuracy(features: np.ndarray, labels: np.ndarray, alpha: np.ndarray,
     return float(np.mean(predicted == labels))
 
 
-def _load_features(sessions_root: Path, cache: Path):
-    dataset = load_position_dataset(sessions_root, DEFAULT_SESSION_IDS)
+def _load_features(sessions_root: Path, cache: Path,
+                   session_ids: tuple[str, ...] = DEFAULT_SESSION_IDS):
+    dataset = load_position_dataset(sessions_root, session_ids)
     if cache.is_file():
         with np.load(cache, allow_pickle=False) as stored:
             if str(stored["dataset_sha256"]) == dataset.dataset_sha256:

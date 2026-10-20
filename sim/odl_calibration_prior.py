@@ -25,6 +25,7 @@ from .odl_calibration_experiment import (
     initial_p,
     os_elm_update,
 )
+from .pc_position_grid_runtime import DEFAULT_SESSION_IDS, parse_session_ids
 from .real_model_pipeline import FeatureScaler, _c_float_array
 
 CALIBRATION_WEIGHT = 30.0
@@ -63,7 +64,9 @@ def _c_bits_array(name: str, bits: np.ndarray, declaration: str) -> str:
 
 
 def export(model_path: Path, model_header: Path, sessions_root: Path, cache: Path,
-           prior_header: Path, golden_header: Path) -> dict:
+           prior_header: Path, golden_header: Path,
+           session_ids: tuple[str, ...] = DEFAULT_SESSION_IDS,
+           golden_session: str = GOLDEN_SESSION) -> dict:
     with np.load(model_path, allow_pickle=False) as model:
         alpha = np.asarray(model["alpha"], dtype=np.float32)
         beta_bits = np.asarray(model["beta_bf16"], dtype=np.uint16)
@@ -73,7 +76,7 @@ def export(model_path: Path, model_header: Path, sessions_root: Path, cache: Pat
         raise ValueError(f"{model_path} beta does not match {model_header}")
     hidden_count, output_count = beta_bits.shape
 
-    dataset, features = _load_features(sessions_root, cache)
+    dataset, features = _load_features(sessions_root, cache, session_ids)
     labels = np.asarray(dataset.labels, dtype=np.int64)
     factory_x = scaler.transform(features)
     p0 = initial_p(hidden_layer(factory_x, alpha), PRIOR_RIDGE, CALIBRATION_WEIGHT)
@@ -96,7 +99,7 @@ def export(model_path: Path, model_header: Path, sessions_root: Path, cache: Pat
     prior_header.parent.mkdir(parents=True, exist_ok=True)
     prior_header.write_text(prior, encoding="ascii")
 
-    members = np.flatnonzero(dataset.session_ids == GOLDEN_SESSION)
+    members = np.flatnonzero(dataset.session_ids == golden_session)
     pool = calibration_pool(labels, dataset.repetitions, np.asarray(dataset.point_names), members)
     chosen = draw_calibration(pool, GOLDEN_PER_CLASS, seed=0)
     input_bits = to_bfloat16_bits(factory_x[chosen])
@@ -108,7 +111,7 @@ def export(model_path: Path, model_header: Path, sessions_root: Path, cache: Pat
 #ifndef APAN_CALIBRATION_GOLDEN_H
 #define APAN_CALIBRATION_GOLDEN_H
 #include <stdint.h>
-/* {count} guided hits from session {GOLDEN_SESSION}; expected values are float64. */
+/* {count} guided hits from session {golden_session}; expected values are float64. */
 #define APAN_CALIBRATION_GOLDEN_COUNT {count}U
 static const uint8_t apan_calibration_golden_targets[{count}] = {{
     {", ".join(str(int(value)) for value in labels[chosen])}
@@ -137,9 +140,14 @@ def main() -> None:
     parser.add_argument("--feature-cache", type=Path, default=DEFAULT_CACHE)
     parser.add_argument("--prior-header", type=Path, default=DEFAULT_PRIOR_HEADER)
     parser.add_argument("--golden-header", type=Path, default=DEFAULT_GOLDEN_HEADER)
+    parser.add_argument("--session-ids", default="default",
+                        help="default, all (every finished session under --sessions) or a comma list")
+    parser.add_argument("--golden-session", default=GOLDEN_SESSION,
+                        help="session whose first hits form the host-test golden sequence (a centre session)")
     args = parser.parse_args()
     print(export(args.model, args.model_header, args.sessions, args.feature_cache,
-                 args.prior_header, args.golden_header))
+                 args.prior_header, args.golden_header,
+                 parse_session_ids(args.session_ids, args.sessions), args.golden_session))
 
 
 if __name__ == "__main__":

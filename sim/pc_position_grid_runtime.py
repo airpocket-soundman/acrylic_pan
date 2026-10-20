@@ -57,6 +57,35 @@ EXTERNAL_EVAL_SESSION_IDS: tuple[str, ...] = ()
 GRID_SESSION_ID = GRID_SESSION_IDS[0]  # Compatibility name for the first grid set.
 DEFAULT_SESSION_IDS = (*CENTRE_SESSION_IDS, *GRID_SESSION_IDS)
 DEFAULT_SEEDS = (1, 7, 21)
+
+
+def discover_session_ids(root: Path) -> tuple[str, ...]:
+    """Every finished 400 x 300 x 5 mm session under ``root``.
+
+    A session counts as finished when its manifest has as many rows as ``event_count``; the session
+    that is still being recorded is left out.
+    """
+    found = []
+    for directory in sorted(Path(root).iterdir()):
+        metadata_path, manifest_path = directory / "session.json", directory / "manifest.jsonl"
+        if not (metadata_path.is_file() and manifest_path.is_file()):
+            continue
+        metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+        if metadata.get("user_metadata", {}).get("panel_profile_id") != PANEL_ID:
+            continue
+        rows = sum(1 for line in manifest_path.read_text(encoding="utf-8").splitlines() if line.strip())
+        if rows and rows == int(metadata.get("event_count", -1)):
+            found.append(directory.name)
+    return tuple(found)
+
+
+def parse_session_ids(value: str, root: Path) -> tuple[str, ...]:
+    """``default`` = the one-point-support sessions, ``all`` = every finished session, or a comma list."""
+    if value == "default":
+        return DEFAULT_SESSION_IDS
+    if value == "all":
+        return discover_session_ids(root)
+    return tuple(item.strip() for item in value.split(",") if item.strip())
 HIDDEN_LAYERS = (384, 192, 96)
 DENSITY_HIDDEN_LAYERS = (384, 192, 96)
 
@@ -385,17 +414,23 @@ def evaluate_external_sessions(sessions_root: Path, baseline_model_path: Path,
 
 
 def run(sessions_root: Path, output_dir: Path, seeds: tuple[int, ...] = DEFAULT_SEEDS,
-        baseline_model_path: Path | None = None) -> dict:
+        baseline_model_path: Path | None = None,
+        session_ids: tuple[str, ...] = DEFAULT_SESSION_IDS) -> dict:
     if not seeds or len(set(seeds)) != len(seeds):
         raise ValueError("seeds must be non-empty and unique")
-    dataset = load_position_dataset(sessions_root)
+    dataset = load_position_dataset(sessions_root, session_ids)
     features = np.stack([extract_grid_features(row) for row in dataset.samples])
     warnings.filterwarnings("ignore", category=ConvergenceWarning)
 
-    grid = np.isin(dataset.session_ids, GRID_SESSION_IDS)
+    # A session of corner points is a grid session; the first half of them form the baseline condition.
+    grid_ids = tuple(name for name in session_ids
+                     if bool(np.any(np.asarray(dataset.point_names)[dataset.session_ids == name] != "center")))
+    baseline_ids = grid_ids[:max(1, len(grid_ids) // 2)]
+    new_ids = grid_ids[len(baseline_ids):]
+    grid = np.isin(dataset.session_ids, grid_ids)
     centre = ~grid
-    baseline_grid = np.isin(dataset.session_ids, BASELINE_GRID_SESSION_IDS)
-    new_grid = np.isin(dataset.session_ids, NEW_GRID_SESSION_IDS)
+    baseline_grid = np.isin(dataset.session_ids, baseline_ids)
+    new_grid = np.isin(dataset.session_ids, new_ids)
 
     previous_model_unseen = None
     if baseline_model_path is not None and Path(baseline_model_path).is_file():
@@ -403,7 +438,7 @@ def run(sessions_root: Path, output_dir: Path, seeds: tuple[int, ...] = DEFAULT_
         previous_prediction = _bundle_predict(previous_bundle, features[new_grid])
         previous_model_unseen = {
             "model": str(baseline_model_path),
-            "test_sessions": list(NEW_GRID_SESSION_IDS),
+            "test_sessions": list(new_ids),
             "test_count": int(new_grid.sum()),
             **regression_metrics(dataset.xy_mm[new_grid], previous_prediction),
         }
@@ -423,16 +458,16 @@ def run(sessions_root: Path, output_dir: Path, seeds: tuple[int, ...] = DEFAULT_
     candidate_metrics = regression_metrics(dataset.xy_mm[common_test], candidate_prediction)
     common_comparison = {
         "held_out_repetition_rule": "repetition_modulo_5_equals_0",
-        "test_sessions": list(GRID_SESSION_IDS),
+        "test_sessions": list(grid_ids),
         "test_count": int(common_test.sum()),
         "baseline_four_grid_sessions": {
-            "training_grid_sessions": list(BASELINE_GRID_SESSION_IDS),
+            "training_grid_sessions": list(baseline_ids),
             "train_count": int(baseline_train.sum()),
             "iterations": baseline_iterations,
             **baseline_metrics,
         },
         "candidate_seven_grid_sessions": {
-            "training_grid_sessions": list(GRID_SESSION_IDS),
+            "training_grid_sessions": list(grid_ids),
             "train_count": int(candidate_train.sum()),
             "iterations": candidate_iterations,
             **candidate_metrics,
@@ -535,7 +570,7 @@ def run(sessions_root: Path, output_dir: Path, seeds: tuple[int, ...] = DEFAULT_
     scope = (
         "400×300×5 mmの12中心＋四隅48点の計60座標について、各座標の条件付き確率を"
         "直接出力するPC専用確率マップモデルです。座標は60クラス分布の期待値として算出します。"
-        "評価は全11セッションで反復番号が5の倍数のイベントを除外した共通holdoutです。"
+        f"評価は全{len(session_ids)}セッションで反復番号が5の倍数のイベントを除外した共通holdoutです。"
         "四隅セッションをすべて学習へ使用したため、完全未学習の外部セッションは残っていません。"
     )
     bundle = {
@@ -581,14 +616,14 @@ def run(sessions_root: Path, output_dir: Path, seeds: tuple[int, ...] = DEFAULT_
     report = {
         "experiment": "pc_position_400x300x5_grid_v7",
         "dataset_sha256": dataset.dataset_sha256,
-        "session_ids": list(DEFAULT_SESSION_IDS),
+        "session_ids": list(session_ids),
         "sample_count": int(len(dataset.samples)),
         "centre_sample_count": int(centre.sum()),
         "grid_sample_count": int(grid.sum()),
-        "grid_session_ids": list(GRID_SESSION_IDS),
+        "grid_session_ids": list(grid_ids),
         "grid_session_counts": {
             session_id: int(np.sum(dataset.session_ids == session_id))
-            for session_id in GRID_SESSION_IDS
+            for session_id in grid_ids
         },
         "unique_coordinates": int(len(np.unique(dataset.xy_mm, axis=0))),
         "feature_count": int(features.shape[1]),
@@ -633,15 +668,18 @@ def main() -> None:
     )
     parser.add_argument("--seeds", type=int, nargs="+", default=list(DEFAULT_SEEDS))
     parser.add_argument("--baseline-model", type=Path)
+    parser.add_argument("--session-ids", default="default",
+                        help="default, all (every finished session under --sessions) or a comma list")
     args = parser.parse_args()
     report = run(
-        args.sessions, args.output_dir, tuple(args.seeds), args.baseline_model
+        args.sessions, args.output_dir, tuple(args.seeds), args.baseline_model,
+        parse_session_ids(args.session_ids, args.sessions),
     )
     comparison = report["common_holdout_comparison"]
     print(f"samples={report['sample_count']}; unique_coordinates={report['unique_coordinates']}")
-    print("baseline four-grid common holdout="
+    print("baseline (first half of the grid sessions) common holdout="
           f"{comparison['baseline_four_grid_sessions']['mean_distance_mm']:.2f} mm")
-    print("candidate seven-grid common holdout="
+    print("candidate (all grid sessions) common holdout="
           f"{comparison['candidate_seven_grid_sessions']['mean_distance_mm']:.2f} mm")
     print(f"improvement={comparison['mean_distance_improvement_percent']:.1f}%")
     print(f"model={report['model']}")
