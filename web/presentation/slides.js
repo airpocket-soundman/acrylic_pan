@@ -126,20 +126,32 @@
         </div>`,
     },
     {
-      id: 'e2e', title: 'E2Eの符号化と復号', seconds: 25,
+      id: 'e2e', title: 'E2Eの符号化と復号', seconds: 25, scenes: 4,
       notes: [
-        '別の見方をすると、これはE2Eの符号化と復号です。',
-        '叩いた位置という情報を、アクリル板が、振動モードの混ざり方に符号化します。これは物理現象です。そのまま、センサに受信されます。',
-        'それを、Solist-AIが波形から60か所の確率へ復号します。モード解析はしていません。符号化は物理が、復号はエッジAIが担当する、という分担です。',
+        '(右矢印で進む: 通常の表示 → 叩いた位置のカードが震える → アクリル板と一点の振動にフォーカス → 加速度センサとSolist-AIにフォーカス)',
+      ],
+      steps: [
+        {title: '通常の表示', sec: 5,
+         action: '右矢印: 叩いた位置のカードが、叩かれたように震える',
+         say: '別の見方をすると、これはE2Eの符号化と復号です。'},
+        {title: '叩く', sec: 5, hit: true,
+         action: '右矢印: アクリル板と一点の振動にフォーカス',
+         say: '叩いた位置という情報が、アクリル板に加わります。'},
+        {title: '板が符号化', sec: 8, focus: 1,
+         action: '右矢印: 加速度センサとSolist-AIにフォーカス',
+         say: 'アクリル板が、叩いた位置という情報を、振動モードの混ざり方に符号化します。これは物理現象です。一点の振動の波形に、位置の情報が現れます。'},
+        {title: '受信と復号', sec: 7, focus: 2,
+         action: '右矢印: 次のスライドへ',
+         say: 'それを、加速度センサが受け取り、Solist-AIが、波形から60か所の確率へ復号します。モード解析はしていません。符号化は物理が、復号はエッジAIが担当する、という分担です。'},
       ],
       render: () => `
         ${head('END TO END', 'アクリル板が「物理エンコーダー」になる')}
         <div class="flow">
-          <div class="node"><small>情報源</small><b>叩いた位置</b><span>(x, y)</span></div>
-          <div class="node amber-node"><small>エンコーダー</small><b>アクリル板</b><span>位置を「振動モードの混ざり方」に変換</span></div>
-          <div class="node white-node"><small>符号</small><b>一点の振動</b><span>板のどの点にも現れる</span></div>
-          <div class="node teal-node"><small>受信機</small><b>加速度センサ</b><span>KX134-1211 / 25.6 kHz</span></div>
-          <div class="node teal-node"><small>デコーダー</small><b>Solist-AI</b><span>波形 → 60点の確率</span></div>
+          <div class="node" data-focus="0" data-hit="1"><small>情報源</small><b>叩いた位置</b><span>(x, y)</span></div>
+          <div class="node amber-node" data-focus="1"><small>エンコーダー</small><b>アクリル板</b><span>位置を「振動モードの混ざり方」に変換</span></div>
+          <div class="node white-node" data-focus="1"><small>符号</small><b>一点の振動</b><span>板のどの点にも現れる</span></div>
+          <div class="node teal-node" data-focus="2"><small>受信機</small><b>加速度センサ</b><span>KX134-1211 / 25.6 kHz</span></div>
+          <div class="node teal-node" data-focus="2"><small>デコーダー</small><b>Solist-AI</b><span>波形 → 60点の確率</span></div>
         </div>
         <div class="bracket-row"><span class="bracket amber">符号化 = 物理現象</span><span class="bracket teal">復号 = エッジAI</span></div>
         <div class="banner">物理現象そのものが計算機として働く — 物理並列計算機<br><small>モード解析はしない。板は位置を波形へ、AIは波形を位置へ、どちらもE2Eで変換する</small></div>`,
@@ -176,11 +188,11 @@
         </div>`,
     },
     {
-      id: 'elm', title: 'ELMで学習するのはβだけ', seconds: 30,
+      id: 'elm', title: 'ELMで学習するのはβだけ', seconds: 45,
       notes: [
-        'ここで、SolistAIのELMの特徴をお話しします。同じ形、入力128・隠れ層32・出力60のネットワークを、全部学習すると、学習するパラメータは約6千個です。小さめの畳み込みのネットワーク、CNNは、約7千個です。',
-        'SolistAIのELMは、入力側の重みが固定の乱数で、シードから生成されるので、学習するのは出力側のβだけです。約1,900個で、全部学習する場合の約3分の1。サイズは約3.75キロバイトです。',
-        'そのぶん、60か所の正解率は、全部学習する場合が99.2パーセント、CNNが99.5パーセント、SolistAIが97.9パーセントで、1ポイント余りの差です。学習する部分が小さいので、ボード上でのODLもできます。',
+        'ROHMさんも聞いておられるところで説明するのもあれなんですが、SolistAIのAxlCOREでは、ELMというモデルを使います。',
+        'このモデルは、パラメータの多くを実際には学習せず、出力側の層だけを学習すれば、結構それなりの精度が出てしまう、という面白い性質を持っています。そのため、学習が必要なパラメータだけを比べると、とても小さなパラメータ数で、かなり良好な表現力を保てる、という特徴があります。',
+        '実際に、通常の全結合の3層のNNと、同規模のCNNを作って比べると、パラメータ数で3分の1から4分の1、データサイズで6分の1から7分の1にもかかわらず、かなりいい感じの精度が得られているのがわかります。',
       ],
       render: () => `
         ${head('WHY ELM', 'ELMで学習するのは、出力側のβだけ')}
@@ -204,12 +216,32 @@
             <div class="elm-size"><b>約 3.75 KB</b><span>bfloat16</span></div>
           </section>
         </div>
-        <p class="elm-ratio">学習するパラメータは、全部を学習する場合の約 <b>1/3</b>、CNN(小)の約 <b>1/4</b></p>
+        <p class="elm-ratio">パラメータ数は約 <b>1/3〜1/4</b>、データサイズは約 <b>1/6〜1/7</b></p>
         <div class="elm-acc">
           <div class="elm-bar"><span>全部を学習</span><i style="width:99.2%"></i><b>99.2%</b></div>
           <div class="elm-bar"><span>CNN(小)</span><i style="width:99.5%"></i><b>99.5%</b></div>
           <div class="elm-bar teal"><span>Solist-AI</span><i style="width:97.9%"></i><b>97.9%</b></div>
           <p class="small">60か所の正解率(Top-1)。2点支持の5セッション・3,600打。同一セッション内の分割で評価(全部を学習する場合とCNNはPC上)</p>
+        </div>`,
+    },
+    {
+      id: 'odl', title: '12クラス版のODL', seconds: 45,
+      notes: [
+        'このパラメータ数が少ないという利点は、SolistAIのもう一つの売りである、ODLにも効果的です。ODLは、簡単に言うと、デバイス上で実行できる追加学習です。そもそも、隠れ層が小さく、学習するのが出力側だけなので、追加学習自体も、低いコストでできてしまいます。そのため、私が作った事前学習モデルについても、オンデバイスで追加学習ができます。',
+        'SolistPanでは、マレットの変化や、叩き方の変化による精度の劣化を防ぐために、ODLを利用しています。先ほどのデモで使ったのは、手作りのマレットですが、これを固いサインペンに変更すると、正解率が60パーセント程度まで落ちてしまいます。ここでODLを使うと、12エリアを各5回ずつ叩くだけで、95パーセント程度まで回復できました。',
+      ],
+      render: () => `
+        ${head('ON-DEVICE LEARNING', '12クラス版は、現場でODLにより補正できる')}
+        <div class="odl-layout">
+          <ol class="odl-steps">
+            <li><b>確認</b><span>各エリア1打で、いまの精度を測る</span></li>
+            <li><b>学習</b><span>各エリア5打 × 12 = 60打をボード上のOS-ELMで学習</span></li>
+            <li><b>確認 → 保存 / 破棄</b><span>正解数が下がらなければFRAMへ保存。下がれば元へ戻す</span></li>
+          </ol>
+          <div class="odl-bars">
+            <div class="bar-row"><span>サインペンで叩いた場合(実機)</span><div class="bar"><i style="width:60%" class="b-old"></i><i style="width:35%" class="b-gain"></i></div><em>60.0% → 95.0%</em></div>
+            <p class="small">手作りのマレットから固いサインペンに替え、各エリア5打(60打)のODL。ODLの前と後に、各エリア10打(120打)ずつ評価。実機、12クラスのモデル。</p>
+          </div>
         </div>`,
     },
     {
@@ -241,7 +273,7 @@
         <div class="acc-layout">
           <div class="acc-map">${gridSvg()}
             <p class="legend"><i class="lg center"></i>エリア中心 12点 <i class="lg corner"></i>中心から±25 mmの4点 × 12 = 48点</p>
-            <p class="strong">60点 × 5セッション = <b>3,600打点</b></p>
+            <p class="strong">60点(12中心+48四隅)、5セッション、計 <b>3,600打</b></p>
           </div>
           <div class="acc-cards">
             <p class="sub">実機搭載モデル(Solist-AI 128-32-60)</p>
@@ -249,27 +281,6 @@
             <div class="stat"><b>5.5 mm</b><span>期待座標の平均誤差(中央値 0.6 mm)</span></div>
             <div class="stat"><b>95.6%</b><span>誤差 25 mm 以内に収まる割合</span></div>
             <p class="small">※ 実機に書き込む重みと同じものをPC上で評価。評価の720打点は学習に未使用(同一セッション内の分割)</p>
-          </div>
-        </div>`,
-    },
-    {
-      id: 'odl', title: '12ヘッド版のODL', seconds: 20,
-      notes: [
-        '12ヘッド版では、Solist-AIのオンデバイス学習、ODLが使えます。設置や固定、叩くマレットが変わっても、その場で補正できます。',
-        'マレットを普段のものからサインペンに替えて、各エリアを5回ずつ、合わせて60回叩いて学習させました。学習の前と後に、120回ずつ叩いて確認したところ、正解率は60パーセントから95パーセントになりました。',
-        '1回の学習は約2ミリ秒で、ボード上で完結します。精度が下がったときは保存せず、元に戻す安全策も入れています。60クラス側は対象外です。',
-      ],
-      render: () => `
-        ${head('ON-DEVICE LEARNING', '12ヘッド版は、現場でODLにより補正できる')}
-        <div class="odl-layout">
-          <ol class="odl-steps">
-            <li><b>確認</b><span>各エリア1打で、いまの精度を測る</span></li>
-            <li><b>学習</b><span>各エリア5打 × 12 = 60打をボード上のOS-ELMで学習</span></li>
-            <li><b>確認 → 保存 / 破棄</b><span>正解数が下がらなければFRAMへ保存。下がれば元へ戻す</span></li>
-          </ol>
-          <div class="odl-bars">
-            <div class="bar-row"><span>サインペンで叩いた場合(実機)</span><div class="bar"><i style="width:60%" class="b-old"></i><i style="width:35%" class="b-gain"></i></div><em>60.0% → 95.0%</em></div>
-            <p class="small">マレットを普段のものからサインペンに替え、各エリア5打(60打)のODL。ODLの前と後に、各エリア10打(120打)ずつ評価。実機、12クラスのモデル。</p>
           </div>
         </div>`,
     },
@@ -285,7 +296,7 @@
           <section class="card amber-card"><span class="num">1</span><h3>楽器兼ゲーム</h3>
             <p>ヒートマップ・疑似XY座標・音色変更・音楽教示で、叩いて遊べる</p></section>
           <section class="card teal-card"><span class="num">2</span><h3>エッジAI研究</h3>
-            <p>物理が符号化し、Solist-AIが復号する。12ヘッド×5で60クラス、12ヘッド版はODLで現場補正</p></section>
+            <p>物理が符号化し、Solist-AIが復号する。12ヘッド×5で60クラス、12クラス版はODLで現場補正</p></section>
         </div>
         <p class="thanks">ご清聴ありがとうございました</p>`,
     },

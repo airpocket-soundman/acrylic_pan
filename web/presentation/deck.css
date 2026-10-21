@@ -142,3 +142,16 @@ h1,h2,h3,p{margin:0}
 .elm-bar i{display:block;height:28px;border-radius:14px;background:var(--amber)}
 .elm-bar.teal i{background:var(--teal)}
 .elm-bar b{font-size:38px;text-align:right}
+/* Floating focus for the flow cards, and the shake of a card that has just been struck. */
+.focusing .node.focus-on{transform:translateY(-18px) scale(1.05)}
+@keyframes hit-shake{
+  0%{transform:translate(0,0) rotate(0);box-shadow:0 0 0 0 #f1b44c00}
+  8%{transform:translate(-16px,6px) rotate(-1.4deg);box-shadow:0 0 36px 6px #f1b44c99}
+  18%{transform:translate(14px,-8px) rotate(1.2deg)}
+  30%{transform:translate(-11px,5px) rotate(-.9deg)}
+  44%{transform:translate(8px,-4px) rotate(.6deg)}
+  60%{transform:translate(-5px,3px) rotate(-.3deg)}
+  80%{transform:translate(2px,-1px)}
+  100%{transform:translate(0,0) rotate(0);box-shadow:0 0 0 0 #f1b44c00}
+}
+.hit{animation:hit-shake .9s ease-out 1}

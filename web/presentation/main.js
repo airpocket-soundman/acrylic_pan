@@ -14,6 +14,7 @@
   let layout = {viewport: {x: 508, y: 246, w: 1387, h: 650}, aspect: 16 / 9};   // camera picture inside the demo page
   let lastFocus = null;
   let lastSpot = null;
+  let lastHitKey = '';
   let focusTimer = null;
   let layerSlide = -1;
   let autoStarted = false;   // the first visit to the demo connects and starts; later visits keep the state as it is
@@ -106,6 +107,15 @@
     const focus = focusStep && typeof focusStep.focus === 'number' ? focusStep.focus : -1;
     slideHost.classList.toggle('focusing', focus >= 0);
     slideHost.querySelectorAll('[data-focus]').forEach(item => item.classList.toggle('focus-on', Number(item.dataset.focus) === focus));
+    // A step with `hit` shakes the elements marked data-hit, as if they had been struck (once per arrival).
+    const hitKey = focusStep && focusStep.hit ? `${state.index}:${state.stepIndex}` : '';
+    if (hitKey !== lastHitKey) {
+      lastHitKey = hitKey;
+      slideHost.querySelectorAll('[data-hit]').forEach(item => {
+        item.classList.remove('hit');
+        if (hitKey) { void item.offsetWidth; item.classList.add('hit'); }
+      });
+    }
     // The card being explained is raised and the others are dimmed (embedded page).
     const spot = slide.demo && !zoomed && slide.steps ? (slide.steps[Math.max(0, Math.min(slide.steps.length - 1, state.stepIndex))].spot || '') : '';
     if (spot !== lastSpot && (slide.demo || lastSpot)) { lastSpot = spot; sendDemoCommand(state, 'spot', spot); }
