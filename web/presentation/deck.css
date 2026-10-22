@@ -87,6 +87,13 @@ h1,h2,h3,p{margin:0}
 .h-ht{fill:var(--amber);font-size:34px;font-weight:800;text-anchor:middle}
 .h-hs{fill:#d9c9a0;font-size:26px;text-anchor:middle}
 .h-arrow{stroke:var(--muted);stroke-width:4}
+.h-arrow.short{stroke:var(--amber);opacity:.8}
+.h-head.res rect{fill:var(--panel2);stroke:var(--text)}
+.h-group{fill:#f1b44c14;stroke:var(--amber);stroke-width:4}
+.h-box.out text{fill:var(--text)}
+.h-box.out .h-s{fill:var(--muted)}
+.h-head.res .h-ht{fill:var(--text)}
+.h-head.res .h-hs{fill:var(--muted)}
 .h-fan{stroke:var(--teal);stroke-width:3;opacity:.7}.h-fan.out{stroke:var(--amber)}
 .points{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:10px}
 .points li{font-size:36px;color:#c9d6e0;padding-left:34px;position:relative;line-height:1.35}
