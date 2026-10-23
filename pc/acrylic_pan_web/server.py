@@ -1727,6 +1727,9 @@ def main() -> None:
     suffix = "" if args.page == "index.html" else args.page
     url = f"http://{args.host}:{server.server_port}/{suffix}"
     print(f"Acrylic Pan monitor: {url}")
+    # The first note loads the sound font (about a second); do it now so the first strike does not wait for it.
+    threading.Thread(target=lambda: synthesize_note({"note": "C4", "area": "0", "instrument": "steel_drum"}),
+                     daemon=True).start()
     if not args.no_browser:
         threading.Timer(0.3, lambda: webbrowser.open(url)).start()
     try:

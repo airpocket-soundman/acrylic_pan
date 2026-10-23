@@ -11,6 +11,7 @@ const FREE_PLAY_NOTES = ['C4','C#4','D4','D#4','E4','F4','F#4','G4','G#4','A4','
 const DEFAULT_NOTES = [...FREE_PLAY_NOTES];
 const SONG_KEY = 'acrylicPanAssistSongV1';
 const NOTE_LENGTH_KEY = 'acrylicPanNoteLengthV1';
+const SONG_SPEED_KEY = 'acrylicPanSongSpeedV1';
 const repeatValues=(values,times=2)=>Array.from({length:times},()=>values).flat();
 const FUR_ELISE_8=['E5','D#5','E5','D#5','E5','B4','D5','C5','A4','C4','E4','A4','B4','E4','G#4','B4','C5','E4','E5','D#5','E5','D#5','E5','B4','D5','C5','A4','C4','E4','A4','B4','E4','C5','B4','A4'];
 const ODE_TO_JOY_8=['E4','E4','F4','G4','G4','F4','E4','D4','C4','C4','D4','E4','E4','D4','D4','E4','E4','F4','G4','G4','F4','E4','D4','C4','C4','D4','E4','D4','C4','C4'];
@@ -88,6 +89,7 @@ let guidePlaying = false;
 let guideTimer = null;
 let guideToken = 0;
 const guideOscillators = new Set();
+let songSpeed = (()=>{try{return Math.max(.2,Math.min(2,Number(localStorage.getItem(SONG_SPEED_KEY))||1));}catch(_){return 1;}})();   // 0.2x to 2x: example performance tempo and the timing cue
 let noteLengthScale = Math.max(.25,Math.min(5,Number(localStorage.getItem(NOTE_LENGTH_KEY))||1));
 let language = localStorage.getItem(LANGUAGE_KEY)==='en'?'en':'ja';
 let latestStatus = null;
@@ -121,9 +123,9 @@ function applyLanguage(){
   document.documentElement.lang=language;document.title=L('Acrylic Pan 確率分布演奏','Acrylic Pan Probability Instrument');$('languageToggle').textContent=L('English','日本語');
   $('introText').textContent=L('60座標の確率分布を12エリアへ集約し、最尤エリアをリアルタイムに発音します。','Aggregates the 60-point probability distribution into 12 areas and plays the most likely area in real time.');
   const tabs=[['/collector.html','学習データ採取','Data Collection'],['/','推論結果','Inference'],['/position.html','位置推定','Position'],['/instrument.html','クラス演奏','Class Instrument'],['/instrument-probability.html','確率演奏','Probability Instrument']];document.querySelector('.app-tabs').setAttribute('aria-label',L('動作モード','Operating mode'));tabs.forEach(([href,ja,en])=>{const link=document.querySelector('.app-tabs a[href="'+href+'"]');if(link)link.textContent=L(ja,en);});
-  [['panelProfileLabel','板仕様','Panel'],['portLabel','COMポート','COM port'],['sourceLabel','確率推論元','Probability source'],['displayLabel','表示','Display'],['masterVolumeLabel','音量','Volume'],['instrumentLabel','音色','Instrument'],['cameraLabel','カメラ','Camera'],['songLabel','演奏補助','Performance guide'],['noteLengthLabel','音の長さ','Note length']].forEach(args=>setLabelText(args[0],L(args[1],args[2])));
+  [['panelProfileLabel','板仕様','Panel'],['portLabel','COMポート','COM port'],['sourceLabel','確率推論元','Probability source'],['displayLabel','表示','Display'],['masterVolumeLabel','音量','Volume'],['instrumentLabel','音色','Instrument'],['cameraLabel','カメラ','Camera'],['songLabel','演奏補助','Performance guide'],['noteLengthLabel','音の長さ','Note length'],['songSpeedLabel','曲の速さ','Song speed']].forEach(args=>setLabelText(args[0],L(args[1],args[2])));
   [['refresh','更新','Refresh'],['connect','接続','Connect'],['disconnect','切断','Disconnect'],['performanceStart','演奏開始','Start performance'],['performanceStop','演奏停止','Stop performance'],['probabilityDemo','表示デモ','Display demo'],['cameraStart','カメラ開始','Start camera'],['cameraStop','停止','Stop'],['calibrationStart','8点フィット','8-point fit'],['calibrationClear','フィット消去','Clear fit'],['songReset','最初から','Restart']].forEach(([id,ja,en])=>$(id).textContent=L(ja,en));
-  setOptionText('positionSource','device',L('デバイス（Solist-AI）','Device (Solist-AI)'));setOptionText('positionSource','pc',L('PC（高精度モデル）','PC (high-accuracy model)'));setOptionText('displayMode','panel',L('パネル表示','Panel'));setOptionText('displayMode','camera',L('カメラ重畳','Camera overlay'));
+  setOptionText('positionSource','device',L('デバイス（Solist-AI）','Device (Solist-AI)'));setOptionText('positionSource','device12',L('デバイス（12クラス・ODL）','Device (12 classes, ODL)'));setOptionText('positionSource','pc',L('PC（高精度モデル）','PC (high-accuracy model)'));setOptionText('displayMode','panel',L('パネル表示','Panel'));setOptionText('displayMode','camera',L('カメラ重畳','Camera overlay'));
   [['steel_drum','スチールドラム','Steel drum'],['piano','ピアノ','Piano'],['harpsichord','チェンバロ','Harpsichord'],['guitar','ギター','Guitar'],['drums','ドラム','Drums']].forEach(([value,ja,en])=>setOptionText('instrumentSelect',value,L(ja,en)));
   $('heatmapTitle').textContent=L('座標確率ヒートマップ','Position Probability Heatmap');$('areaProbabilityTitle').textContent=L('12エリア確率','12-Area Probability');$('cameraTitle').textContent=L('USBカメラ','USB Camera');$('positionPanel').setAttribute('aria-label',L('400 × 300 mm アクリル板上の条件付き座標確率分布','Conditional position probability on a 400 × 300 mm acrylic panel'));document.querySelector('.sensor-marker').setAttribute('aria-label',L('加速度センサ位置','Accelerometer position'));document.querySelector('.clamp-marker').setAttribute('aria-label',L('固定領域','Clamped area'));document.querySelector('.clamp-marker span').textContent=L('固定','clamp');$('usbCamera').setAttribute('aria-label',L('USBカメラ映像','USB camera video'));$('cameraHeatmapOverlay').setAttribute('aria-label',L('カメラ映像上のヒートマップ位置合わせ','Heatmap alignment over camera video'));$('noteLength').setAttribute('aria-label',L('音の長さ','Note length'));
   populateSongOptions();localizePanelProfile();updateSongAssist();updateGuideButton();updateHeatmapToggle();updatePanelAreaToggle();renderPerformanceStatus();setCameraState(cameraStateKey);$('cameraPlaceholder').textContent=L(...cameraPlaceholderText);if(calibrationStatusText)showCalibrationStatus(...calibrationStatusText);if(latestStatus)updateControls(latestStatus);if(lastRenderedPosition)renderPosition(lastRenderedPosition,false);localStorage.setItem(LANGUAGE_KEY,language);
@@ -137,7 +139,7 @@ async function api(path,body){
   if(!response.ok){const error=new Error(data.error||`${response.status} ${response.statusText}`);error.status=response.status;throw error;}
   return data;
 }
-const modeForSource=()=>$('positionSource').value==='device'?'device_position':'inference';
+const modeForSource=()=>{const source=$('positionSource').value;return source==='device'?'device_position':source==='device12'?'instrument':'inference';};
 const sleep=milliseconds=>new Promise(resolve=>setTimeout(resolve,milliseconds));
 
 function noteFrequency(note){
@@ -151,16 +153,137 @@ function currentSongArea(offset=0){const song=activeSong(),index=songStep+offset
 function panelNote(area){return activeSong()?songPanelNotes[area]:FREE_PLAY_NOTES[area];}
 function panelNoteLabel(area){const note=panelNote(area)||'—';return activeSong()?note:note.replace(/-?\d+$/,'');}
 function updateAreaLabels(){Array.from($('areaSelectionGrid').children).forEach((cell,index)=>{let label=cell.querySelector('.area-note-label');if(!label){label=document.createElement('span');label.className='area-note-label';cell.appendChild(label);}label.textContent=panelNoteLabel(index);});}
-function configureSong(songId,reset=true){if(guidePlaying)stopGuide(false);activeSongId=SONGS[songId]?songId:'';if(reset)songStep=0;songPanelNotes=Array(12).fill(null);const song=activeSong();if(song){const unique=[...new Set(song.notes)].sort((a,b)=>noteFrequency(a)-noteFrequency(b));const used=unique.slice(0,12),first=used.length<12?1:0;used.forEach((note,index)=>songPanelNotes[first+index]=note);}localStorage.setItem(SONG_KEY,activeSongId);schedulePrimeSampler();updateAreaLabels();updateSongAssist();}
+function configureSong(songId,reset=true){if(guidePlaying)stopGuide(false);activeSongId=SONGS[songId]?songId:'';if(reset)songStep=0;cueClear();songPanelNotes=Array(12).fill(null);const song=activeSong();if(song){const unique=[...new Set(song.notes)].sort((a,b)=>noteFrequency(a)-noteFrequency(b));const used=unique.slice(0,12),first=used.length<12?1:0;used.forEach((note,index)=>songPanelNotes[first+index]=note);}localStorage.setItem(SONG_KEY,activeSongId);schedulePrimeSampler();updateAreaLabels();updateSongAssist();}
 function updateSongAssist(){const song=activeSong(),nextArea=currentSongArea(),secondArea=currentSongArea(1);if(!song)$('songProgress').textContent=L('自由演奏：C～B 半音階','Free play: C–B chromatic');else if(songStep>=song.notes.length)$('songProgress').textContent=songName(song)+L('：完奏',': Complete');else $('songProgress').textContent=L('次 ','Next ')+song.notes[songStep]+L('・エリア',' · Area ')+(nextArea+1)+' ('+(songStep+1)+'/'+song.notes.length+')';Array.from($('areaSelectionGrid').children).forEach((cell,index)=>{cell.classList.toggle('next-note',index===nextArea);cell.classList.toggle('second-next-note',index===secondArea&&index!==nextArea);});document.querySelectorAll('#areaProbabilities .area-probability').forEach((row,index)=>{row.classList.toggle('next-note',index===nextArea);row.classList.toggle('second-next-note',index===secondArea&&index!==nextArea);});updateGuideButton();redrawCameraOverlay();}
-function advanceSong(area){const song=activeSong();if(!song)return;songStep=Math.min(song.notes.length,songStep+1);updateSongAssist();}  /* any sounded note moves on, right or wrong */
-function updateGuideButton(){const button=$('guidePlay');if(!button)return;button.textContent=guidePlaying?L('手本停止','Stop example'):L('手本演奏','Example performance');button.disabled=!activeSong();button.classList.toggle('is-playing',guidePlaying);}
-function stopGuide(update=true){guidePlaying=false;guideToken++;if(guideTimer)clearTimeout(guideTimer);guideTimer=null;guideOscillators.forEach(oscillator=>{try{oscillator.stop();}catch(_){}});guideOscillators.clear();if(update)updateSongAssist();else updateGuideButton();}
+function advanceSong(area){const song=activeSong();if(!song)return;songStep=Math.min(song.notes.length,songStep+1);updateSongAssist();}
+/* Timing cue (rhythm-game style).  The song has a fixed timeline: every note has a sounding time.  CUE_LEAD_MS before
+   it a square starts to grow from the centre of the area and meets the area's frame exactly at that time, where it
+   flashes and vanishes.  The timeline keeps running whether or not the notes are struck. */
+const CUE_LEAD_MS=2000,CUE_WINDOW_MS=300,CUE_BURST_MS=900,COUNTDOWN_MS=3000;   // the first note sounds when the 3-2-1 countdown ends
+let timeline=null,cueItems=[],cueBursts=[],cueFrame=0,cueLastCamera=0;
+/* The countdown is drawn in the middle of the camera picture and of the area grid. */
+let countdownShown='';
+function showCountdown(text){if(text===countdownShown)return;countdownShown=text;[document.querySelector('.camera-viewport'),$('areaSelectionGrid')?.parentElement].forEach(host=>{if(!host)return;if(getComputedStyle(host).position==='static')host.style.position='relative';let element=host.querySelector(':scope>.cue-countdown');if(!element){element=document.createElement('div');element.className='cue-countdown';element.setAttribute('aria-hidden','true');host.appendChild(element);}
+  if(!text){element.textContent='';element.classList.remove('on');return;}element.textContent=text;element.classList.remove('on');void element.offsetWidth;element.classList.add('on');});}
+function cueClear(){if(timeline&&timeline.timer)clearInterval(timeline.timer);timeline=null;showCountdown('');comboReset();cueItems.forEach(item=>item.element?.remove());cueItems=[];cueBursts=[];document.querySelectorAll('.cue-fx').forEach(element=>element.remove());if(cueFrame){cancelAnimationFrame(cueFrame);cueFrame=0;}redrawCameraOverlay();updateGuideButton();}
+function cueSpawn(area,time){
+  const cell=$('areaSelectionGrid')?.children[area],now=performance.now(),item={area,time,start:now,element:null,judged:false};
+  if(cell){const square=document.createElement('i');square.className='cue-square';cell.appendChild(square);item.element=square;
+    // it reaches the frame at the sounding time; a note nobody strikes fades out over the grace window
+    square.animate([{transform:'scale(0)',opacity:.35},{transform:'scale(1)',opacity:1}],{duration:Math.max(1,time-now),easing:'linear',fill:'forwards'}).onfinish=()=>{
+      if(item.judged){square.remove();return;}
+      square.animate([{opacity:1},{opacity:0}],{duration:CUE_WINDOW_MS,easing:'ease-in',fill:'forwards'}).onfinish=()=>square.remove();};}
+  cueItems.push(item);startCueLoop();
+}
+/* A strike bursts the square.  The nearer it is to the sounding time, the bigger the burst.
+   GOOD or better keeps the combo going; OK or a missed note breaks it. */
+const CUE_TIERS=[
+  {max:70,label:'PERFECT!',q:1,rings:4,count:46,reach:250,gold:true,colors:['#fff','#ffe04b','#ff5f9b','#7ff','#a6ff5a']},
+  {max:140,label:'GREAT',q:.86,rings:3,count:36,reach:205,gold:true,colors:['#ffe04b','#fff','#ff9a3d','#ff5f9b']},
+  {max:250,label:'GOOD',q:.68,rings:3,count:26,reach:160,gold:false,colors:['#7ff','#fff','#6af','#a6ff5a']},
+  {max:Infinity,label:'OK',q:.2,rings:1,count:8,reach:70,gold:false,colors:['#fff','#ffc8dc']},
+];
+let comboCount=0,comboBest=0,comboBreakTimer=0;
+function comboView(){
+  const host=document.querySelector('.camera-viewport');if(!host)return null;
+  if(getComputedStyle(host).position==='static')host.style.position='relative';
+  let element=host.querySelector(':scope>.cue-combo');
+  if(!element){element=document.createElement('div');element.className='cue-combo';element.setAttribute('aria-hidden','true');element.innerHTML='<b class="num">0</b><span class="word">COMBO</span><i class="note"></i>';host.appendChild(element);}
+  return element;
+}
+function comboUp(){
+  comboCount++;comboBest=Math.max(comboBest,comboCount);const element=comboView();if(!element)return;
+  clearTimeout(comboBreakTimer);element.classList.remove('break','result');element.querySelector('.note').textContent='';
+  if(comboCount<2){element.classList.remove('on');return;}
+  element.querySelector('.num').textContent=String(comboCount);element.dataset.tier=comboCount>=50?'3':comboCount>=25?'2':comboCount>=10?'1':'0';
+  element.classList.add('on');element.classList.remove('hit');void element.offsetWidth;element.classList.add('hit');
+  if(comboCount%10===0){const note=element.querySelector('.note');note.textContent=comboCount+' COMBO!!';note.classList.remove('go');void note.offsetWidth;note.classList.add('go');}
+}
+function comboBreak(){
+  const had=comboCount;comboCount=0;const element=comboView();if(!element)return;
+  if(had<3){element.classList.remove('on');return;}
+  element.classList.add('break');element.querySelector('.note').textContent='BREAK';
+  clearTimeout(comboBreakTimer);comboBreakTimer=setTimeout(()=>element.classList.remove('on','break'),900);
+}
+function comboFinish(){
+  const element=comboView();if(!element||comboBest<2)return;
+  clearTimeout(comboBreakTimer);element.classList.remove('break','hit');element.classList.add('on','result');element.dataset.tier=comboBest>=50?'3':comboBest>=25?'2':comboBest>=10?'1':'0';
+  element.querySelector('.num').textContent=String(comboBest);element.querySelector('.word').textContent='MAX COMBO';
+  comboBreakTimer=setTimeout(()=>{element.classList.remove('on','result');element.querySelector('.word').textContent='COMBO';},5000);
+}
+function comboReset(){comboCount=0;comboBest=0;clearTimeout(comboBreakTimer);const element=document.querySelector('.camera-viewport>.cue-combo');if(element){element.classList.remove('on','hit','break','result');element.querySelector('.word').textContent='COMBO';}}
+function cueJudge(area){
+  const now=performance.now();let best=null;
+  cueItems.forEach(item=>{if(item.judged||item.missed||item.area!==area)return;const error=Math.abs(now-item.time);if(error<=CUE_WINDOW_MS&&(!best||error<best.error))best={item,error};});
+  if(!best)return;
+  const {item,error}=best,tierIndex=CUE_TIERS.findIndex(tier=>error<=tier.max),tier=CUE_TIERS[tierIndex],early=now<item.time;
+  item.judged=true;if(item.element){item.element.getAnimations().forEach(animation=>animation.cancel());item.element.remove();item.element=null;}
+  cueBursts.push({area,start:now,tier,early,error});cueBurstDom(area,tier,early);startCueLoop();
+  if(timeline&&!timeline.audio){if(tierIndex<=2)comboUp();else comboBreak();}
+}
+function cueBurstDom(area,tier,early){
+  const cell=$('areaSelectionGrid')?.children[area];if(!cell)return;const q=tier.q;
+  const add=(tag,className)=>{const element=document.createElement(tag);element.className='cue-fx '+className;cell.appendChild(element);return element;},done=(element,animation)=>{animation.onfinish=()=>element.remove();};
+  const glow=add('i','cue-glow');glow.style.setProperty('--glow',tier.colors[0]);done(glow,glow.animate([{opacity:1,transform:'scale(1)'},{opacity:0,transform:`scale(${1.3+.5*q})`}],{duration:500+400*q,easing:'ease-out',fill:'forwards'}));
+  const flash=add('i','cue-flash');done(flash,flash.animate([{opacity:.6+.4*q,transform:'scale(1)'},{opacity:0,transform:`scale(${1.1+.4*q})`}],{duration:350+300*q,easing:'ease-out',fill:'forwards'}));
+  for(let ring=0;ring<tier.rings;ring++){const element=add('i','cue-ring'+(tier.gold?' gold':''));done(element,element.animate([{transform:'scale(1)',opacity:1,borderWidth:`${6+4*q}px`},{transform:`scale(${1.5+2.2*q+ring*.55})`,opacity:0,borderWidth:'1px'}],{duration:500+450*q+ring*140,delay:ring*80,easing:'ease-out',fill:'both'}));}
+  for(let i=0;i<tier.count;i++){const angle=Math.PI*2*(i/tier.count)+i*.7,distance=tier.reach*(.5+.5*((i*37)%10)/10),size=5+Math.round(11*q*(1+((i*13)%5)/5)),element=add('i','cue-spark');
+    element.style.width=element.style.height=size+'px';element.style.background=tier.colors[i%tier.colors.length];if(i%3===0)element.style.borderRadius='2px';
+    done(element,element.animate([{transform:'translate(-50%,-50%) scale(1) rotate(0deg)',opacity:1},{transform:`translate(calc(-50% + ${Math.cos(angle)*distance}px),calc(-50% + ${Math.sin(angle)*distance}px)) scale(.2) rotate(${(i%2?1:-1)*240}deg)`,opacity:0}],{duration:600+500*q,easing:'cubic-bezier(.1,.7,.3,1)',fill:'forwards'}));}
+  const text=add('b','cue-label'+(tier.gold?' gold':''));text.textContent=tier.label+(q<1?(early?' 早':' 遅'):'');text.style.fontSize=(22+24*q)+'px';
+  done(text,text.animate([{transform:'translate(-50%,-50%) scale(.5)',opacity:0},{transform:'translate(-50%,-50%) scale(1.3)',opacity:1,offset:.18},{transform:'translate(-50%,-100%) scale(1)',opacity:0}],{duration:1000,easing:'ease-out',fill:'forwards'}));
+}
+function startCueLoop(){if(cueFrame)return;const tick=()=>{cueFrame=0;const now=performance.now();cueItems=cueItems.filter(item=>now<item.time+CUE_WINDOW_MS+60);cueBursts=cueBursts.filter(effect=>now-effect.start<CUE_BURST_MS);if(!cueItems.length&&!cueBursts.length){redrawCameraOverlay();return;}if($('displayMode')?.value==='camera'&&now-cueLastCamera>40){cueLastCamera=now;redrawCameraOverlay();}cueFrame=requestAnimationFrame(tick);};cueFrame=requestAnimationFrame(tick);}
+function cueDrawCamera(context,width,height){
+  const now=performance.now(),columns=activePanel.columns,rows=activePanel.rows,rect=(column,row,grow)=>[quadPoint((column-grow)/columns,(row-grow)/rows,width,height),quadPoint((column+1+grow)/columns,(row-grow)/rows,width,height),quadPoint((column+1+grow)/columns,(row+1+grow)/rows,width,height),quadPoint((column-grow)/columns,(row+1+grow)/rows,width,height)];
+  cueItems.forEach(item=>{
+    if(item.judged)return;const column=item.area%columns,row=Math.floor(item.area/columns);
+    if(now<item.time){const p=Math.max(0,Math.min(1,(now-item.start)/Math.max(1,item.time-item.start))),half=.5*p,cu0=column+.5-half,cu1=column+.5+half,cv0=row+.5-half,cv1=row+.5+half;
+      cameraPolygon(context,[quadPoint(cu0/columns,cv0/rows,width,height),quadPoint(cu1/columns,cv0/rows,width,height),quadPoint(cu1/columns,cv1/rows,width,height),quadPoint(cu0/columns,cv1/rows,width,height)],`rgba(255,95,155,${(.12*p).toFixed(2)})`,'#ff5f9b',4);}
+    else{const fade=Math.max(0,1-(now-item.time)/CUE_WINDOW_MS);cameraPolygon(context,rect(column,row,0),`rgba(255,95,155,${(.12*fade).toFixed(2)})`,`rgba(255,95,155,${fade.toFixed(2)})`,4);}
+  });
+  cueBursts.forEach(effect=>{
+    const tier=effect.tier,q=tier.q,t=(now-effect.start)/CUE_BURST_MS,column=effect.area%columns,row=Math.floor(effect.area/columns),fadeOut=Math.max(0,1-t),centre=quadPoint((column+.5)/columns,(row+.5)/rows,width,height);
+    if(t<.45){const u=t/.45;cameraPolygon(context,rect(column,row,.15*u),`rgba(255,255,255,${((.6+.4*q)*(1-u)).toFixed(2)})`,'rgba(0,0,0,0)',0);}
+    for(let ring=0;ring<tier.rings;ring++){const u=Math.max(0,Math.min(1,(t-ring*.08)/.65));if(u<=0||u>=1)continue;cameraPolygon(context,rect(column,row,(.4+1.6*q+ring*.4)*u*.5),'rgba(0,0,0,0)',tier.gold?`rgba(255,224,75,${(1-u).toFixed(2)})`:`rgba(120,255,255,${(1-u).toFixed(2)})`,Math.max(1,(5+4*q)*(1-u)));}
+    context.save();const reachU=tier.reach/230;
+    for(let i=0;i<tier.count;i++){const angle=Math.PI*2*(i/tier.count)+i*.7,u=Math.min(1,t/.75),distance=reachU*(.5+.5*((i*37)%10)/10)*u,point=quadPoint((column+.5+Math.cos(angle)*distance)/columns,(row+.5+Math.sin(angle)*distance)/rows,width,height),size=(3+6*q)*(1-u*.8);
+      if(u>=1)continue;context.globalAlpha=1-u;context.fillStyle=tier.colors[i%tier.colors.length];context.beginPath();context.arc(point[0],point[1],size,0,Math.PI*2);context.fill();}
+    context.globalAlpha=fadeOut;context.textAlign='center';context.textBaseline='middle';context.font=`900 ${Math.round(22+22*q)}px "Segoe UI",sans-serif`;context.lineWidth=6;context.strokeStyle='#071d29';context.fillStyle=tier.gold?'#ffe04b':'#fff';
+    const text=tier.label+(q<1?(effect.early?' 早':' 遅'):''),lift=26*t;context.strokeText(text,centre[0],centre[1]-lift);context.fillText(text,centre[0],centre[1]-lift);context.restore();
+  });
+}
+function timelineStart(withAudio){
+  const song=activeSong();if(!song)return false;cueClear();
+  const now=performance.now(),notes=[];let at=now+COUNTDOWN_MS;
+  song.notes.forEach((note,index)=>{const timing=guideTiming(index);notes.push({area:songPanelNotes.indexOf(note),time:at,beats:timing.beats,spawned:false,played:false});at+=timing.milliseconds;});
+  timeline={notes,audio:withAudio,first:now+COUNTDOWN_MS,end:at,timer:setInterval(timelineTick,20)};timelineTick();updateGuideButton();return true;
+}
+function timelineTick(){
+  if(!timeline)return;const now=performance.now(),untilFirst=timeline.first-now;
+  if(!timeline.audio)cueItems.forEach(item=>{if(!item.judged&&!item.missed&&now>item.time+CUE_WINDOW_MS){item.missed=true;comboBreak();}});
+  showCountdown(untilFirst>0?String(Math.ceil(untilFirst/1000)):(untilFirst>-600?'GO!':''));
+  for(const note of timeline.notes){
+    if(!note.spawned&&note.time-now<=CUE_LEAD_MS){note.spawned=true;if(note.area>=0)cueSpawn(note.area,note.time);}
+    if(timeline&&timeline.audio&&!note.played&&now>=note.time){note.played=true;if(note.area>=0){playArea(note.area,1,'guide',note.beats);cueJudge(note.area);}}
+  }
+  if(timeline&&now>timeline.end+CUE_BURST_MS)timelineStop();
+}
+function timelineStop(){const audio=timeline&&timeline.audio;cueClear();if(audio)guidePlaying=false;else comboFinish();updateSongAssist();}
+function updateGuideButton(){updateCueStartButton();const cueButton=$('cuePlay');if(cueButton){const on=Boolean(timeline&&!timeline.audio);cueButton.textContent=on?L('教示停止','Stop cue'):L('教示スタート','Start cue');cueButton.disabled=!activeSong();cueButton.classList.toggle('is-playing',on);}const button=$('guidePlay');if(!button)return;button.textContent=guidePlaying?L('手本停止','Stop example'):L('手本演奏','Example performance');button.disabled=!activeSong();button.classList.toggle('is-playing',guidePlaying);}
+function stopGuide(update=true){cueClear();guidePlaying=false;guideToken++;if(guideTimer)clearTimeout(guideTimer);guideTimer=null;guideOscillators.forEach(oscillator=>{try{oscillator.stop();}catch(_){}});guideOscillators.clear();if(update)updateSongAssist();else updateGuideButton();}
 function validateSongGuides(){const invalid=[];Object.entries(SONGS).forEach(([id,song])=>{const score=SONG_GUIDE[id],rhythm=score?.rhythm?.replace(/\s/g,'')||'',beats=[...rhythm].reduce((sum,symbol)=>sum+(RHYTHM_BEATS[symbol]||0),0);if(!score||score.bars!==16||new Set(song.notes).size>12||rhythm.length!==song.notes.length||[...rhythm].some(symbol=>!RHYTHM_BEATS[symbol])||Math.abs(beats-score.expectedBeats)>.001)invalid.push(id);});return invalid;}
-function guideTiming(index){const score=SONG_GUIDE[activeSongId]||{bpm:100,rhythm:'q'},rhythm=score.rhythm.replace(/\s/g,'')||'q',beats=RHYTHM_BEATS[rhythm[index]]||1;return {beats,milliseconds:60000/score.bpm*beats};}
-async function toggleGuide(){if(guidePlaying){stopGuide();return;}const song=activeSong();if(!song){$('error').textContent=L('曲を選択してください。','Select a song.');return;}try{await ensureAudio();$('error').textContent='';songStep=0;guidePlaying=true;const token=++guideToken;updateSongAssist();const playNext=()=>{if(!guidePlaying||token!==guideToken)return;if(songStep>=song.notes.length){stopGuide();return;}const timing=guideTiming(songStep);playArea(currentSongArea(),1,'guide',timing.beats);guideTimer=setTimeout(playNext,timing.milliseconds);};playNext();}catch(error){stopGuide();$('error').textContent=error.message;}}
+function guideTiming(index){const score=SONG_GUIDE[activeSongId]||{bpm:100,rhythm:'q'},rhythm=score.rhythm.replace(/\s/g,'')||'q',beats=RHYTHM_BEATS[rhythm[index]]||1;return {beats,milliseconds:60000/score.bpm*beats/songSpeed};}
+function updateCueStartButton(){
+  const host=document.querySelector('.camera-viewport');if(!host)return;
+  let button=host.querySelector(':scope>.cue-start');
+  if(!button){if(getComputedStyle(host).position==='static')host.style.position='relative';button=document.createElement('button');button.type='button';button.className='cue-start';button.addEventListener('click',()=>toggleCue());host.appendChild(button);}
+  button.textContent='▶ '+L('スタート','Start');button.hidden=!activeSong()||Boolean(timeline);
+}
+async function toggleGuide(){if(guidePlaying){stopGuide();return;}const song=activeSong();if(!song){$('error').textContent=L('曲を選択してください。','Select a song.');return;}try{await ensureAudio();$('error').textContent='';songStep=0;guidePlaying=true;timelineStart(true);updateSongAssist();}catch(error){stopGuide();$('error').textContent=error.message;}}
+function toggleCue(){if(timeline&&!timeline.audio){cueClear();updateSongAssist();return;}if(guidePlaying)stopGuide(false);if(!activeSong()){$('error').textContent=L('曲を選択してください。','Select a song.');return;}$('error').textContent='';songStep=0;timelineStart(false);updateSongAssist();}
 async function ensureAudio(){
-  if(audioToParent)return;
+  if(audioToParent){await primeSampler();return;}
   if(!audioContext){
     const AudioContext=window.AudioContext||window.webkitAudioContext;
     if(!AudioContext)throw new Error(L('このブラウザはWeb Audioに対応していません。','This browser does not support Web Audio.'));
@@ -174,6 +297,7 @@ function noteUrl(note,area){return ServerSampler.url(note,area,{instrument:setti
 async function primeSampler(){const urls=[];for(let area=0;area<12;area++){const note=panelNote(area);if(note)urls.push(audioToParent?new URL(noteUrl(note,area),location.href).href:noteUrl(note,area));}if(audioToParent){toParent({type:'apan-prime',urls});return;}if(!sampler)return;await sampler.prime(urls);}
 function schedulePrimeSampler(){if(!sampler&&!audioToParent)return;clearTimeout(samplerPrimeTimer);samplerPrimeTimer=setTimeout(()=>primeSampler().catch(()=>{}),180);}
 function playArea(area,probability,source='live',beatLength=1){
+  if(source==='live'&&timeline&&!timeline.audio)cueJudge(area);
   if(source==='live'&&guidePlaying)stopGuide(false);
   if(audioToParent){
     const note=panelNote(area);if(!note)return;
@@ -210,8 +334,8 @@ function updateControls(data){
   latestStatus=data;
   const connected=Boolean(data.connected),running=Boolean(data.inference_active),audible=running&&performanceEnabled;
   $('connection').textContent=connected?L('接続中 ','Connected ')+data.port:L('未接続','Disconnected');$('connection').classList.toggle('online',connected);
-  $('firmwareMode').textContent=audible?L('確率演奏中','Probability performance'):(data.device_mode==='device_position'?L('デバイス確率モード','Device probability mode'):(data.device_mode==='inference'?L('PC確率モード','PC probability mode'):L('モード不明','Unknown mode')));
-  $('firmwareMode').classList.toggle('online',audible);$('port').disabled=connected;$('positionSource').disabled=running;
+  $('firmwareMode').textContent=audible?L('確率演奏中','Probability performance'):(data.device_mode==='instrument'?L('デバイス12クラス（ODL）','Device 12 classes (ODL)'):data.device_mode==='device_position'?L('デバイス確率モード','Device probability mode'):(data.device_mode==='inference'?L('PC確率モード','PC probability mode'):L('モード不明','Unknown mode')));
+  $('firmwareMode').classList.toggle('online',audible);$('port').disabled=connected;
   setButton('connect',connected,connected);setButton('disconnect',!connected);setButton('performanceStart',!connected||audible,audible);setButton('performanceStop',!connected||!running);
 }
 async function refreshStatus(){
@@ -265,7 +389,7 @@ function redrawCameraOverlay(){
     const map=lastRenderedPosition.probability_map||{},support=map.support_xy_mm||[],probability=map.probabilities||[],columns=40,rows=Math.round(columns*activePanel.height_mm/activePanel.width_mm),values=new Float32Array(columns*rows),inverse=1/(2*27*27);let peak=1e-12;
     if(heatmapVisible&&support.length&&support.length===probability.length){for(let row=0;row<rows;row++)for(let column=0;column<columns;column++){const x=(column+.5)*activePanel.width_mm/columns,y=(row+.5)*activePanel.height_mm/rows;let density=0;for(let index=0;index<support.length;index++){const dx=x-Number(support[index][0]),dy=y-Number(support[index][1]);density+=Math.max(0,Number(probability[index])||0)*Math.exp(-(dx*dx+dy*dy)*inverse);}values[row*columns+column]=density;peak=Math.max(peak,density);}for(let row=0;row<rows;row++)for(let column=0;column<columns;column++){const level=Math.round(Math.pow(values[row*columns+column]/peak,.52)*9)/9,[r,g,b]=heatColor(level),u0=column/columns,u1=(column+1)/columns,v0=row/rows,v1=(row+1)/rows;cameraPolygon(context,[quadPoint(u0,v0,width,height),quadPoint(u1,v0,width,height),quadPoint(u1,v1,width,height),quadPoint(u0,v1,width,height)],`rgba(${r},${g},${b},.52)`);}}
     if(panelAreaVisible){const areaValues=areaProbabilities(lastRenderedPosition),winner=areaValues.indexOf(Math.max(...areaValues)),winnerColumn=winner%activePanel.columns,winnerRow=Math.floor(winner/activePanel.columns),u0=winnerColumn/activePanel.columns,u1=(winnerColumn+1)/activePanel.columns,v0=winnerRow/activePanel.rows,v1=(winnerRow+1)/activePanel.rows;cameraPolygon(context,[quadPoint(u0,v0,width,height),quadPoint(u1,v0,width,height),quadPoint(u1,v1,width,height),quadPoint(u0,v1,width,height)],'rgba(255,224,75,.08)','#ffe04b',4);
-    const nextArea=currentSongArea(),secondArea=currentSongArea(1);if(secondArea>=0&&secondArea!==nextArea){const secondColumn=secondArea%activePanel.columns,secondRow=Math.floor(secondArea/activePanel.columns),secondU0=secondColumn/activePanel.columns,secondU1=(secondColumn+1)/activePanel.columns,secondV0=secondRow/activePanel.rows,secondV1=(secondRow+1)/activePanel.rows;cameraPolygon(context,[quadPoint(secondU0,secondV0,width,height),quadPoint(secondU1,secondV0,width,height),quadPoint(secondU1,secondV1,width,height),quadPoint(secondU0,secondV1,width,height)],'rgba(255,190,213,.14)','#ffc8dc',2);}if(nextArea>=0){const nextColumn=nextArea%activePanel.columns,nextRow=Math.floor(nextArea/activePanel.columns),nextU0=nextColumn/activePanel.columns,nextU1=(nextColumn+1)/activePanel.columns,nextV0=nextRow/activePanel.rows,nextV1=(nextRow+1)/activePanel.rows;cameraPolygon(context,[quadPoint(nextU0,nextV0,width,height),quadPoint(nextU1,nextV0,width,height),quadPoint(nextU1,nextV1,width,height),quadPoint(nextU0,nextV1,width,height)],'rgba(255,145,184,.32)','#ff91b8',4);}}
+    const nextArea=currentSongArea(),secondArea=currentSongArea(1);if(secondArea>=0&&secondArea!==nextArea){const secondColumn=secondArea%activePanel.columns,secondRow=Math.floor(secondArea/activePanel.columns),secondU0=secondColumn/activePanel.columns,secondU1=(secondColumn+1)/activePanel.columns,secondV0=secondRow/activePanel.rows,secondV1=(secondRow+1)/activePanel.rows;cameraPolygon(context,[quadPoint(secondU0,secondV0,width,height),quadPoint(secondU1,secondV0,width,height),quadPoint(secondU1,secondV1,width,height),quadPoint(secondU0,secondV1,width,height)],'rgba(255,190,213,.14)','#ffc8dc',2);}if(nextArea>=0){const nextColumn=nextArea%activePanel.columns,nextRow=Math.floor(nextArea/activePanel.columns),nextU0=nextColumn/activePanel.columns,nextU1=(nextColumn+1)/activePanel.columns,nextV0=nextRow/activePanel.rows,nextV1=(nextRow+1)/activePanel.rows;cameraPolygon(context,[quadPoint(nextU0,nextV0,width,height),quadPoint(nextU1,nextV0,width,height),quadPoint(nextU1,nextV1,width,height),quadPoint(nextU0,nextV1,width,height)],'rgba(255,145,184,.32)','#ff91b8',4);}cueDrawCamera(context,width,height);}
     const mapX=Number(lastRenderedPosition.map_x_mm??lastRenderedPosition.x_mm),mapY=Number(lastRenderedPosition.map_y_mm??lastRenderedPosition.y_mm),marker=quadPoint(mapX/activePanel.width_mm,mapY/activePanel.height_mm,width,height);context.save();context.translate(...marker);context.rotate(Math.PI/4);context.fillStyle='#00777ccc';context.strokeStyle='#72ffff';context.lineWidth=3;context.fillRect(-7,-7,14,14);context.strokeRect(-7,-7,14,14);context.restore();
   }
   if(panelAreaVisible&&calibrationPoints.length===4){for(let column=0;column<=activePanel.columns;column++){const u=column/activePanel.columns;context.beginPath();for(let row=0;row<=activePanel.rows;row++){const point=quadPoint(u,row/activePanel.rows,width,height);row?context.lineTo(...point):context.moveTo(...point);}context.strokeStyle='#ffffff99';context.lineWidth=1;context.stroke();}for(let row=0;row<=activePanel.rows;row++){const v=row/activePanel.rows,a=quadPoint(0,v,width,height),b=quadPoint(1,v,width,height);context.beginPath();context.moveTo(...a);context.lineTo(...b);context.strokeStyle='#ffffff99';context.lineWidth=1;context.stroke();}context.save();context.textAlign='center';context.textBaseline='middle';context.font='800 20px Consolas,monospace';context.lineWidth=5;context.strokeStyle='#071d29cc';context.fillStyle='#fff';for(let area=0;area<activePanel.class_count;area++){const column=area%activePanel.columns,row=Math.floor(area/activePanel.columns),point=quadPoint((column+.5)/activePanel.columns,(row+.5)/activePanel.rows,width,height),label=panelNoteLabel(area);context.strokeText(label,...point);context.fillText(label,...point);}context.restore();}
@@ -306,6 +430,13 @@ function renderPosition(position,play=false){
 function flushPendingHeatmap(){
   heatmapTimer=null;if(!pendingHeatmapPosition)return;const position=pendingHeatmapPosition;pendingHeatmapPosition=null;renderPosition(position,false);lastHeatmapRenderedAt=performance.now();
 }
+/* 12-class mode: the board answers with the class only (no probability map); the area sounds and is highlighted. */
+function playClass12(result){
+  const area=Number(result.predicted_class),score=Math.max(0,Math.min(1,Math.max(...result.outputs.map(Number))));
+  if(!(area>=0&&area<activePanel.class_count))return;
+  Array.from($('areaSelectionGrid').children).forEach((cell,index)=>cell.classList.toggle('winner',index===area));
+  if(performanceEnabled)playArea(area,score);
+}
 function scheduleLivePosition(position){
   const probabilities=areaProbabilities(position),area=probabilities.indexOf(Math.max(...probabilities));if(performanceEnabled)playArea(area,probabilities[area]||0);
   const remaining=MIN_HEATMAP_DISPLAY_MS-(performance.now()-lastHeatmapRenderedAt);if(remaining<=0&&!heatmapTimer){renderPosition(position,false);lastHeatmapRenderedAt=performance.now();return;}pendingHeatmapPosition=position;if(!heatmapTimer)heatmapTimer=setTimeout(flushPendingHeatmap,Math.max(0,remaining));
@@ -315,10 +446,10 @@ function demo(){
   const support=[];for(let y=25;y<300;y+=50)for(let x=25;x<400;x+=50)support.push([x,y]);for(let y=50;y<300;y+=100)for(let x=50;x<400;x+=100)support.push([x,y]);const raw=support.map(([x,y])=>Math.exp(-((x-275)**2+(y-175)**2)/2200)+.25*Math.exp(-((x-125)**2+(y-75)**2)/1800)),sum=raw.reduce((a,b)=>a+b,0),probabilities=raw.map(v=>v/sum),maximum=probabilities.indexOf(Math.max(...probabilities));renderPosition({x_mm:support[maximum][0],y_mm:support[maximum][1],probability_map:{support_xy_mm:support,probabilities},inference_source:'device'},false);
 }
 async function inferenceLoop(){
-  while(loopRunning){if(!performanceEnabled){await sleep(60);continue;}try{const after=lastSequence===null?'':String(lastSequence),result=await api(`/api/ai/wait?after=${encodeURIComponent(after)}&timeout=1.0`);if(result.sequence!==undefined&&result.sequence!==lastSequence){lastSequence=result.sequence;if(result.position)scheduleLivePosition(result.position);$('error').textContent='';}}catch(error){if(error.status!==204)$('error').textContent=error.message;await sleep(100);}}
+  while(loopRunning){if(!performanceEnabled){await sleep(60);continue;}try{const after=lastSequence===null?'':String(lastSequence),result=await api(`/api/ai/wait?after=${encodeURIComponent(after)}&timeout=1.0`);if(result.sequence!==undefined&&result.sequence!==lastSequence){lastSequence=result.sequence;if(result.position)scheduleLivePosition(result.position);else if(Array.isArray(result.outputs)&&result.predicted_class!==undefined)playClass12(result);$('error').textContent='';}}catch(error){if(error.status!==204)$('error').textContent=error.message;await sleep(100);}}
 }
 async function startPerformance(){
-  try{await ensureAudio();let current=await api('/api/status');if(current.inference_active)await api('/api/inference/stop',{});if(current.panel_profile_id!=='400x300x5')await api('/api/panel',{panel_profile_id:'400x300x5'});await api('/api/inference/retrigger',{milliseconds:80});current=await api('/api/status');lastSequence=current.latest_ai?.sequence??null;await api('/api/inference/start',{mode:modeForSource()});performanceEnabled=true;$('error').textContent='';performanceMessage={kind:'running'};renderPerformanceStatus();$('performanceStatus').classList.add('playing');await refreshStatus();}catch(error){$('error').textContent=error.message;}
+  try{await ensureAudio();let current=await api('/api/status');if(current.inference_active)await api('/api/inference/stop',{});if(current.panel_profile_id!=='400x300x5')await api('/api/panel',{panel_profile_id:'400x300x5'});await api('/api/inference/retrigger',{milliseconds:80});current=await api('/api/status');lastSequence=current.latest_ai?.sequence??null;await api('/api/inference/start',{mode:modeForSource()});stopGuide(false);songStep=0;cueClear();updateSongAssist();performanceEnabled=true;$('error').textContent='';performanceMessage={kind:'running'};renderPerformanceStatus();$('performanceStatus').classList.add('playing');await refreshStatus();}catch(error){$('error').textContent=error.message;}
 }
 async function stopPerformance(){try{performanceEnabled=false;clearPendingHeatmap();await api('/api/inference/stop',{});performanceMessage={kind:'stopped'};renderPerformanceStatus();$('performanceStatus').classList.remove('playing');await refreshStatus();}catch(error){$('error').textContent=error.message;}}
 
@@ -332,14 +463,15 @@ $('refresh').onclick=()=>ports().catch(error=>$('error').textContent=error.messa
 $('connect').onclick=async()=>{try{await api('/api/connect',{port:$('port').value});const current=await api('/api/status');if(current.panel_profile_id!=='400x300x5')await api('/api/panel',{panel_profile_id:'400x300x5'});await api('/api/device/mode',{mode:modeForSource()});await refreshStatus();}catch(error){$('error').textContent=error.message;}};
 $('disconnect').onclick=async()=>{try{performanceEnabled=false;await api('/api/disconnect',{});await refreshStatus();}catch(error){$('error').textContent=error.message;}};
 $('performanceStart').onclick=startPerformance;$('performanceStop').onclick=stopPerformance;$('probabilityDemo').onclick=demo;
-$('positionSource').onchange=async()=>{try{const current=await api('/api/status');if(current.connected&&!current.inference_active)await api('/api/device/mode',{mode:modeForSource()});await refreshStatus();}catch(error){$('error').textContent=error.message;}};
+$('positionSource').onchange=async()=>{try{const wasPerforming=performanceEnabled;if(wasPerforming)await stopPerformance();const current=await api('/api/status');if(current.connected&&!current.inference_active)await api('/api/device/mode',{mode:modeForSource()});await refreshStatus();if(wasPerforming)await startPerformance();}catch(error){$('error').textContent=error.message;}};
 const volume=$('masterVolume'),showVolume=()=>{$('masterVolumeValue').value=Math.round(settings.masterVolume*100)+'%';};
 volume.value=Math.round(settings.masterVolume*100);showVolume();
 volume.oninput=()=>{settings.masterVolume=Number(volume.value)/100;showVolume();saveInstrument();if(masterGain)masterGain.gain.setTargetAtTime(settings.masterVolume,audioContext.currentTime,.01);};
 $('instrumentSelect').value=settings.instrument;$('instrumentSelect').onchange=()=>{settings.instrument=$('instrumentSelect').value;saveInstrument();schedulePrimeSampler();};
 $('songSelect').value=localStorage.getItem(SONG_KEY)||'';$('songSelect').onchange=()=>configureSong($('songSelect').value,true);
-$('songReset').onclick=()=>{stopGuide(false);songStep=0;updateSongAssist();};$('guidePlay').onclick=toggleGuide;configureSong($('songSelect').value,true);
+$('songReset').onclick=()=>{stopGuide(false);songStep=0;cueClear();updateSongAssist();};$('guidePlay').onclick=toggleGuide;$('cuePlay').onclick=toggleCue;configureSong($('songSelect').value,true);
 $('noteLength').value=String(Math.round(noteLengthScale*100));const updateNoteLength=()=>{noteLengthScale=Number($('noteLength').value)/100;$('noteLengthValue').textContent=`${Math.round(noteLengthScale*100)}%`;localStorage.setItem(NOTE_LENGTH_KEY,String(noteLengthScale));schedulePrimeSampler();};$('noteLength').oninput=updateNoteLength;updateNoteLength();
+{const slider=$('songSpeed'),show=()=>{$('songSpeedValue').textContent=songSpeed.toFixed(2)+L('倍','x');};slider.value=String(Math.round(Math.log2(songSpeed)*100));show();slider.oninput=()=>{songSpeed=Math.max(.2,Math.min(2,Math.pow(2,Number(slider.value)/100)));show();try{localStorage.setItem(SONG_SPEED_KEY,String(songSpeed));}catch(_){}};slider.ondblclick=()=>{slider.value='0';slider.oninput();};}
 $('languageToggle').onclick=()=>{language=language==='ja'?'en':'ja';applyLanguage();};applyLanguage();
 $('displayMode').value=localStorage.getItem(DISPLAY_MODE_KEY)==='camera'?'camera':'panel';$('displayMode').onchange=applyDisplayMode;applyDisplayMode();
 $('heatmapToggle').onclick=toggleHeatmap;updateHeatmapToggle();
@@ -370,6 +502,7 @@ if(document.body.classList.contains('embed')){
     async instrument(value){fire('instrumentSelect',value);},
     async song(value){fire('songSelect',value);},
     async guide(){await toggleGuide();},
+    async cue(){toggleCue();},
     async spot(value){if(value)document.body.dataset.spot=value;else delete document.body.dataset.spot;},
     async camfocus(value){const on=value==='1'||value===true,body=document.body;clearTimeout(window.apanRevealTimer);if(on){body.classList.remove('cam-reveal');body.classList.add('cam-focus');return;}if(body.classList.contains('cam-focus')){body.classList.add('cam-reveal');body.classList.remove('cam-focus');window.apanRevealTimer=setTimeout(()=>body.classList.remove('cam-reveal'),1100);}},
     async volume(value){fire('masterVolume',String(Math.round(Number(value)*100)));},
