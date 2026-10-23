@@ -14,7 +14,7 @@
   let layout = {viewport: {x: 508, y: 246, w: 1387, h: 650}, aspect: 16 / 9};   // camera picture inside the demo page
   let lastFocus = null;
   let lastSpot = null;
-  let lastHitKey = '';
+  let hitTimer = null, hitSlide = -1;
   let focusTimer = null;
   let layerSlide = -1;
   let autoStarted = false;   // the first visit to the demo connects and starts; later visits keep the state as it is
@@ -66,6 +66,23 @@
   function fitAll() { window.Deck.fit(viewport); window.Deck.fit(slideHost); applyScene(sync.state, false); }
 
   /* ---- scenes of the demo slide: the camera picture full screen, a steel pan over it, then the whole demo page ---- */
+  const HIT_EVERY_MS = 2000;   // interval of the repeated shake (E2E slide)
+
+  function strikeCards() {
+    slideHost.querySelectorAll('[data-hit]').forEach(item => {
+      item.classList.remove('hit');
+      void item.offsetWidth;
+      item.classList.add('hit');
+    });
+  }
+
+  function stopHit() {
+    if (hitTimer) clearInterval(hitTimer);
+    hitTimer = null;
+    hitSlide = -1;
+    slideHost.querySelectorAll('[data-hit]').forEach(item => item.classList.remove('hit'));
+  }
+
   const MOVE_MS = 1300;   // duration of the picture's shrink-and-slide
 
   function sceneOf(state, slide) {
@@ -106,15 +123,26 @@
     const focusStep = !slide.demo && slide.steps ? slide.steps[Math.max(0, Math.min(slide.steps.length - 1, state.stepIndex))] : null;
     const focus = focusStep && typeof focusStep.focus === 'number' ? focusStep.focus : -1;
     slideHost.classList.toggle('focusing', focus >= 0);
+    if (!slide.demo && slide.steps) slideHost.dataset.step = String(Math.max(0, Math.min(slide.steps.length - 1, state.stepIndex)));
+    else delete slideHost.dataset.step;
     slideHost.querySelectorAll('[data-focus]').forEach(item => item.classList.toggle('focus-on', Number(item.dataset.focus) === focus));
-    // A step with `hit` shakes the elements marked data-hit, as if they had been struck (once per arrival).
-    const hitKey = focusStep && focusStep.hit ? `${state.index}:${state.stepIndex}` : '';
-    if (hitKey !== lastHitKey) {
-      lastHitKey = hitKey;
-      slideHost.querySelectorAll('[data-hit]').forEach(item => {
-        item.classList.remove('hit');
-        if (hitKey) { void item.offsetWidth; item.classList.add('hit'); }
-      });
+    // From step `hitFrom` on, the elements marked data-hit shake as if struck, again every HIT_EVERY_MS,
+    // and keep doing so while the focus moves on.
+    const repeatHit = !slide.demo && typeof slide.hitFrom === 'number' && state.stepIndex >= slide.hitFrom;
+    if (repeatHit && (!hitTimer || hitSlide !== state.index)) {
+      if (hitTimer) clearInterval(hitTimer);
+      hitSlide = state.index;
+      strikeCards();
+      hitTimer = setInterval(() => {
+        const now = sync.state, current = SLIDES[now.index];
+        if (now.index !== hitSlide || !current || typeof current.hitFrom !== 'number' || now.stepIndex < current.hitFrom) {
+          stopHit();
+          return;
+        }
+        strikeCards();
+      }, HIT_EVERY_MS);
+    } else if (!repeatHit && hitTimer) {
+      stopHit();
     }
     // The card being explained is raised and the others are dimmed (embedded page).
     const spot = slide.demo && !zoomed && slide.steps ? (slide.steps[Math.max(0, Math.min(slide.steps.length - 1, state.stepIndex))].spot || '') : '';
@@ -175,9 +203,8 @@
       doneCommand = command.id;
       runDemoCommand(state, command);
     }
-    // The step that asks for it connects and starts playing by itself (first time only).
-    const step = slide.steps ? slide.steps[Math.max(0, Math.min(slide.steps.length - 1, state.stepIndex))] : null;
-    if (slide.demo && state.autoDemo && !autoStarted && state.demoMode !== 'video' && step && (step.run || []).includes('start')) {
+    // Entering the demo slide connects and starts playing by itself (first time only), so the first strike sounds at once.
+    if (slide.demo && state.autoDemo && !autoStarted && state.demoMode !== 'video') {
       autoStarted = true;
       sendDemoCommand(state, 'start', '');
     }
@@ -187,6 +214,10 @@
     const index = Math.max(0, Math.min(SLIDES.length - 1, state.index));
     const slide = SLIDES[index];
     if (index !== shownIndex) {
+      // The state of the previous slide (data-step, focusing) must not reach the new slide, or its elements flash
+      // in that state and then fade out.
+      delete slideHost.dataset.step;
+      slideHost.classList.remove('focusing');
       window.Deck.mount(slideHost, slide, {preview: false});
       fitAll();
       shownIndex = index;

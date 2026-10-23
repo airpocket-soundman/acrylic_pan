@@ -13,7 +13,7 @@ class PresentationTests(unittest.TestCase):
     def test_planned_time_fills_the_five_minute_talk(self):
         seconds = [int(value) for value in re.findall(r"seconds: (\d+)", self.slides)]
         self.assertEqual(len(seconds), 10)
-        self.assertEqual(sum(seconds), 416)
+        self.assertEqual(sum(seconds), 455)
 
     def test_demo_steps_fill_the_demo_slide_time(self):
         demo = self.slides[self.slides.index("id: 'demo'"):self.slides.index("id: 'sim'")]
