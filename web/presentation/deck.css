@@ -209,3 +209,10 @@ h1,h2,h3,p{margin:0}
 /* Accuracy slide: the two design features appear one at a time (data-step on the slide host) */
 .acc-r1,.acc-r2{opacity:0;transform:translateY(24px);transition:opacity .7s ease,transform .7s ease}
 [data-step="1"] .acc-r1,[data-step="2"] .acc-r1,[data-step="2"] .acc-r2{opacity:1;transform:none}
+/* ODL modes slide: two cards, each with the strike points of the mode */
+.g-corner.dim{opacity:.18}
+.odl-modes .mode-card{display:flex;flex-direction:column;align-items:center;padding:28px 40px}
+.odl-modes .mode-fig{width:100%}.odl-modes .mode-fig .grid-svg{width:100%;height:auto;max-height:310px;display:block}
+.odl-modes .mode-count{margin-top:12px;font-size:42px;font-weight:700}.odl-modes .mode-count b{font-size:72px;color:var(--amber);margin-right:8px}
+.odl-modes .teal-card .mode-count b{color:var(--teal)}
+.odl-modes .mode-note{margin-top:6px;font-size:30px;color:#c9d6e0;text-align:center;line-height:1.4}

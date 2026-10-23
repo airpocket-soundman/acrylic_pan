@@ -8,7 +8,7 @@
     `<header class="s-head"><span class="kicker">${kicker}</span><h2>${title}</h2></header>`;
 
   /* 60 measurement points: 12 area centres and 48 points 25 mm from the centre (4 x 3 areas, 400 x 300 mm). */
-  function gridSvg() {
+  function gridSvg(centresOnly = false) {
     const W = 400, H = 300, pad = 14;
     const parts = [`<svg viewBox="${-pad} ${-pad} ${W + pad * 2} ${H + pad * 2}" class="grid-svg" role="img" aria-label="60測定点の配置">`];
     parts.push(`<rect x="0" y="0" width="${W}" height="${H}" rx="4" class="g-board"/>`);
@@ -18,7 +18,7 @@
     for (let r = 0; r < 3; r++) for (let c = 0; c < 4; c++) {
       const cx = c * 100 + 50, cy = r * 100 + 50;
       for (const dx of [-25, 25]) for (const dy of [-25, 25])
-        parts.push(`<circle cx="${cx + dx}" cy="${cy + dy}" r="5" class="g-corner"/>`);
+        parts.push(`<circle cx="${cx + dx}" cy="${cy + dy}" r="5" class="g-corner${centresOnly ? ' dim' : ''}"/>`);
       parts.push(`<circle cx="${cx}" cy="${cy}" r="8" class="g-center"/>`);
     }
     parts.push('</svg>');
@@ -301,6 +301,39 @@
             <p class="odl-title">サインペンで叩いた場合(12クラスでの実験)</p>
             ${odlChartSvg()}
           </div>
+        </div>`,
+    },
+    {
+      id: 'odlmodes', title: 'ODLの2つのモード', seconds: 28, scenes: 3,
+      notes: [
+        '(右矢印で、精密モード → 簡易モードの順に、1つずつ前に出る)',
+      ],
+      steps: [
+        {title: '2つのモード', sec: 6,
+         action: '右矢印: 精密モードにフォーカス',
+         say: 'ODLには、二つのモードがあります。'},
+        {title: '精密モード', sec: 10, focus: 0,
+         action: '右矢印: 簡易モードにフォーカス',
+         say: '精密モードは、60点すべてを叩いて学習します。位置推定と、確率分布そのものを、現場に合わせられます。'},
+        {title: '簡易モード', sec: 12, focus: 1,
+         action: '右矢印: 次のスライドへ',
+         say: '簡易モードは、12エリアの中心の、12点を叩くだけです。少ない打数で、12エリアの演奏に、現場を合わせられます。'},
+      ],
+      render: () => `
+        ${head('TWO CALIBRATION MODES', 'ODLは、2つのモードで現場に合わせられる')}
+        <div class="two-col odl-modes">
+          <section class="card amber-card mode-card" data-focus="0">
+            <h3>精密モード</h3>
+            <div class="mode-fig">${gridSvg()}</div>
+            <p class="mode-count"><b>60点</b>をすべて叩く</p>
+            <p class="mode-note">12中心 + 48四隅(60打)。位置推定と確率分布そのものを現場に合わせる</p>
+          </section>
+          <section class="card teal-card mode-card" data-focus="1">
+            <h3>簡易モード</h3>
+            <div class="mode-fig">${gridSvg(true)}</div>
+            <p class="mode-count"><b>12点</b>だけでも対応可能</p>
+            <p class="mode-note">各エリアの中心を1打ずつ(12打)。少ない打数で12エリアの演奏を現場に合わせる</p>
+          </section>
         </div>`,
     },
     {
