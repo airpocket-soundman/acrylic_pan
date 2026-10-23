@@ -76,25 +76,6 @@ h1,h2,h3,p{margin:0}
 .banner{margin-top:56px;padding:40px 44px;border:3px solid var(--teal);border-radius:24px;background:#0f3a35;text-align:center;font-size:52px;font-weight:800;line-height:1.5}
 .banner small{display:block;margin-top:10px;font-size:32px;font-weight:500;color:#cfe6e2}
 
-/* ---- 7 heads ---- */
-.heads-layout{display:grid;grid-template-columns:1fr;gap:20px}
-.heads-svg{width:100%;height:auto;max-height:560px}
-.h-box rect{fill:var(--panel);stroke:var(--line);stroke-width:3}
-.h-box.fixed rect{stroke:var(--teal)}.h-box.out rect{stroke:var(--amber)}
-.h-t{fill:var(--text);font-size:44px;font-weight:800;text-anchor:middle}
-.h-s{fill:var(--muted);font-size:30px;text-anchor:middle}
-.h-head rect{fill:#2b2410;stroke:var(--amber);stroke-width:3}
-.h-ht{fill:var(--amber);font-size:34px;font-weight:800;text-anchor:middle}
-.h-hs{fill:#d9c9a0;font-size:26px;text-anchor:middle}
-.h-arrow{stroke:var(--muted);stroke-width:4}
-.h-arrow.short{stroke:var(--amber);opacity:.8}
-.h-head.res rect{fill:var(--panel2);stroke:var(--text)}
-.h-group{fill:#f1b44c14;stroke:var(--amber);stroke-width:4}
-.h-box.out text{fill:var(--text)}
-.h-box.out .h-s{fill:var(--muted)}
-.h-head.res .h-ht{fill:var(--text)}
-.h-head.res .h-hs{fill:var(--muted)}
-.h-fan{stroke:var(--teal);stroke-width:3;opacity:.7}.h-fan.out{stroke:var(--amber)}
 .points{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:10px}
 .points li{font-size:36px;color:#c9d6e0;padding-left:34px;position:relative;line-height:1.35}
 .points li:before{content:"";position:absolute;left:0;top:.55em;width:16px;height:16px;border-radius:50%;background:var(--teal)}
@@ -194,28 +175,6 @@ h1,h2,h3,p{margin:0}
 [data-step="2"] .elm-chart .r2.c-acc text,[data-step="3"] .elm-chart .r2.c-acc text,[data-step="3"] .elm-chart .r3.c-acc text,
 [data-step="3"] .elm-chart .r3.c-note{opacity:1}
 [data-step="2"] .elm-chart .seg2,[data-step="3"] .elm-chart .seg2,[data-step="3"] .elm-chart .seg3{stroke-dashoffset:0}
-/* Heads slide: a single head in a straight line first; the right arrow slides it up and adds the other four. */
-.hd-r1 rect,.hd-r1 text,.hd-r1 path{transition:x .9s cubic-bezier(.4,0,.2,1),y .9s cubic-bezier(.4,0,.2,1),width .9s cubic-bezier(.4,0,.2,1),height .9s cubic-bezier(.4,0,.2,1),rx .9s ease,transform .9s cubic-bezier(.4,0,.2,1),font-size .9s ease,d .9s cubic-bezier(.4,0,.2,1)}
-.hd-fan1{d:path("M620 280 L680 280");transition:d .9s cubic-bezier(.4,0,.2,1)}
-.hd-b{x:680px;y:150px;width:190px;height:260px;rx:18px}
-.hd-o{x:930px;y:150px;width:190px;height:260px;rx:18px}
-.hd-bt,.hd-ot{font-size:44px}.hd-bs,.hd-os{font-size:30px}
-.hd-bt{transform:translate(0,206px)}.hd-bs{transform:translate(0,220px)}
-.hd-ot{transform:translate(-5px,206px)}.hd-os{transform:translate(-5px,220px)}
-.hd-arr1{d:path("M870 280 L930 280")}
-[data-step="1"] .hd-fan1{d:path("M620 280 L690 60")}
-[data-step="1"] .hd-b{x:690px;y:20px;width:170px;height:80px;rx:14px}
-[data-step="1"] .hd-o{x:900px;y:20px;width:260px;height:80px;rx:14px}
-[data-step="1"] .hd-bt,[data-step="1"] .hd-ot{transform:none;font-size:34px}
-[data-step="1"] .hd-bs,[data-step="1"] .hd-os{transform:none;font-size:26px}
-[data-step="1"] .hd-arr1{d:path("M860 60 L900 60")}
-.hd-row,.hd-frame,.hd-label{opacity:0;transition:opacity .6s ease}
-[data-step="1"] .hd-r2{opacity:1;transition-delay:1.1s}
-[data-step="1"] .hd-r3{opacity:1;transition-delay:1.7s}
-[data-step="1"] .hd-r4{opacity:1;transition-delay:2.3s}
-[data-step="1"] .hd-r5{opacity:1;transition-delay:2.9s}
-[data-step="1"] .hd-frame{opacity:1;transition-delay:3.6s}
-[data-step="1"] .hd-label{opacity:1;transition-delay:4.2s}
 /* ELM slide: the model names are large */
 .card.elm-card{padding:36px 32px}
 .card.elm-card .elm-name{font-size:60px;font-weight:800;line-height:1.15;margin-bottom:24px;color:var(--text)}

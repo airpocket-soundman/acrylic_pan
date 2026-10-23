@@ -25,42 +25,6 @@
     return parts.join('');
   }
 
-  /* One 128-32 network with five switchable 12-output heads.  Step 0 shows a single head in a straight line;
-     step 1 slides it to the top and adds the other four, then the frame and the label of 60 outputs. */
-  function headsSvg() {
-    const rows = [];
-    const x0 = 80, xB = 690, xR = 900, xF = 1250;
-    rows.push('<svg viewBox="0 -14 1560 574" class="heads-svg" role="img" aria-label="12出力のβを5つ切り替えて、60出力相当にする図">');
-    rows.push(`<g class="h-box"><rect x="${x0 - 60}" y="150" width="190" height="260" rx="18"/><text x="${x0 + 35}" y="262" class="h-t">入力</text><text x="${x0 + 35}" y="306" class="h-s">128点の波形</text></g>`);
-    rows.push(`<line x1="${x0 + 130}" y1="280" x2="${x0 + 250}" y2="280" class="h-arrow"/>`);
-    rows.push(`<g class="h-box fixed"><rect x="${x0 + 250}" y="130" width="290" height="300" rx="18"/><text x="${x0 + 395}" y="252" class="h-t">隠れ層 32</text><text x="${x0 + 395}" y="298" class="h-s">α は固定</text><text x="${x0 + 395}" y="336" class="h-s">(5回とも共通)</text></g>`);
-    // the frame goes behind the five heads
-    rows.push(`<rect x="${xR - 26}" y="-4" width="312" height="544" rx="26" class="h-group hd-frame"/>`);
-    for (let i = 0; i < 5; i++) {
-      const y = 20 + i * 104;
-      const hidden = x0 + 540;
-      const fan = i === 0
-        ? `<path d="M${hidden} 280 L${xB} ${y + 40}" class="h-fan hd-fan1"/>`
-        : `<line x1="${hidden}" y1="280" x2="${xB}" y2="${y + 40}" class="h-fan"/>`;
-      if (i === 0) {
-        // the first head starts as large as the input box and shrinks while it slides to the top (see deck.css)
-        rows.push(`${fan}<g class="hd-r1">`
-          + `<g class="h-head"><rect x="${xB}" y="${y}" width="170" height="80" rx="14" class="hd-b"/><text x="${xB + 85}" y="${y + 36}" class="h-ht hd-bt">β1</text><text x="${xB + 85}" y="${y + 66}" class="h-hs hd-bs">出力側の重み</text></g>`
-          + `<path d="M${xB + 170} ${y + 40} L${xR} ${y + 40}" class="h-arrow short hd-arr1"/>`
-          + `<g class="h-head res"><rect x="${xR}" y="${y}" width="260" height="80" rx="14" class="hd-o"/><text x="${xR + 130}" y="${y + 36}" class="h-ht hd-ot">12出力</text><text x="${xR + 130}" y="${y + 66}" class="h-hs hd-os">位置 1〜12</text></g>`
-          + `</g>`);
-        continue;
-      }
-      const body = `<g class="h-head"><rect x="${xB}" y="${y}" width="170" height="80" rx="14"/><text x="${xB + 85}" y="${y + 36}" class="h-ht">β${i + 1}</text><text x="${xB + 85}" y="${y + 66}" class="h-hs">出力側の重み</text></g>`
-        + `<line x1="${xB + 170}" y1="${y + 40}" x2="${xR}" y2="${y + 40}" class="h-arrow short"/>`
-        + `<g class="h-head res"><rect x="${xR}" y="${y}" width="260" height="80" rx="14"/><text x="${xR + 130}" y="${y + 36}" class="h-ht">12出力</text><text x="${xR + 130}" y="${y + 66}" class="h-hs">位置 ${i * 12 + 1}〜${i * 12 + 12}</text></g>`;
-      rows.push(`<g class="hd-row hd-r${i + 1}">${fan}${body}</g>`);
-    }
-    rows.push(`<g class="h-box out hd-label"><text x="${xF + 70}" y="236" class="h-t">60出力相当</text><text x="${xF + 70}" y="290" class="h-s">12出力 × 5</text><text x="${xF + 70}" y="336" class="h-s">60位置の確率</text></g>`);
-    rows.push('</svg>');
-    return rows.join('');
-  }
-
   /* Overlay chart of the ELM slide: three models, one after another (steps 1-3). Parameters and sizes are shown
      relative to the first model (= 100), the accuracy as it is, so the first two fall while the third stays up. */
   function elmChartSvg() {
@@ -286,7 +250,7 @@
          say: '(説明を続けながら、②のモデルを出す)'},
         {title: 'グラフ(③)', sec: 6,
          action: '右矢印: 次のスライドへ',
-         say: '(説明を続けながら、③のモデルを出す。サイズは右肩下がりでも、正解率はほとんど変わらない)'},
+         say: '(説明を続けながら、③のモデルを出す。サイズは右肩下がりでも、正解率はほとんど変わらない。この60出力を、ボード上で1回の推論で出している)'},
       ],
       render: () => `
         ${head('WHY ELM', 'ELMで学習するのは、出力側のβだけ')}
@@ -313,54 +277,30 @@
         <div class="elm-overlay"><div class="elm-panel">${elmChartSvg()}</div></div>`,
     },
     {
-      id: 'odl', title: '12クラス版のODL', seconds: 27, scenes: 2,
+      id: 'odl', title: '60クラスのODL', seconds: 40, scenes: 2,
       notes: [
-        '(右矢印で、学習前の棒に続けて、ODL後の棒がアニメーションで表示される)',
+        '(右矢印で、学習前の棒に続けて、ODL後の棒がアニメーションで表示される。棒は、12クラスで行った実験の結果)',
       ],
       steps: [
-        {title: 'ODLとは', sec: 22,
+        {title: 'ODLとは', sec: 34,
          action: '右矢印: ODL後の棒を表示する',
-         say: 'このパラメータ数が少ないという利点は、SolistAIのもう一つの売りである、ODLにも効果的です。ODLは、簡単に言うと、デバイス上で実行できる追加学習です。SolistPanでも、この仕組みを使って、叩き方とか、マレットの変更による精度低下を、大幅に改善できます。例えば、マレットの代わりにサインペンでたたくと、認識精度が60%程度に落ちましたが、'},
-        {title: 'ODL後', sec: 5,
+         say: 'このパラメータ数が少ないという利点は、SolistAIのもう一つの売りである、ODLにも効果的です。ODLは、簡単に言うと、デバイス上で実行できる追加学習です。SolistPanでは、60クラスのモデルのまま、この仕組みを使って、叩き方とか、マレットの変更による精度低下を、現場で補正できます。方式は二つあって、12エリアの中心を12回叩くだけの高速校正と、60点を順に叩く精密校正です。効果は、先に12クラスで確かめていて、マレットの代わりにサインペンでたたくと、認識精度が60%程度に落ちましたが、'},
+        {title: 'ODL後', sec: 6,
          action: '右矢印: 次のスライドへ',
          say: 'ODLで95%まで回復しました。'},
       ],
       render: () => `
-        ${head('ON-DEVICE LEARNING', '12クラス版は、現場でODLにより補正できる')}
+        ${head('ON-DEVICE LEARNING', '60クラスのまま、現場でODLにより補正できる')}
         <div class="odl-layout">
           <ol class="odl-steps">
-            <li><b>確認</b><span>各エリア1打で、いまの精度を測る</span></li>
-            <li><b>学習</b><span>各エリア5打 × 12 = 60打をボード上のOS-ELMで学習</span></li>
-            <li><b>確認 → 保存 / 破棄</b><span>正解数が下がらなければFRAMへ保存。下がれば元へ戻す</span></li>
+            <li><b>高速校正</b><span>12エリアの中心を1打ずつ(12打)。中心と、同じエリアの周辺4点をまとめて強める</span></li>
+            <li><b>精密校正</b><span>60点を順に1打ずつ(60打)。位置推定と確率分布そのものを現場に合わせる</span></li>
+            <li><b>保存 / 破棄</b><span>保存すると、校正後のβをFRAMへ1件だけ残す。破棄すると、元のβへ戻る</span></li>
           </ol>
           <div class="odl-bars">
-            <p class="odl-title">サインペンで叩いた場合</p>
+            <p class="odl-title">サインペンで叩いた場合(12クラスでの実験)</p>
             ${odlChartSvg()}
           </div>
-        </div>`,
-    },
-    {
-      id: 'heads', title: '12ヘッド×5=60クラス', seconds: 55, scenes: 2,
-      notes: [
-        '(右矢印で、12出力のヘッド1つの図から、5つ束ねた図へ変わる)',
-      ],
-      steps: [
-        {title: '12出力のヘッド', sec: 40,
-         action: '右矢印: β1の12出力が上へ移り、β2〜β5が順に加わる',
-         say: 'あと、精度を上げる工夫として、60クラス分類問題に解像度を上げて推論させています。用途としては、12クラス分類で十分なのですが、もう少し欲張って、確率分布表示したいなとか、座標回帰したいなというのが出てきまして、完全な座標回帰は、さすがに無理なので、60クラス分類を実装して、出力の表現を上げようというのをやりました。先ほど出てきたELMは、軽くて速いモデルですが、SolistAI上では、12クラスまでしか扱えないという制限がありました。'},
-        {title: '5つ束ねる', sec: 15,
-         action: '右矢印: 次のスライドへ',
-         say: 'そこで、12ヘッドのモデルを5回回すことで、60クラス分類と同等の計算結果を得て、なんちゃって座標回帰とか、なんちゃって確率分布ヒートマップ表示を、実装できています。'},
-      ],
-      render: () => `
-        ${head('ON-DEVICE MODEL', '12ヘッドを5つ束ねて、60クラスにする')}
-        <div class="heads-layout">
-          ${headsSvg()}
-          <ul class="points">
-            <li>実機で動作確認済みの<b>12出力</b>を、βだけ切り替えて<b>5回</b>実行</li>
-            <li>入力128 → 隠れ32 → 出力60(<b>128-32-60</b>、bfloat16)</li>
-            <li>MCUでsoftmax → <b>60位置の確率</b>をPCへ送信</li>
-          </ul>
         </div>`,
     },
     {
@@ -384,11 +324,11 @@
         <div class="acc-layout">
           <div class="acc-map">${gridSvg()}
             <p class="legend"><i class="lg center"></i>エリア中心 12点 <i class="lg corner"></i>中心から±25 mmの4点 × 12 = 48点</p>
-            <p class="strong">60点(12中心+48四隅)、5セッション、計 <b>3,600打</b></p>
+            <p class="strong">60点(12中心+48四隅)、6セッション、計 <b>4,680打</b></p>
           </div>
           <div class="acc-cards">
             <p class="sub">実機搭載モデル(Solist-AI 128-32-60)</p>
-            <div class="stat"><b>97.9%</b><span>60測定点の正解率(Top-1)</span></div>
+            <div class="stat"><b>98.6%</b><span>60測定点の正解率(Top-1)</span></div>
             <p class="sub tip acc-r1">精度を上げる工夫</p>
             <div class="stat txt acc-r1"><b>アシンメトリー構造</b><span>対称位置の信号分離性向上</span></div>
             <div class="stat txt acc-r2"><b>制振ダンパー追加</b><span>連打時の信号分離性向上</span></div>
