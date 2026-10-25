@@ -25,7 +25,7 @@ INPUT_FEATURE_COUNT = 127
 ENGINE_INPUT_COUNT = 128
 ENGINE_HIDDEN_COUNT = 32
 POSITION_COUNT = 60
-ENGINE_OUTPUT_COUNT = 12
+ENGINE_OUTPUT_COUNT = 60
 DISTILLATION_WEIGHT = 0.25
 SOFTMAX_TEMPERATURE = 0.05
 SEED = 1
@@ -134,9 +134,9 @@ def write_header(path: Path, scaler: StandardScaler, alpha: np.ndarray,
 #define APAN_POSITION_FEATURE_COUNT 127U
 #define APAN_POSITION_INPUT_SIZE 128U
 #define APAN_POSITION_HIDDEN_SIZE 32U
-#define APAN_POSITION_ENGINE_OUTPUT_SIZE 12U
+#define APAN_POSITION_ENGINE_OUTPUT_SIZE 60U
 #define APAN_POSITION_OUTPUT_SIZE 60U
-#define APAN_POSITION_HEAD_COUNT 5U
+#define APAN_POSITION_HEAD_COUNT 1U
 #define APAN_POSITION_ACTIVATION 1
 #define APAN_POSITION_LOSS 1
 #define APAN_POSITION_SEED 1U
@@ -148,11 +148,10 @@ def write_header(path: Path, scaler: StandardScaler, alpha: np.ndarray,
     content += _float_array("apan_position_feature_scale", scaler.scale_)
     content += "static const uint16_t apan_position_time_indices[127] = {\n    "
     content += ", ".join(f"{int(v)}U" for v in time_sample_indices()[:127]) + "\n};\n"
-    beta_heads = np.concatenate([
-        beta[:, start:start + ENGINE_OUTPUT_COUNT].reshape(-1)
-        for start in range(0, POSITION_COUNT, ENGINE_OUTPUT_COUNT)
-    ])
-    content += _bf16_array("apan_position_beta", beta_heads)
+    # Kept for the CPU OS-ELM fallback and host-side verification.  Production
+    # inference still uses the identical seed-generated Alpha inside AxlCORE.
+    content += _bf16_array("apan_position_alpha", alpha)
+    content += _bf16_array("apan_position_beta", beta)
     content += _bf16_array("apan_position_golden_inputs", golden_inputs)
     content += _bf16_array("apan_position_golden_logits", golden_logits)
     content += "static const uint16_t apan_position_support_xy_mm[60][2] = {\n"

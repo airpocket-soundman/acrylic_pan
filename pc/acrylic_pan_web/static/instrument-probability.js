@@ -76,6 +76,7 @@ let pendingHeatmapPosition = null;
 let heatmapTimer = null;
 let lastRenderedPosition = null;
 let calibrationPoints = loadCalibration();
+let virtualGrid = false;   // kiosk without a camera: a fixed, tidy grid instead of a fitted one
 let rowDividerRatios = loadRowDividerRatios();
 let calibrating = false;
 let dividerCalibrationStep = 0;
@@ -125,7 +126,7 @@ function applyLanguage(){
   const tabs=[['/collector.html','学習データ採取','Data Collection'],['/','推論結果','Inference'],['/position.html','位置推定','Position'],['/instrument.html','クラス演奏','Class Instrument'],['/instrument-probability.html','確率演奏','Probability Instrument']];document.querySelector('.app-tabs').setAttribute('aria-label',L('動作モード','Operating mode'));tabs.forEach(([href,ja,en])=>{const link=document.querySelector('.app-tabs a[href="'+href+'"]');if(link)link.textContent=L(ja,en);});
   [['panelProfileLabel','板仕様','Panel'],['portLabel','COMポート','COM port'],['sourceLabel','確率推論元','Probability source'],['displayLabel','表示','Display'],['masterVolumeLabel','音量','Volume'],['instrumentLabel','音色','Instrument'],['cameraLabel','カメラ','Camera'],['songLabel','演奏補助','Performance guide'],['noteLengthLabel','音の長さ','Note length'],['songSpeedLabel','曲の速さ','Song speed']].forEach(args=>setLabelText(args[0],L(args[1],args[2])));
   [['refresh','更新','Refresh'],['connect','接続','Connect'],['disconnect','切断','Disconnect'],['performanceStart','演奏開始','Start performance'],['performanceStop','演奏停止','Stop performance'],['probabilityDemo','表示デモ','Display demo'],['cameraStart','カメラ開始','Start camera'],['cameraStop','停止','Stop'],['calibrationStart','8点フィット','8-point fit'],['calibrationClear','フィット消去','Clear fit'],['songReset','最初から','Restart']].forEach(([id,ja,en])=>$(id).textContent=L(ja,en));
-  setOptionText('positionSource','device',L('デバイス（Solist-AI）','Device (Solist-AI)'));setOptionText('positionSource','device12',L('デバイス（12クラス・ODL）','Device (12 classes, ODL)'));setOptionText('positionSource','pc',L('PC（高精度モデル）','PC (high-accuracy model)'));setOptionText('displayMode','panel',L('パネル表示','Panel'));setOptionText('displayMode','camera',L('カメラ重畳','Camera overlay'));
+  setOptionText('positionSource','device',L('デバイス（Solist-AI・60クラス）','Device (Solist-AI, 60 classes)'));setOptionText('positionSource','pc',L('PC（高精度モデル）','PC (high-accuracy model)'));setOptionText('displayMode','panel',L('パネル表示','Panel'));setOptionText('displayMode','camera',L('カメラ重畳','Camera overlay'));
   [['steel_drum','スチールドラム','Steel drum'],['piano','ピアノ','Piano'],['harpsichord','チェンバロ','Harpsichord'],['guitar','ギター','Guitar'],['drums','ドラム','Drums']].forEach(([value,ja,en])=>setOptionText('instrumentSelect',value,L(ja,en)));
   $('heatmapTitle').textContent=L('座標確率ヒートマップ','Position Probability Heatmap');$('areaProbabilityTitle').textContent=L('12エリア確率','12-Area Probability');$('cameraTitle').textContent=L('USBカメラ','USB Camera');$('positionPanel').setAttribute('aria-label',L('400 × 300 mm アクリル板上の条件付き座標確率分布','Conditional position probability on a 400 × 300 mm acrylic panel'));document.querySelector('.sensor-marker').setAttribute('aria-label',L('加速度センサ位置','Accelerometer position'));document.querySelector('.clamp-marker').setAttribute('aria-label',L('固定領域','Clamped area'));document.querySelector('.clamp-marker span').textContent=L('固定','clamp');$('usbCamera').setAttribute('aria-label',L('USBカメラ映像','USB camera video'));$('cameraHeatmapOverlay').setAttribute('aria-label',L('カメラ映像上のヒートマップ位置合わせ','Heatmap alignment over camera video'));$('noteLength').setAttribute('aria-label',L('音の長さ','Note length'));
   populateSongOptions();localizePanelProfile();updateSongAssist();updateGuideButton();updateHeatmapToggle();updatePanelAreaToggle();renderPerformanceStatus();setCameraState(cameraStateKey);$('cameraPlaceholder').textContent=L(...cameraPlaceholderText);if(calibrationStatusText)showCalibrationStatus(...calibrationStatusText);if(latestStatus)updateControls(latestStatus);if(lastRenderedPosition)renderPosition(lastRenderedPosition,false);localStorage.setItem(LANGUAGE_KEY,language);
@@ -139,7 +140,7 @@ async function api(path,body){
   if(!response.ok){const error=new Error(data.error||`${response.status} ${response.statusText}`);error.status=response.status;throw error;}
   return data;
 }
-const modeForSource=()=>{const source=$('positionSource').value;return source==='device'?'device_position':source==='device12'?'instrument':'inference';};
+const modeForSource=()=>$('positionSource').value==='device'?'device_position':'inference';
 const sleep=milliseconds=>new Promise(resolve=>setTimeout(resolve,milliseconds));
 
 function noteFrequency(note){
@@ -334,7 +335,7 @@ function updateControls(data){
   latestStatus=data;
   const connected=Boolean(data.connected),running=Boolean(data.inference_active),audible=running&&performanceEnabled;
   $('connection').textContent=connected?L('接続中 ','Connected ')+data.port:L('未接続','Disconnected');$('connection').classList.toggle('online',connected);
-  $('firmwareMode').textContent=audible?L('確率演奏中','Probability performance'):(data.device_mode==='instrument'?L('デバイス12クラス（ODL）','Device 12 classes (ODL)'):data.device_mode==='device_position'?L('デバイス確率モード','Device probability mode'):(data.device_mode==='inference'?L('PC確率モード','PC probability mode'):L('モード不明','Unknown mode')));
+  $('firmwareMode').textContent=audible?L('確率演奏中','Probability performance'):(data.device_mode==='instrument'?L('デバイス60位置（ODL）','Device 60 positions (ODL)'):data.device_mode==='device_position'?L('デバイス確率モード','Device probability mode'):(data.device_mode==='inference'?L('PC確率モード','PC probability mode'):L('モード不明','Unknown mode')));
   $('firmwareMode').classList.toggle('online',audible);$('port').disabled=connected;
   setButton('connect',connected,connected);setButton('disconnect',!connected);setButton('performanceStart',!connected||audible,audible);setButton('performanceStop',!connected||!running);
 }
@@ -405,7 +406,7 @@ function showCalibrationStatus(ja='',en=''){calibrationStatusText=ja?[ja,en||ja]
 function lerpPoint(a,b,t){return [a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t];}
 function mappedSideRatio(v,side){const stops=[0,rowDividerRatios[0][side],rowDividerRatios[1][side],1],scaled=Math.max(0,Math.min(1,v))*3,index=Math.min(2,Math.floor(scaled)),fraction=scaled-index;return stops[index]+(stops[index+1]-stops[index])*fraction;}
 function dividerHandlePoint(divider,side){const start=side===0?calibrationPoints[0]:calibrationPoints[1],end=side===0?calibrationPoints[3]:calibrationPoints[2];return lerpPoint(start,end,rowDividerRatios[divider][side]);}
-function calibrationHandles(){if(calibrationPoints.length!==4)return calibrationPoints.map((point,index)=>({point,index,label:String(index+1),kind:'corner'}));return [...calibrationPoints.map((point,index)=>({point,index,label:String(index+1),kind:'corner'})),{point:dividerHandlePoint(0,0),index:4,label:'L1',kind:'divider'},{point:dividerHandlePoint(0,1),index:5,label:'R1',kind:'divider'},{point:dividerHandlePoint(1,0),index:6,label:'L2',kind:'divider'},{point:dividerHandlePoint(1,1),index:7,label:'R2',kind:'divider'}];}
+function calibrationHandles(){if(virtualGrid)return [];if(calibrationPoints.length!==4)return calibrationPoints.map((point,index)=>({point,index,label:String(index+1),kind:'corner'}));return [...calibrationPoints.map((point,index)=>({point,index,label:String(index+1),kind:'corner'})),{point:dividerHandlePoint(0,0),index:4,label:'L1',kind:'divider'},{point:dividerHandlePoint(0,1),index:5,label:'R1',kind:'divider'},{point:dividerHandlePoint(1,0),index:6,label:'L2',kind:'divider'},{point:dividerHandlePoint(1,1),index:7,label:'R2',kind:'divider'}];}
 function projectSideRatio(point,side){const start=side===0?calibrationPoints[0]:calibrationPoints[1],end=side===0?calibrationPoints[3]:calibrationPoints[2],dx=end[0]-start[0],dy=end[1]-start[1],lengthSquared=dx*dx+dy*dy;return lengthSquared>1e-8?Math.max(0,Math.min(1,((point[0]-start[0])*dx+(point[1]-start[1])*dy)/lengthSquared)):.5;}
 function setDividerHandle(handleIndex,point){const divider=handleIndex<6?0:1,side=handleIndex%2,other=rowDividerRatios[1-divider][side],minimumGap=.05,ratio=projectSideRatio(point,side);rowDividerRatios[divider][side]=divider===0?Math.max(.03,Math.min(other-minimumGap,ratio)):Math.min(.97,Math.max(other+minimumGap,ratio));}
 function nextCalibrationPrompt(){const namesJa=['左上','右上','右下','左下','左側の上段境界','右側の上段境界','左側の下段境界','右側の下段境界'],namesEn=['top-left corner','top-right corner','bottom-right corner','bottom-left corner','upper divider on the left edge','upper divider on the right edge','lower divider on the left edge','lower divider on the right edge'],index=calibrationPoints.length<4?calibrationPoints.length:4+dividerCalibrationStep;showCalibrationStatus(namesJa[index]+'をクリックしてください（'+(index+1)+'/8）','Click the '+namesEn[index]+' ('+(index+1)+'/8).');}
@@ -430,7 +431,7 @@ function renderPosition(position,play=false){
 function flushPendingHeatmap(){
   heatmapTimer=null;if(!pendingHeatmapPosition)return;const position=pendingHeatmapPosition;pendingHeatmapPosition=null;renderPosition(position,false);lastHeatmapRenderedAt=performance.now();
 }
-/* 12-class mode: the board answers with the class only (no probability map); the area sounds and is highlighted. */
+/* Device instrument mode returns the area selected from the 60-position model. */
 function playClass12(result){
   const area=Number(result.predicted_class),score=Math.max(0,Math.min(1,Math.max(...result.outputs.map(Number))));
   if(!(area>=0&&area<activePanel.class_count))return;
@@ -457,7 +458,7 @@ function cameraError(error){if(error?.name==='NotAllowedError')return L('カメ�
 function releaseCamera(){if(cameraStream)cameraStream.getTracks().forEach(track=>track.stop());cameraStream=null;$('usbCamera').srcObject=null;$('cameraPlaceholder').hidden=false;$('cameraStart').disabled=false;$('cameraStop').disabled=true;$('calibrationStart').disabled=true;$('cameraState').classList.remove('is-running');}
 async function refreshCameras(preferred=''){const devices=(await navigator.mediaDevices?.enumerateDevices?.()||[]).filter(device=>device.kind==='videoinput'),current=preferred||localStorage.getItem(CAMERA_KEY)||'';$('cameraDevice').replaceChildren(...(devices.length?devices.map((device,index)=>new Option(device.label||L('USBカメラ ','USB Camera ')+(index+1),device.deviceId)):[new Option(L('USBカメラが見つかりません','No USB camera found'),'')]));if(devices.some(device=>device.deviceId===current))$('cameraDevice').value=current;$('cameraStart').disabled=!devices.length||Boolean(cameraStream);if(!devices.length)setCameraState('missing');return devices;}
 async function startCamera(){try{releaseCamera();setCameraState('connecting');const selected=$('cameraDevice').value,video={width:{ideal:1280},height:{ideal:720},frameRate:{ideal:30}};if(selected)video.deviceId={exact:selected};cameraStream=await navigator.mediaDevices.getUserMedia({audio:false,video});$('usbCamera').srcObject=cameraStream;await $('usbCamera').play();const id=cameraStream.getVideoTracks()[0]?.getSettings().deviceId||selected;if(id)localStorage.setItem(CAMERA_KEY,id);$('cameraPlaceholder').hidden=true;$('cameraStart').disabled=true;$('cameraStop').disabled=false;$('calibrationStart').disabled=false;setCameraState('running');$('cameraState').classList.add('is-running');await refreshCameras(id);redrawCameraOverlay();}catch(error){releaseCamera();setCameraState('failed');const message=cameraError(error);setCameraPlaceholder(message,message);}}
-async function setupCamera(){try{const devices=await refreshCameras();if(devices.length)setCameraState('waiting');}catch(_){}$('cameraStart').onclick=startCamera;$('cameraStop').onclick=()=>{releaseCamera();setCameraState('stopped');};$('cameraDevice').onchange=()=>{localStorage.setItem(CAMERA_KEY,$('cameraDevice').value);if(cameraStream)startCamera();};$('calibrationStart').onclick=beginCalibration;$('calibrationClear').onclick=clearCalibration;const overlay=$('cameraHeatmapOverlay');overlay.onpointerdown=overlayPointerDown;overlay.onpointermove=overlayPointerMove;overlay.onpointerup=overlayPointerUp;overlay.onpointercancel=overlayPointerUp;new ResizeObserver(redrawCameraOverlay).observe(document.querySelector('.camera-viewport'));showCalibrationStatus('','');updateOverlayInteraction();window.addEventListener('pagehide',releaseCamera);}
+async function setupCamera(){try{if(document.body.classList.contains('kiosk')){$('cameraStart').disabled=false;setCameraState('waiting');}else{const devices=await refreshCameras();if(devices.length)setCameraState('waiting');}}catch(_){}$('cameraStart').onclick=startCamera;$('cameraStop').onclick=()=>{releaseCamera();setCameraState('stopped');};$('cameraDevice').onchange=()=>{localStorage.setItem(CAMERA_KEY,$('cameraDevice').value);if(cameraStream)startCamera();};$('calibrationStart').onclick=beginCalibration;$('calibrationClear').onclick=clearCalibration;const overlay=$('cameraHeatmapOverlay');overlay.onpointerdown=overlayPointerDown;overlay.onpointermove=overlayPointerMove;overlay.onpointerup=overlayPointerUp;overlay.onpointercancel=overlayPointerUp;new ResizeObserver(redrawCameraOverlay).observe(document.querySelector('.camera-viewport'));showCalibrationStatus('','');updateOverlayInteraction();window.addEventListener('pagehide',releaseCamera);}
 
 $('refresh').onclick=()=>ports().catch(error=>$('error').textContent=error.message);
 $('connect').onclick=async()=>{try{await api('/api/connect',{port:$('port').value});const current=await api('/api/status');if(current.panel_profile_id!=='400x300x5')await api('/api/panel',{panel_profile_id:'400x300x5'});await api('/api/device/mode',{mode:modeForSource()});await refreshStatus();}catch(error){$('error').textContent=error.message;}};
@@ -534,4 +535,33 @@ if(document.body.classList.contains('embed')){
     toParent({type:'apan-key',key:event.key});event.preventDefault();
   });
   schedulePrimeSampler();
+}
+
+/* Exhibition kiosk (?kiosk=1): same screen as the presentation (camera area with the grid, no coordinate heat map).
+   The performance starts as soon as the board is connected, also again after the ODL page left the device in
+   calibration mode.  Without a camera the area shows a fixed, tidy grid for the effects; once the camera is on, the
+   grid is fitted by hand as in the demo. */
+if(document.body.classList.contains('kiosk')){
+  let starting=false,gridKey='';
+  $('displayMode').value='camera';applyDisplayMode();
+  document.addEventListener('pointerdown',()=>{ensureAudio().catch(()=>{});},{passive:true});
+  setInterval(async()=>{
+    if(starting||performanceEnabled)return;
+    starting=true;
+    try{const current=await api('/api/status');if(current.connected)await startPerformance();}catch(_){}finally{starting=false;}
+  },1500);
+  const fixedGrid=()=>{
+    if(calibrating)return;
+    if(cameraStream){
+      if(virtualGrid){virtualGrid=false;gridKey='';calibrationPoints=loadCalibration();rowDividerRatios=loadRowDividerRatios();document.body.classList.remove('virtual-grid');updateOverlayInteraction();redrawCameraOverlay();}
+      return;
+    }
+    const rect=$('cameraHeatmapOverlay').getBoundingClientRect(),key=Math.round(rect.width)+'x'+Math.round(rect.height);
+    if(!rect.width||(virtualGrid&&calibrationPoints.length===4&&key===gridKey))return;
+    const aspect=activePanel.width_mm/activePanel.height_mm;let gh=rect.height*.9,gw=gh*aspect;if(gw>rect.width*.94){gw=rect.width*.94;gh=gw/aspect;}
+    const x0=(1-gw/rect.width)/2,y0=(1-gh/rect.height)/2;
+    calibrationPoints=[[x0,y0],[1-x0,y0],[1-x0,1-y0],[x0,1-y0]];rowDividerRatios=[[1/3,1/3],[2/3,2/3]];
+    virtualGrid=true;gridKey=key;document.body.classList.add('virtual-grid');updateOverlayInteraction();redrawCameraOverlay();
+  };
+  setInterval(fixedGrid,300);fixedGrid();
 }

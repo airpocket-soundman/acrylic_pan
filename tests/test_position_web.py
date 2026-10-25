@@ -111,7 +111,7 @@ class PositionWebTests(unittest.TestCase):
         self.assertIn("function toggleGuide", script)
         self.assertIn("function stopGuide", script)
         self.assertIn("source==='live'&&guidePlaying", script)
-        self.assertIn("playArea(currentSongArea(),1,'guide',timing.beats)", script)
+        self.assertIn("playArea(note.area,1,'guide',note.beats)", script)
         self.assertIn("const SONG_GUIDE", script)
         self.assertIn("function guideTiming", script)
         self.assertIn("function validateSongGuides", script)

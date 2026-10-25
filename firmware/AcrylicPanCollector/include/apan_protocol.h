@@ -5,7 +5,7 @@
 #include <stdint.h>
 
 #include "apan_capture.h"
-#include "apan_inference.h"
+#define APAN_AREA_OUTPUT_COUNT (12U)
 
 #define APAN_PROTOCOL_VERSION (1U)
 #define APAN_MESSAGE_HELLO      (0x01U)
@@ -37,17 +37,11 @@
 #define APAN_MODE_CALIBRATION (4U)
 /* CALIBRATION request payload: operation, argument. */
 #define APAN_CALIBRATION_OP_STATUS        (0U)
-#define APAN_CALIBRATION_OP_BEGIN         (1U)
-#define APAN_CALIBRATION_OP_ARM           (2U) /* argument: area 0-11, or 0xFF to check only */
+#define APAN_CALIBRATION_OP_BEGIN         (1U) /* argument: 0 quick, 1 precise */
+#define APAN_CALIBRATION_OP_ARM           (2U) /* quick: area 0-11; precise: point 0-59; 0xFF: check */
 #define APAN_CALIBRATION_OP_COMMIT        (3U)
 #define APAN_CALIBRATION_OP_DISCARD       (4U)
 #define APAN_CALIBRATION_OP_FACTORY_RESET (5U)
-/* Engine-ODL experiment (apan_odl_experiment.h; only in the experiment build). */
-#define APAN_CALIBRATION_OP_EXPERIMENT_BEGIN       (6U)
-#define APAN_CALIBRATION_OP_EXPERIMENT_RUN         (7U) /* argument: hits to learn */
-#define APAN_CALIBRATION_OP_EXPERIMENT_DUMP_ENGINE (8U) /* argument: part */
-#define APAN_CALIBRATION_OP_EXPERIMENT_DUMP_CPU    (9U) /* argument: part */
-#define APAN_CALIBRATION_OP_EXPERIMENT_DUMP_INPUT  (10U) /* the last model input */
 #define APAN_CALIBRATION_CHECK_ONLY       (0xFFU)
 
 typedef struct
@@ -85,7 +79,7 @@ size_t ApanProtocolEncodeEvent(const ApanEvent *event,
 /* One atomic live result: event metadata, class/scores, then 512 raw samples. */
 size_t ApanProtocolEncodeInferenceEvent(const ApanEvent *event,
                                         uint8_t class_id,
-                                        const float outputs[APAN_INFERENCE_OUTPUT_COUNT],
+                                        const float outputs[APAN_AREA_OUTPUT_COUNT],
                                         uint32_t sequence,
                                         uint32_t timestamp_us,
                                         uint8_t *encoded,

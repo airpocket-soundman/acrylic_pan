@@ -4,12 +4,16 @@ from __future__ import annotations
 
 import argparse
 from dataclasses import dataclass, field
+import hmac
+import ipaddress
 import json
 import math
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 import queue
+import secrets
+import struct
 import threading
 import time
 import webbrowser
@@ -19,6 +23,10 @@ from urllib.parse import parse_qs, urlparse
 import numpy as np
 
 from pc.acrylic_pan_web.audio_synth import audio_backend_name, synthesize_note
+from pc.acrylic_pan_web.admin import run_diagnostics, start_system_action
+from pc.acrylic_pan_web.exhibit import (
+    DEFAULT_VIDEO_DIR, AutoConnector, serve_exhibit_static, serve_video, video_list,
+)
 from pc.acrylic_pan_monitor.ai_validation import (
     DEFAULT_GOLDEN_PATH,
     compare_ai_result,
@@ -132,7 +140,7 @@ PANEL_PROFILES: dict[str, PanelProfile] = {
         "400x200x3", "400 × 200 × 3 mm（8クラス）", 400.0, 200.0, 3.0, 4, 2
     ),
     "400x300x5": PanelProfile(
-        "400x300x5", "400 × 300 × 5 mm（12クラス）", 400.0, 300.0, 5.0, 4, 3
+        "400x300x5", "400 × 300 × 5 mm（60位置・12エリア）", 400.0, 300.0, 5.0, 4, 3
     ),
 }
 DEFAULT_PANEL_PROFILE_ID = "400x200x3"
@@ -380,6 +388,9 @@ class AcquisitionController:
         self.event_assembler = EventAssembler(timeout_seconds=2.0)
         self.assembly_retry_required = False
         self._hello_seen = threading.Event()
+        self._probe_lock = threading.Lock()
+        self.last_frame_monotonic: float | None = None
+        self.last_ai_monotonic: float | None = None
         self.calibration: dict[str, Any] = {
             "pending": False, "result_count": 0, "result": None, "error": None, "status": None,
         }
@@ -427,6 +438,77 @@ class AcquisitionController:
         self.link.send(encode_frame(Frame(MessageType.HELLO, sequence)))
         return self._hello_seen.wait(timeout)
 
+    def probe_device(self, timeout: float = 0.8) -> dict[str, Any]:
+        """Run a sequence-matched, non-mutating HELLO/STATUS probe while idle.
+
+        The firmware has a single pending-command slot.  Probing while inference,
+        collection, or calibration is active can race its START re-arm command,
+        so busy operation is reported from cached state without writing to UART.
+        """
+        with self._probe_lock:
+            with self._lock:
+                busy = (
+                    self.inference_active or self.collection.active
+                    or self.calibration.get("pending") or self.device_mode == "calibration"
+                )
+                if not self.link.connected:
+                    return {"active_probe": "disconnected", "ok": False}
+                if busy:
+                    return {"active_probe": "skipped_busy", "ok": None}
+
+            def request(kind: MessageType) -> tuple[dict[str, Any], float]:
+                with self._lock:
+                    sequence = self._command_sequence
+                    self._command_sequence += 1
+                    completed = threading.Event()
+                    response: dict[str, Any] = {}
+                    self._control_waiters[sequence] = (completed, response)
+                started = time.monotonic()
+                try:
+                    self.link.send(encode_frame(Frame(kind, sequence)))
+                except Exception:
+                    # USB may disappear after the connected check but before
+                    # this write.  Do not retain a waiter that can never fire.
+                    with self._lock:
+                        self._control_waiters.pop(sequence, None)
+                    raise
+                if not completed.wait(timeout):
+                    with self._lock:
+                        self._control_waiters.pop(sequence, None)
+                    raise TimeoutError(f"{kind.name} response timed out")
+                return response, (time.monotonic() - started) * 1000.0
+
+            try:
+                hello, hello_ms = request(MessageType.HELLO)
+                status, status_ms = request(MessageType.STATUS)
+                payload = status.get("payload", b"")
+                if len(payload) != 11:
+                    raise ProtocolError(f"STATUS payload is {len(payload)} bytes, expected 11")
+                state, flags, samples, trigger, sample_rate, mode = struct.unpack("<BBHHIB", payload)
+                modes = {0: "collection", 1: "inference", 2: "instrument",
+                         3: "device_position", 4: "calibration"}
+                states = {0: "idle", 1: "forced_capture", 2: "transmitting", 3: "stopped"}
+                identity = str(hello.get("identity", ""))
+                return {
+                    "active_probe": "completed",
+                    "ok": identity == "AcrylicPanCollector" and mode in modes,
+                    "hello": {"identity": identity, "rtt_ms": round(hello_ms, 1)},
+                    "firmware": {
+                        "state": states.get(state, f"unknown_{state}"),
+                        "state_id": state,
+                        "flags": flags,
+                        "lcd_startup_test": bool(flags & 0x01),
+                        "sample_count": samples,
+                        "trigger_index": trigger,
+                        "sample_rate_hz": sample_rate,
+                        "mode": modes.get(mode, f"unknown_{mode}"),
+                        "mode_id": mode,
+                        "rtt_ms": round(status_ms, 1),
+                    },
+                }
+            except Exception as error:
+                return {"active_probe": "failed", "ok": False, "error": str(error)}
+
     def _negotiate_fast_uart(self) -> int:
         """Switch the link to 960 kbit/s when the firmware supports it; return the speed in use.
 
@@ -458,13 +540,17 @@ class AcquisitionController:
         self.link.set_baudrate(BOOT_BAUDRATE)
         return BOOT_BAUDRATE
 
-    def connect(self, port: str, baudrate: int = 115_200, fast: bool = True) -> None:
+    def connect(self, port: str, baudrate: int = 115_200, fast: bool = True,
+                require_response: bool = False) -> None:
         self.link.connect(port, baudrate)
         if fast and baudrate == BOOT_BAUDRATE:
             try:
                 baudrate = self._negotiate_fast_uart()
             except (OSError, ValueError):
                 baudrate = BOOT_BAUDRATE
+        if require_response and not self._board_answers(0.6):
+            self.link.disconnect()
+            raise OSError(f"{port} did not answer the Acrylic Pan HELLO request")
         with self._lock:
             self.event_assembler.reset()
             self.assembly_retry_required = False
@@ -609,6 +695,8 @@ class AcquisitionController:
             "saved_valid": status.saved_valid,
             "saved_count": status.saved_count,
             "work_count": status.work_count,
+            "saved_kind": status.saved_kind.name.lower(),
+            "work_kind": status.work_kind.name.lower(),
         }
         with self._lock:
             self.calibration["status"] = info
@@ -1030,6 +1118,7 @@ class AcquisitionController:
     def status(self) -> dict[str, Any]:
         with self._lock:
             self.stats.decoder_errors = self.link.decoder_error_count
+            now = time.monotonic()
             return {
                 "connected": self.link.connected,
                 "port": self.port,
@@ -1037,6 +1126,14 @@ class AcquisitionController:
                 "identity": self.identity,
                 "last_error": self.last_error,
                 "last_control": self.last_control,
+                "last_frame_age_s": (
+                    round(now - self.last_frame_monotonic, 1)
+                    if self.last_frame_monotonic is not None else None
+                ),
+                "last_ai_age_s": (
+                    round(now - self.last_ai_monotonic, 1)
+                    if self.last_ai_monotonic is not None else None
+                ),
                 "latest_ai": self.latest_ai,
                 "device_mode": self.device_mode,
                 "inference_active": self.inference_active,
@@ -1237,6 +1334,7 @@ class AcquisitionController:
                 continue
             with self._lock:
                 self.stats.observe_frame()
+                self.last_frame_monotonic = time.monotonic()
             if item.message_type == MessageType.EVENT_DATA:
                 try:
                     self._process_event(decode_event(item), "serial", True)
@@ -1269,6 +1367,11 @@ class AcquisitionController:
             elif item.message_type == MessageType.HELLO:
                 with self._lock:
                     self.identity = item.payload.decode("ascii", errors="replace")
+                    waiter = self._control_waiters.pop(item.sequence, None)
+                    if waiter is not None:
+                        waiter[1].update({"type": "hello", "identity": self.identity,
+                                          "payload": item.payload})
+                        waiter[0].set()
                     self.last_control = {"response": "hello", "payload": self.identity, "sequence": item.sequence}
                 self._hello_seen.set()
             elif item.message_type == MessageType.AI_RESULT:
@@ -1292,6 +1395,8 @@ class AcquisitionController:
                                 )
                     with self._lock:
                         self.latest_ai = payload
+                        if result.case_id == 0xFF:
+                            self.last_ai_monotonic = time.monotonic()
                         self._ai_condition.notify_all()
                         self.last_control = {
                             "response": "ai_result",
@@ -1334,6 +1439,7 @@ class AcquisitionController:
                         }
                     with self._lock:
                         self.latest_ai = payload
+                        self.last_ai_monotonic = time.monotonic()
                         self._ai_condition.notify_all()
                         self.last_control = {
                             "response": "inference_event",
@@ -1368,6 +1474,7 @@ class AcquisitionController:
                     }
                     with self._lock:
                         self.latest_ai = payload
+                        self.last_ai_monotonic = time.monotonic()
                         self._ai_condition.notify_all()
                         self.last_control = {
                             "response": "position_result",
@@ -1438,6 +1545,10 @@ class AcquisitionController:
                         self.calibration["error"] = f"キャリブレーション結果の解析エラー: {error}"
             elif item.message_type == MessageType.STATUS:
                 with self._lock:
+                    waiter = self._control_waiters.pop(item.sequence, None)
+                    if waiter is not None:
+                        waiter[1].update({"type": "status", "payload": item.payload})
+                        waiter[0].set()
                     if len(item.payload) >= 11 and item.payload[10] in (0, 1, 2, 3, 4):
                         self.device_mode = {
                             0: "collection", 1: "inference", 2: "instrument",
@@ -1469,6 +1580,10 @@ class ApiHandler(BaseHTTPRequestHandler):
     controller: AcquisitionController
     audio_cache: dict[tuple[tuple[str, str], ...], bytes] = {}
     audio_cache_lock = threading.RLock()
+    video_dir: Path = DEFAULT_VIDEO_DIR
+    admin_nonce = ""
+    admin_action_lock = threading.Lock()
+    admin_action_pending = False
 
     def _note_wav(self, query: str) -> None:
         options = {name: values[-1] for name, values in parse_qs(query).items()}
@@ -1496,6 +1611,12 @@ class ApiHandler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:
         parsed = urlparse(self.path)
         path = parsed.path
+        if serve_exhibit_static(self, path) or serve_video(self, path, self.video_dir):
+            return
+        if path == "/api/exhibit/videos":
+            return self._json({"videos": video_list(self.video_dir)})
+        if path == "/api/admin/session":
+            return self._json({"nonce": self.admin_nonce})
         if path == "/api/status":
             return self._json(self.controller.status())
         if path == "/api/calibration/state":
@@ -1576,9 +1697,18 @@ class ApiHandler(BaseHTTPRequestHandler):
         if action == "arm":
             target = body.get("target")
             argument = CALIBRATION_CHECK_ONLY if target is None else int(target)
-            if target is not None and not 0 <= argument < 12:
-                raise ValueError("target must be an area from 0 to 11")
+            kind = str(body.get("kind", "quick"))
+            limit = 12 if kind == "quick" else 60 if kind == "precise" else 0
+            if target is not None and not 0 <= argument < limit:
+                raise ValueError(f"target must be in range 0..{limit - 1} for {kind} mode")
             return controller.calibration_request(CalibrationOp.ARM, argument)
+        if action == "begin":
+            kind = str(body.get("kind", "quick"))
+            if kind not in ("quick", "precise"):
+                raise ValueError("kind must be quick or precise")
+            # Bit 4 asks the firmware to keep training from the saved calibration of the same kind.
+            argument = (0 if kind == "quick" else 1) | (0x10 if body.get("continue") else 0)
+            return controller.calibration_request(CalibrationOp.BEGIN, argument)
         if action in operations:
             return controller.calibration_request(operations[action])
         raise KeyError(action)
@@ -1587,6 +1717,37 @@ class ApiHandler(BaseHTTPRequestHandler):
         path = urlparse(self.path).path
         try:
             body = self._request_json()
+            if path == "/api/admin/diagnostics":
+                self._require_admin_request(body)
+                return self._json(run_diagnostics(self.controller, self.video_dir))
+            if path == "/api/admin/system":
+                self._require_admin_request(body)
+                action = str(body.get("action", ""))
+                status = self.controller.status()
+                work_count = int((self.controller.calibration_state().get("status") or {}).get("work_count", 0))
+                if status["collection"]["active"] or self.controller.calibration_state().get("pending"):
+                    raise ValueError("採取または学習処理中はシステム操作できません")
+                if status.get("device_mode") == "calibration" and work_count:
+                    raise ValueError("未保存の追加学習があります。先に保存または破棄してください")
+                cls = type(self)
+                with cls.admin_action_lock:
+                    if cls.admin_action_pending:
+                        raise ValueError("システム操作はすでに実行中です")
+                    cls.admin_action_pending = True
+
+                def action_error(message: str) -> None:
+                    with cls.admin_action_lock:
+                        cls.admin_action_pending = False
+                    with self.controller._lock:
+                        self.controller.last_error = f"システム操作エラー: {message}"
+
+                try:
+                    start_system_action(action, action_error)
+                except Exception:
+                    with cls.admin_action_lock:
+                        cls.admin_action_pending = False
+                    raise
+                return self._json({"accepted": True, "action": action})
             if path.startswith("/api/calibration/"):
                 return self._json(self._calibration_post(path.rsplit("/", 1)[1], body))
             if path == "/api/connect":
@@ -1643,6 +1804,8 @@ class ApiHandler(BaseHTTPRequestHandler):
             self._json({"error": "not found"}, HTTPStatus.NOT_FOUND)
         except LibraryError as error:
             self._json({"error": str(error)}, HTTPStatus.NOT_FOUND)
+        except PermissionError as error:
+            self._json({"error": str(error)}, HTTPStatus.FORBIDDEN)
         except (KeyError, TypeError, ValueError, OSError) as error:
             self._json({"error": str(error)}, HTTPStatus.BAD_REQUEST)
         except Exception as error:
@@ -1653,6 +1816,24 @@ class ApiHandler(BaseHTTPRequestHandler):
         if length > 65_536:
             raise ValueError("request body is too large")
         return json.loads(self.rfile.read(length) or b"{}")
+
+    def _require_admin_request(self, body: dict[str, Any]) -> None:
+        """Limit state-changing admin calls to this localhost JSON UI."""
+        try:
+            if not ipaddress.ip_address(self.client_address[0]).is_loopback:
+                raise PermissionError("管理操作はラズパイ本体からのみ実行できます")
+        except ValueError as error:
+            raise PermissionError("管理操作の接続元を確認できません") from error
+        if not self.headers.get("Content-Type", "").lower().startswith("application/json"):
+            raise PermissionError("管理操作はJSONリクエストに限定されています")
+        origin = self.headers.get("Origin")
+        if origin:
+            hostname = urlparse(origin).hostname
+            if hostname not in ("127.0.0.1", "localhost", "::1"):
+                raise PermissionError("別サイトからの管理操作を拒否しました")
+        nonce = str(body.pop("nonce", ""))
+        if not nonce or not hmac.compare_digest(nonce, self.admin_nonce):
+            raise PermissionError("管理セッションが無効です。ページを再読込してください")
 
     def _json(self, value: Any, status: HTTPStatus = HTTPStatus.OK) -> None:
         body = json.dumps(_json_safe(value), ensure_ascii=False, allow_nan=False,
@@ -1679,6 +1860,7 @@ class ApiHandler(BaseHTTPRequestHandler):
             "/position.css": "position.css",
             "/instrument.js": "instrument.js",
             "/instrument-probability.js": "instrument-probability.js",
+            "/position-calibration.js": "position-calibration.js",
             "/position.js": "position.js",
             "/panel-profile.js": "panel-profile.js",
             "/server-audio.js": "server-audio.js",
@@ -1705,8 +1887,15 @@ class ApiHandler(BaseHTTPRequestHandler):
         return
 
 
-def create_server(host: str, port: int, controller: AcquisitionController) -> ThreadingHTTPServer:
-    handler = type("BoundApiHandler", (ApiHandler,), {"controller": controller})
+def create_server(host: str, port: int, controller: AcquisitionController,
+                  video_dir: Path = DEFAULT_VIDEO_DIR) -> ThreadingHTTPServer:
+    handler = type("BoundApiHandler", (ApiHandler,), {
+        "controller": controller,
+        "video_dir": video_dir,
+        "admin_nonce": secrets.token_urlsafe(24),
+        "admin_action_lock": threading.Lock(),
+        "admin_action_pending": False,
+    })
     return ThreadingHTTPServer((host, port), handler)
 
 
@@ -1717,13 +1906,21 @@ def main() -> None:
     parser.add_argument("--output", default="data/raw/sessions")
     parser.add_argument(
         "--page",
-        choices=("index.html", "collector.html", "position.html", "instrument.html", "instrument-probability.html"),
+        choices=("index.html", "collector.html", "position.html", "instrument.html", "instrument-probability.html",
+                 "exhibit/play.html", "exhibit/odl.html", "exhibit/video.html"),
         default="index.html",
     )
+    parser.add_argument("--auto-connect", nargs="?", const="auto", default=None, metavar="PORT",
+                        help="keep connecting to the board (every port when PORT is omitted)")
+    parser.add_argument("--video-dir", default=str(DEFAULT_VIDEO_DIR),
+                        help="folder with the demo videos shown on the exhibit video page")
     parser.add_argument("--no-browser", action="store_true")
     args = parser.parse_args()
     controller = AcquisitionController(args.output)
-    server = create_server(args.host, args.port, controller)
+    server = create_server(args.host, args.port, controller, Path(args.video_dir))
+    connector = AutoConnector(controller, args.auto_connect) if args.auto_connect else None
+    if connector:
+        connector.start()
     suffix = "" if args.page == "index.html" else args.page
     url = f"http://{args.host}:{server.server_port}/{suffix}"
     print(f"Acrylic Pan monitor: {url}")
@@ -1737,6 +1934,8 @@ def main() -> None:
     except KeyboardInterrupt:
         pass
     finally:
+        if connector:
+            connector.stop()
         server.server_close()
         controller.close()
 

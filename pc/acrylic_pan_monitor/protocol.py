@@ -19,8 +19,8 @@ AI_RESULT_PAYLOAD = struct.Struct("<BBH8f")
 AI_RESULT_12_PAYLOAD = struct.Struct("<BBH12f")
 POSITION_RESULT_PAYLOAD = struct.Struct("<BBHIII60f")
 POSITION_DIAGNOSTIC_PAYLOAD = struct.Struct("<BBH60f")
-CALIBRATION_RESULT_PAYLOAD = struct.Struct("<BBBBHHII12f")
-CALIBRATION_ACK_PAYLOAD = struct.Struct("<BBBBHH")
+CALIBRATION_RESULT_PAYLOAD = struct.Struct("<BBBBHHII60f")
+CALIBRATION_ACK_PAYLOAD = struct.Struct("<BBBBHHBB")
 CALIBRATION_CHECK_ONLY = 0xFF
 EVENT_CHUNK_HEADER = struct.Struct("<IHHIHHHH")
 MAX_PAYLOAD_SIZE = 4096
@@ -122,6 +122,12 @@ class CalibrationSource(IntEnum):
     WORKING = 2
 
 
+class CalibrationKind(IntEnum):
+    QUICK = 0
+    PRECISE = 1
+    NONE = 0xFF
+
+
 @dataclass(frozen=True)
 class CalibrationStatus:
     operation: CalibrationOp
@@ -129,6 +135,8 @@ class CalibrationStatus:
     saved_valid: bool
     saved_count: int
     work_count: int
+    saved_kind: CalibrationKind
+    work_kind: CalibrationKind
 
 
 @dataclass(frozen=True)
@@ -426,14 +434,15 @@ def decode_calibration_ack(frame: Frame) -> CalibrationStatus:
     """Decode the status carried by the ACK of every CALIBRATION request."""
     if frame.message_type != MessageType.ACK or len(frame.payload) != CALIBRATION_ACK_PAYLOAD.size:
         raise ProtocolError("frame is not a calibration ACK")
-    request, operation, source, saved_valid, saved_count, work_count = (
+    request, operation, source, saved_valid, saved_count, work_count, saved_kind, work_kind = (
         CALIBRATION_ACK_PAYLOAD.unpack(frame.payload)
     )
     if request != MessageType.CALIBRATION or saved_valid > 1:
         raise ProtocolError("unsupported calibration ACK payload")
     try:
         return CalibrationStatus(CalibrationOp(operation), CalibrationSource(source),
-                                 bool(saved_valid), saved_count, work_count)
+                                 bool(saved_valid), saved_count, work_count,
+                                 CalibrationKind(saved_kind), CalibrationKind(work_kind))
     except ValueError as error:
         raise ProtocolError("unknown calibration operation or source") from error
 

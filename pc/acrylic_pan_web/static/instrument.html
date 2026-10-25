@@ -46,22 +46,6 @@
     </div>
   </section>
 
-  <section id="calibrationCard" class="card calibration-card">
-    <div class="section-heading"><div><span class="kicker">ODL CALIBRATION</span><h2>マレット差のキャリブレーション(ODL)</h2></div><span id="calibrationModel" class="badge">使用中のモデル: 未確認</span></div>
-    <p class="calibration-note">「認識テスト」は、学習も保存もせずに、いまのモデルで、各エリアを叩いたときの認識を調べます(マレットを変えた比較に使えます)。叩くたびに、認識したエリアの音も鳴ります。「教示演奏テスト」は、マリオ(地上BGMの前半、41音)を、次に叩くパネルが光る教示で演奏して、各音が正しく認識されるかを調べます(学習はしません)。板の固定やマレットの違いを、ボード上のオンデバイス学習(ODL)で吸収します。各エリアを順に叩く手順(確認1周 → 学習 → 確認1周)で、確認打の正解数が下がらなかった場合だけ保存します。12クラス専用で、確率分布ヒートマップは使いません。接続後、演奏を止めた状態で実行してください。</p>
-    <div class="calibration-controls">
-      <label>周回数(学習・認識テスト) <select id="calibrationRounds"><option value="1">1周(12打)</option><option value="3">3周(36打)</option><option value="5" selected>5周(60打)</option><option value="10">10周(120打)</option></select></label>
-      <button id="calibrationStart" type="button" class="primary">キャリブレーション開始</button>
-      <button id="calibrationCancel" type="button" disabled>中止</button>
-      <button id="calibrationTest" type="button">認識テスト(学習しない)</button>
-      <button id="calibrationSong" type="button">教示演奏テスト(マリオ)</button>
-      <button id="calibrationStatusButton" type="button">モデルを確認</button>
-      <button id="calibrationFactory" type="button">工場モデルへ戻す</button>
-    </div>
-    <div id="calibrationProgress" class="calibration-progress" aria-live="polite"></div>
-    <div id="calibrationMessage" class="calibration-message" aria-live="polite"></div>
-  </section>
-
   <section class="instrument-layout">
     <div class="instrument-main">
     <div class="card stage-card">
@@ -168,5 +152,5 @@
       <div class="dialog-footer"><button value="cancel">閉じる</button></div>
     </form>
   </dialog>
-</main><script src="/panel-profile.js?v=20260720-1"></script><script src="/server-audio.js?v=20261015-6"></script><script src="/instrument.js?v=20261015-4"></script><script src="/calibration.js?v=20261019-6"></script><script src="/song.js?v=20261019-5"></script></body>
+</main><script src="/panel-profile.js?v=20260720-1"></script><script src="/server-audio.js?v=20261015-6"></script><script src="/instrument.js?v=20261015-4"></script><script src="/song.js?v=20261019-5"></script></body>
 </html>

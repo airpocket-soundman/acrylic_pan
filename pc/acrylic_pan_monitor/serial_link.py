@@ -74,18 +74,29 @@ class SerialLink:
             serial_port.write(packet)
 
     def _run(self) -> None:
+        serial_port = self._serial
         try:
-            assert self._serial is not None
+            assert serial_port is not None
             while not self._stop.is_set():
                 # Block for the first byte only: read(4096) would hold a short frame
                 # until the 50 ms timeout, which is the largest delay on the path.
-                data = self._serial.read(1)
+                data = serial_port.read(1)
                 if data:
-                    waiting = self._serial.in_waiting
+                    waiting = serial_port.in_waiting
                     if waiting:
-                        data += self._serial.read(waiting)
+                        data += serial_port.read(waiting)
                 for frame in self._decoder.feed(data):
                     self.on_frame(frame)
         except Exception as error:  # delivered to the GUI thread through a queue
             if not self._stop.is_set():
                 self.on_error(error)
+        finally:
+            # pyserial can leave ``is_open`` true after a USB unplug even though
+            # every read now fails.  Publish the disconnection so AutoConnector
+            # can reopen the board when it appears again.
+            try:
+                serial_port.close()
+            except Exception:
+                pass
+            if self._serial is serial_port:
+                self._serial = None

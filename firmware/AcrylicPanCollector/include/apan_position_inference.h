@@ -7,6 +7,10 @@
 #include "apan_capture.h"
 
 #define APAN_POSITION_OUTPUT_COUNT (60U)
+#define APAN_POSITION_CALIBRATION_QUICK   (0U)
+#define APAN_POSITION_CALIBRATION_PRECISE (1U)
+/* OR-ed into the BEGIN argument: keep training from the saved calibration of the same kind. */
+#define APAN_POSITION_CALIBRATION_CONTINUE (0x10U)
 
 void ApanPositionInferenceInitialize(void);
 bool ApanPositionInferencePredict(const ApanEvent *event,
@@ -17,5 +21,8 @@ bool ApanPositionInferenceSelfTest(uint8_t case_id,
                                    uint8_t *position_id);
 void ApanPositionInferenceSupport(uint8_t position_id, uint16_t *x_mm,
                                   uint16_t *y_mm);
+bool ApanPositionCalibrationBegin(uint8_t argument);
+bool ApanPositionTrainLast(uint8_t target);
+bool ApanPositionCalibrationCommit(void);
 
 #endif

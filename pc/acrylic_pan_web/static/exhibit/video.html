@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Acrylic Pan デモ動画</title>
+  <link rel="stylesheet" href="/exhibit/exhibit.css">
+  <style>
+    [hidden]{display:none!important}
+    .video-page{position:absolute;inset:0;display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:16px;padding:16px;background:#0b141b}
+    .video-page.single{grid-template-columns:minmax(0,1fr)}
+    .video-main{min-width:0;min-height:0;display:flex;flex-direction:column;gap:12px}
+    .video-stage{flex:1 1 0;min-height:0;position:relative;background:#000;border-radius:12px;overflow:hidden}
+    .video-stage video{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#000}
+    .video-empty{position:absolute;inset:0;display:grid;place-items:center;margin:0;color:#dbe7f2;font-size:20px;text-align:center;line-height:1.8}
+    .video-bar{flex:0 0 auto;display:flex;align-items:center;gap:14px;padding:10px 14px;border-radius:12px;background:#152633;color:#dbe7f2}
+    .video-bar button{font:inherit;font-size:18px;font-weight:800;min-width:64px;height:52px;padding:0 16px;border-radius:12px;border:2px solid #ffffff33;background:#0b141b;color:#fff;cursor:pointer}
+    .video-bar button[aria-pressed="true"]{background:#fff;color:#102733;border-color:#fff}
+    .video-bar input[type=range]{flex:1;min-width:0;height:36px;accent-color:#70e2d5}
+    .video-bar output{font:700 16px Consolas,monospace;min-width:7.5em;text-align:center}
+    .video-list{display:flex;flex-direction:column;gap:10px;overflow:auto}
+    .video-list button{text-align:left;padding:14px 16px;border-radius:12px;border:2px solid #ffffff22;background:#152633;color:#dbe7f2;font:inherit;font-size:16px;font-weight:700;cursor:pointer}
+    .video-list button[aria-current="true"]{background:#fff;color:#102733;border-color:#fff}
+    .video-list small{display:block;margin-top:4px;font-weight:500;opacity:.7}
+  </style>
+</head>
+<body>
+  <div class="exhibit-body">
+    <div id="page" class="video-page single">
+      <div class="video-main">
+        <div class="video-stage"><video id="player" playsinline preload="metadata"></video><p id="empty" class="video-empty" hidden>表示できるデモ動画がありません。<br>動画フォルダに mp4 を置いてください。</p></div>
+        <div class="video-bar">
+          <button id="toggle" type="button" aria-label="再生・一時停止">⏸</button>
+          <input id="seek" type="range" min="0" max="1000" value="0" step="1" aria-label="シークバー">
+          <output id="time">0:00 / 0:00</output>
+          <button id="repeat" type="button" aria-pressed="true">🔁 全リピート</button>
+        </div>
+      </div>
+      <div id="list" class="video-list" hidden></div>
+    </div>
+  </div>
+  <script src="/exhibit/exhibit.js"></script>
+  <script>
+    const $ = id => document.getElementById(id);
+    const player = $('player'), list = $('list'), seek = $('seek');
+    const key = 'exhibit-video', repeatKey = 'exhibit-video-repeat';
+    // repeat: off = play once, all = next video and back to the first, one = the same video again
+    const MODES = { all: ['🔁 全リピート', true], one: ['🔂 1本リピート', true], off: ['リピートなし', false] };
+    let videos = [], buttons = [], index = 0, repeat = 'all', scrubbing = false;
+    try { repeat = MODES[localStorage.getItem(repeatKey)] ? localStorage.getItem(repeatKey) : 'all'; } catch (_) { /* ignore */ }
+
+    const fmt = seconds => `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2, '0')}`;
+    function showRepeat() {
+      $('repeat').textContent = MODES[repeat][0];
+      $('repeat').setAttribute('aria-pressed', String(MODES[repeat][1]));
+    }
+    function play(next, auto) {
+      index = next;
+      player.src = videos[index].url;
+      buttons.forEach((b, i) => b.setAttribute('aria-current', String(i === index)));
+      try { sessionStorage.setItem(key, videos[index].name); } catch (_) { /* ignore */ }
+      if (auto) player.play().catch(() => { /* needs a first touch */ });
+    }
+    function tick() {
+      const duration = player.duration || 0;
+      if (!scrubbing && duration) seek.value = Math.round(1000 * player.currentTime / duration);
+      $('time').textContent = `${fmt(player.currentTime)} / ${fmt(duration)}`;
+      $('toggle').textContent = player.paused ? '▶' : '⏸';
+    }
+    player.addEventListener('timeupdate', tick);
+    player.addEventListener('loadedmetadata', tick);
+    player.addEventListener('play', tick);
+    player.addEventListener('pause', tick);
+    player.addEventListener('ended', () => {
+      if (repeat === 'one') { player.currentTime = 0; player.play(); }
+      else if (repeat === 'all') play((index + 1) % videos.length, true);
+    });
+    $('toggle').onclick = () => { if (player.paused) player.play().catch(() => {}); else player.pause(); };
+    player.addEventListener('click', () => $('toggle').click());
+    seek.addEventListener('input', () => {
+      scrubbing = true;
+      if (player.duration) player.currentTime = player.duration * seek.value / 1000;
+    });
+    seek.addEventListener('change', () => { scrubbing = false; });
+    $('repeat').onclick = () => {
+      const order = videos.length > 1 ? ['all', 'one', 'off'] : ['one', 'off'];
+      repeat = order[(order.indexOf(repeat) + 1) % order.length] || order[0];
+      try { localStorage.setItem(repeatKey, repeat); } catch (_) { /* ignore */ }
+      showRepeat();
+    };
+    (async () => {
+      try { videos = (await (await fetch('/api/exhibit/videos', { cache: 'no-store' })).json()).videos; } catch (_) { /* empty */ }
+      if (!videos.length) { player.hidden = true; $('empty').hidden = false; document.querySelector('.video-bar').hidden = true; return; }
+      if (videos.length === 1 && repeat === 'all') repeat = 'one';
+      showRepeat();
+      buttons = videos.map((video, i) => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.innerHTML = `${video.title}<small>${(video.size / 1048576).toFixed(1)} MB</small>`;
+        b.onclick = () => play(i, true);
+        list.appendChild(b);
+        return b;
+      });
+      if (videos.length > 1) { list.hidden = false; $('page').classList.remove('single'); }
+      let saved = null; try { saved = sessionStorage.getItem(key); } catch (_) { /* ignore */ }
+      play(Math.max(0, videos.findIndex(v => v.name === saved)), true);
+    })();
+    // Leaving the page must stop the sound.
+    addEventListener('pagehide', () => player.pause());
+  </script>
+</body>
+</html>

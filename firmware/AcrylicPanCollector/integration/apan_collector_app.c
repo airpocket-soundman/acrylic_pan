@@ -14,8 +14,6 @@
 #include "Uart1.h"
 #include "apan_ai_selftest.h"
 #include "apan_calibration.h"
-#include "apan_inference.h"
-#include "apan_odl_experiment.h"
 #include "apan_position_inference.h"
 #include "apan_position_probability_model.h"
 #include "apan_position_softmax.h"
@@ -71,7 +69,7 @@ static uint8_t operating_mode;
 static bool inference_telemetry_pending;
 static bool inference_rearm_pending;
 static uint8_t inference_class_id;
-static float inference_outputs[APAN_INFERENCE_OUTPUT_COUNT];
+static float inference_outputs[APAN_AREA_OUTPUT_COUNT];
 static uint32_t inference_sequence;
 static volatile bool instrument_transmit_done;
 static bool lcd_result_pending;
@@ -407,8 +405,10 @@ static void send_ready_event(void)
 static void send_inference_result(void)
 {
     const ApanEvent *event = ApanCaptureGetEvent(&capture);
-    float output[APAN_INFERENCE_OUTPUT_COUNT];
-    uint8_t payload[4U + (APAN_INFERENCE_OUTPUT_COUNT * 4U)];
+    float output[APAN_AREA_OUTPUT_COUNT] = {0.0F};
+    float position_probability[APAN_POSITION_OUTPUT_COUNT];
+    uint8_t payload[4U + (APAN_AREA_OUTPUT_COUNT * 4U)];
+    uint8_t position_id;
     uint8_t class_id;
     uint8_t index;
     size_t encoded_size;
@@ -435,7 +435,9 @@ static void send_inference_result(void)
         return;
     }
     inference_start = SysTick->VAL;
-    if (!ApanInferencePredict(event, output, &class_id))
+    if (!ApanPositionInferencePredict(event, position_probability, &position_id) ||
+        !apan_position_softmax(position_probability, APAN_POSITION_OUTPUT_COUNT,
+                               position_id, position_probability))
     {
         payload[0] = APAN_MESSAGE_AI_RESULT;
         payload[1] = 4U;
@@ -443,6 +445,21 @@ static void send_inference_result(void)
     }
     else
     {
+        float best = -1.0F;
+        for (index = 0U; index < APAN_POSITION_OUTPUT_COUNT; index++)
+        {
+            uint16_t x_mm;
+            uint16_t y_mm;
+            uint8_t area;
+            ApanPositionInferenceSupport(index, &x_mm, &y_mm);
+            area = (uint8_t)((y_mm / 100U) * 4U + (x_mm / 100U));
+            output[area] += position_probability[index];
+        }
+        class_id = 0U;
+        for (index = 0U; index < APAN_AREA_OUTPUT_COUNT; index++)
+        {
+            if (output[index] > best) { best = output[index]; class_id = index; }
+        }
         inference_end = SysTick->VAL;
         if ((operating_mode == APAN_MODE_INSTRUMENT) && !accept_instrument_inference())
         {
@@ -467,7 +484,7 @@ static void send_inference_result(void)
         payload[1] = class_id;
         payload[2] = 0U;
         payload[3] = 0U;
-        for (index = 0U; index < APAN_INFERENCE_OUTPUT_COUNT; index++)
+        for (index = 0U; index < APAN_AREA_OUTPUT_COUNT; index++)
         {
             union { float value; uint32_t bits; } packed;
             uint8_t offset = (uint8_t)(4U + index * 4U);
@@ -611,12 +628,15 @@ static void put_u32(uint8_t *destination, uint32_t value)
 static void send_calibration_result(void)
 {
     const ApanEvent *event = ApanCaptureGetEvent(&capture);
-    float output[APAN_INFERENCE_OUTPUT_COUNT];
-    uint8_t payload[16U + (APAN_INFERENCE_OUTPUT_COUNT * 4U)];
+    float output[APAN_POSITION_OUTPUT_COUNT];
+    uint8_t payload[16U + (APAN_POSITION_OUTPUT_COUNT * 4U)];
     ApanCalibrationStatus status;
-    uint8_t class_id = 0U;
+    uint8_t position_id = 0U;
+    uint8_t area_id;
     uint8_t flags = 0U;
-    uint8_t index;
+    uint16_t x_mm;
+    uint16_t y_mm;
+    uint16_t index;
     uint32_t start_tick;
     uint32_t start;
     uint32_t predicted;
@@ -625,7 +645,7 @@ static void send_calibration_result(void)
 
     if ((event == NULL) || transmit_busy) { return; }
     start = SysTick->VAL;
-    if (!ApanInferencePredict(event, output, &class_id))
+    if (!ApanPositionInferencePredict(event, output, &position_id))
     {
         ApanCaptureReleaseEvent(&capture);
         collector_stopped = true;
@@ -635,12 +655,13 @@ static void send_calibration_result(void)
         return;
     }
     predicted = SysTick->VAL;
-    if (calibration_target < APAN_INFERENCE_OUTPUT_COUNT)
+    ApanCalibrationGetStatus(&status);
+    if (calibration_target != APAN_CALIBRATION_CHECK_ONLY)
     {
         /* The FRAM update can exceed one 24-bit SysTick period (0.35 s). */
         start_tick = app_tick_10ms;
         trained = SysTick->VAL;
-        flags = ApanInferenceTrainLast(calibration_target) ? 0x01U : 0x02U;
+        flags = ApanPositionTrainLast(calibration_target) ? 0x01U : 0x02U;
         train_us = elapsed_systick_us(trained, SysTick->VAL);
         if ((app_tick_10ms - start_tick) >= 30UL)
         {
@@ -650,22 +671,24 @@ static void send_calibration_result(void)
     ApanCaptureReleaseEvent(&capture);
     collector_stopped = true;
     ApanCalibrationGetStatus(&status);
-    lcd_class_id = class_id;
-    lcd_x_mm = (uint16_t)((class_id % 4U) * 100U + 50U);
-    lcd_y_mm = (uint16_t)((class_id / 4U) * 100U + 50U);
+    ApanPositionInferenceSupport(position_id, &x_mm, &y_mm);
+    area_id = (uint8_t)((y_mm / 100U) * 4U + (x_mm / 100U));
+    lcd_class_id = area_id;
+    lcd_x_mm = x_mm;
+    lcd_y_mm = y_mm;
     lcd_inference_us = elapsed_systick_us(start, predicted);
     lcd_result_pending = true;
-    display_area_on_leds(class_id);
+    display_area_on_leds(area_id);
 
     payload[0] = calibration_target;
-    payload[1] = class_id;
+    payload[1] = position_id;
     payload[2] = flags;
     payload[3] = status.source;
     put_u16(&payload[4], status.work_count);
     put_u16(&payload[6], 0U);
     put_u32(&payload[8], lcd_inference_us);
     put_u32(&payload[12], train_us);
-    for (index = 0U; index < APAN_INFERENCE_OUTPUT_COUNT; index++)
+    for (index = 0U; index < APAN_POSITION_OUTPUT_COUNT; index++)
     {
         union { float value; uint32_t bits; } packed;
         packed.value = output[index];
@@ -678,7 +701,7 @@ static void send_calibration_result(void)
 static void acknowledge_calibration(uint32_t request_sequence, uint8_t operation)
 {
     ApanCalibrationStatus status;
-    uint8_t payload[8];
+    uint8_t payload[10];
     ApanCalibrationGetStatus(&status);
     payload[0] = APAN_MESSAGE_CALIBRATION;
     payload[1] = operation;
@@ -686,86 +709,37 @@ static void acknowledge_calibration(uint32_t request_sequence, uint8_t operation
     payload[3] = status.saved_valid ? 1U : 0U;
     put_u16(&payload[4], status.saved_count);
     put_u16(&payload[6], status.work_count);
+    payload[8] = status.saved_kind;
+    payload[9] = status.work_kind;
     write_protocol(APAN_MESSAGE_ACK, request_sequence, payload, sizeof(payload));
 }
-
-#if APAN_ODL_EXPERIMENT
-static uint8_t experiment_payload[2U + 256U];
-
-/* Engine-ODL experiment: replies with ODL_EXPERIMENT_RESULT (operation, status, data). */
-static uint8_t handle_experiment(uint32_t request_sequence, uint8_t operation, uint8_t argument)
-{
-    uint16_t size = 2U;
-    uint8_t status = 0U;
-    experiment_payload[0] = operation;
-    if (operation == APAN_CALIBRATION_OP_EXPERIMENT_BEGIN)
-    {
-        if (!ApanOdlExperimentBegin()) { return 4U; }
-    }
-    else if (operation == APAN_CALIBRATION_OP_EXPERIMENT_RUN)
-    {
-        uint16_t updates = 0U;
-        uint32_t cycles = 0UL;
-        if (!ApanOdlExperimentRun(argument, &updates, &cycles)) { status = 1U; }
-        put_u16(&experiment_payload[2], updates);
-        put_u32(&experiment_payload[4], (cycles + (APAN_CPU_CLOCK_HZ / 2000000UL)) /
-                                          (APAN_CPU_CLOCK_HZ / 1000000UL));
-        size = 8U;
-    }
-    else if (operation == APAN_CALIBRATION_OP_EXPERIMENT_DUMP_INPUT)
-    {
-        memcpy(&experiment_payload[2], ApanInferenceLastInput(), 256U);
-        size = 2U + 256U;
-    }
-    else
-    {
-        uint8_t bytes = (operation == APAN_CALIBRATION_OP_EXPERIMENT_DUMP_ENGINE) ?
-            ApanOdlExperimentDumpEngine(argument, &experiment_payload[2]) :
-            ApanOdlExperimentDumpCpu(argument, &experiment_payload[2]);
-        if (bytes == 0U) { return 3U; }
-        size = (uint16_t)(2U + bytes);
-    }
-    experiment_payload[1] = status;
-    write_protocol(APAN_MESSAGE_ODL_EXPERIMENT_RESULT, request_sequence, experiment_payload, size);
-    return 0U;
-}
-#endif
 
 /* Returns the NACK reason, or zero after sending the ACK. */
 static uint8_t handle_calibration(uint32_t request_sequence, uint8_t operation,
                                   uint8_t argument)
 {
     ApanCalibrationStatus status;
-    bool twelve_area_model = (operating_mode == APAN_MODE_INFERENCE) ||
-                             (operating_mode == APAN_MODE_INSTRUMENT) ||
-                             (operating_mode == APAN_MODE_CALIBRATION);
     ApanCalibrationGetStatus(&status);
     if (operation == APAN_CALIBRATION_OP_STATUS)
     {
         acknowledge_calibration(request_sequence, operation);
         return 0U;
     }
-#if APAN_ODL_EXPERIMENT
-    if ((operation >= APAN_CALIBRATION_OP_EXPERIMENT_BEGIN) && (operation <= APAN_CALIBRATION_OP_EXPERIMENT_DUMP_INPUT))
-    {
-        if (!collector_stopped) { return 1U; }
-        if (operating_mode != APAN_MODE_CALIBRATION) { return 3U; }
-        return handle_experiment(request_sequence, operation, argument);
-    }
-#endif
     if (operation > APAN_CALIBRATION_OP_FACTORY_RESET) { return 2U; }
     if (!collector_stopped) { return 1U; }
     switch (operation)
     {
         case APAN_CALIBRATION_OP_BEGIN:
             if (operating_mode != APAN_MODE_CALIBRATION) { return 3U; }
-            if (!ApanInferenceCalibrationBegin()) { return 4U; }
+            if (!ApanPositionCalibrationBegin(argument)) { return 4U; }
             break;
         case APAN_CALIBRATION_OP_ARM:
             if ((operating_mode != APAN_MODE_CALIBRATION) ||
                 ((argument != APAN_CALIBRATION_CHECK_ONLY) &&
-                 ((argument >= APAN_INFERENCE_OUTPUT_COUNT) ||
-                  (status.source != APAN_CALIBRATION_SOURCE_WORKING))))
+                 ((status.source != APAN_CALIBRATION_SOURCE_WORKING) ||
+                  ((status.work_kind == APAN_CALIBRATION_KIND_QUICK) && (argument >= 12U)) ||
+                  ((status.work_kind == APAN_CALIBRATION_KIND_PRECISE) &&
+                   (argument >= APAN_POSITION_OUTPUT_COUNT)))))
             {
                 return 3U;
             }
@@ -775,15 +749,15 @@ static uint8_t handle_calibration(uint32_t request_sequence, uint8_t operation,
             SensorStart();
             break;
         case APAN_CALIBRATION_OP_COMMIT:
-            if (!ApanInferenceCalibrationCommit()) { return 3U; }
+            if (!ApanPositionCalibrationCommit()) { return 3U; }
             break;
         case APAN_CALIBRATION_OP_DISCARD:
             ApanCalibrationDiscard();
-            if (twelve_area_model) { ApanInferenceInitialize(); }
+            ApanPositionInferenceInitialize();
             break;
         default:
             ApanCalibrationFactoryReset();
-            if (twelve_area_model) { ApanInferenceInitialize(); }
+            ApanPositionInferenceInitialize();
             break;
     }
     acknowledge_calibration(request_sequence, operation);
@@ -842,7 +816,7 @@ void ApanCollectorAppInitialize(void)
     warmup_blocks = 4U;
     ApanProtocolDecoderInit(&protocol_decoder);
     ApanAiSelfTestInitialize();
-    ApanInferenceInitialize();
+    ApanPositionInferenceInitialize();
     PeriodicHandler10msSetCallBack(app_periodic_10ms);
     SysTick->LOAD = APAN_SYSTICK_RELOAD;
     SysTick->VAL = 0UL;
@@ -1015,34 +989,6 @@ void ApanCollectorAppProcess(void)
             uint8_t class_id;
             uint8_t index;
             bool result_ok = false;
-            if (pending_case_id >= 0x90U)
-            {
-                /* Cases 0x90-0x9B: golden input n of the 12-area model; the reply reuses the
-                   POSITION_DIAGNOSTIC frame with 12 outputs. */
-                float model_output[APAN_INFERENCE_OUTPUT_COUNT];
-                uint8_t model_class = 0U;
-                bool model_ok = collector_stopped && (operating_mode != APAN_MODE_POSITION) &&
-                    ApanInferenceSelfTest((uint8_t)(pending_case_id - 0x90U), model_output, &model_class);
-                if (!model_ok)
-                {
-                    payload[0] = request_type;
-                    payload[1] = 3U;
-                    write_protocol(APAN_MESSAGE_NACK, request_sequence, payload, 2U);
-                    break;
-                }
-                payload[0] = pending_case_id;
-                payload[1] = model_class;
-                payload[2] = 0U; payload[3] = 0U;
-                for (index = 0U; index < APAN_INFERENCE_OUTPUT_COUNT; index++)
-                {
-                    union { float value; uint32_t bits; } packed;
-                    packed.value = model_output[index];
-                    put_u32(&payload[4U + index * 4U], packed.bits);
-                }
-                write_protocol(APAN_MESSAGE_POSITION_DIAGNOSTIC, request_sequence,
-                               payload, 4U + APAN_INFERENCE_OUTPUT_COUNT * 4U);
-                break;
-            }
             if (pending_case_id >= 0x80U)
             {
                 float position_output[APAN_POSITION_OUTPUT_COUNT];
@@ -1062,11 +1008,7 @@ void ApanCollectorAppProcess(void)
                                                           position_id, position_output);
                     }
                 }
-                if (operating_mode == APAN_MODE_POSITION)
-                {
-                    ApanPositionInferenceInitialize();
-                }
-                else { ApanInferenceInitialize(); }
+                ApanPositionInferenceInitialize();
                 if (!result_ok)
                 {
                     payload[0] = request_type;
@@ -1096,8 +1038,7 @@ void ApanCollectorAppProcess(void)
                 result_ok = ApanAiSelfTestRun(pending_case_id, output, &class_id);
             }
             /* The self-test replaces the accelerator's global alpha. */
-            if (operating_mode == APAN_MODE_POSITION) { ApanPositionInferenceInitialize(); }
-            else { ApanInferenceInitialize(); }
+            ApanPositionInferenceInitialize();
             if (!result_ok)
             {
                 if (binary)
@@ -1149,14 +1090,7 @@ void ApanCollectorAppProcess(void)
                 collector_stopped = true;
                 calibration_target = APAN_CALIBRATION_CHECK_ONLY;
                 operating_mode = pending_mode;
-                if (operating_mode == APAN_MODE_POSITION)
-                {
-                    ApanPositionInferenceInitialize();
-                }
-                else if (operating_mode != APAN_MODE_COLLECT)
-                {
-                    ApanInferenceInitialize();
-                }
+                if (operating_mode != APAN_MODE_COLLECT) { ApanPositionInferenceInitialize(); }
                 (void)ApanCaptureSetTargetSamples(
                     &capture,
                     (operating_mode != APAN_MODE_COLLECT) ?

@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="/controls.css?v=20260718-1">
   <link rel="stylesheet" href="/tabs.css?v=20260719-1">
   <link rel="stylesheet" href="/position.css?v=20260823-3">
-<link rel="stylesheet" href="/instrument-probability.css?v=20261023-8">
+<link rel="stylesheet" href="/instrument-probability.css?v=20261023-9">
   <link rel="stylesheet" href="/panel-profile.css?v=20260720-1">
 </head>
 <body><main>
@@ -27,7 +27,7 @@
   <section class="controls card">
     <label id="panelProfileLabel">板仕様 <select id="panelProfile"></select></label>
     <label id="portLabel">COMポート <select id="port"></select></label><button id="refresh">更新</button>
-    <label id="sourceLabel">確率推論元 <select id="positionSource"><option value="device">デバイス（Solist-AI）</option><option value="device12">デバイス（12クラス・ODL）</option><option value="pc">PC（高精度モデル）</option></select></label>
+    <label id="sourceLabel">確率推論元 <select id="positionSource"><option value="device">デバイス（Solist-AI・60クラス）</option><option value="pc">PC（高精度モデル）</option></select></label>
     <label id="displayLabel">表示 <select id="displayMode"><option value="panel">パネル表示</option><option value="camera">カメラ重畳</option></select></label>
     <button id="connect">接続</button><button id="disconnect" disabled>切断</button>
     <button id="performanceStart" disabled>演奏開始</button><button id="performanceStop" disabled>演奏停止</button>
@@ -66,5 +66,18 @@
       </div>
     </aside>
   </section>
-</main><script>{const q=new URLSearchParams(location.search);if(q.has('embed')){document.body.classList.add('embed');if(!q.has('nofit'))document.body.classList.add('fit');}if(q.has('bare'))document.body.classList.add('bare');}</script><script src="/panel-profile.js?v=20260720-1"></script><script src="/server-audio.js?v=20261015-6"></script><script src="/instrument-probability.js?v=20261023-13"></script></body>
+  <section id="positionCalibrationCard" class="card position-calibration-card">
+    <div class="position-heading"><div><span class="kicker">60-CLASS ODL</span><h2>60位置モデルのオンデバイス校正</h2></div><span id="odlCalibrationModel" class="badge">使用中: 未確認</span></div>
+    <p>高速は12エリアの中心を叩き、中心0.6＋同一エリア内4点各0.1のソフトターゲットで更新します。精密は60地点を順番に叩き、各地点のone-hotターゲットで更新します。保存枠は1件で、新しく保存すると以前の校正結果を置き換えます。</p>
+    <div class="position-calibration-controls">
+      <label>校正方式 <select id="odlCalibrationKind"><option value="quick">高速（12地点）</option><option value="precise">精密（60地点）</option></select></label>
+      <label>周回数 <select id="odlCalibrationRounds"><option value="1" selected>1周</option><option value="2">2周</option><option value="3">3周</option></select></label>
+      <button id="odlCalibrationStart" type="button" class="primary">校正開始</button>
+      <button id="odlCalibrationCancel" type="button" disabled>中止</button>
+      <button id="odlCalibrationStatusButton" type="button">保存状態を確認</button>
+      <button id="odlCalibrationFactory" type="button">工場モデルへ戻す</button>
+    </div>
+    <div id="odlCalibrationProgress" class="calibration-status" aria-live="polite"></div>
+  </section>
+</main><script>{const q=new URLSearchParams(location.search);if(q.has('embed')){document.body.classList.add('embed');if(!q.has('nofit'))document.body.classList.add('fit');}if(q.has('bare'))document.body.classList.add('bare');if(q.has('kiosk')){document.body.classList.add('kiosk','fit');}}</script><script src="/panel-profile.js?v=20260720-1"></script><script src="/server-audio.js?v=20261015-6"></script><script src="/instrument-probability.js?v=20261024-14"></script><script src="/position-calibration.js?v=20261024-1"></script></body>
 </html>

@@ -101,3 +101,27 @@ body.fit .song-assist>.song-actions{grid-column:span 3;justify-self:end;flex-wra
 @keyframes comboRainbow{to{background-position:300% 0}}
 @keyframes comboBreak{0%{transform:scale(1)}30%{transform:scale(1.15) rotate(-3deg)}100%{transform:translateY(24px) scale(.8);opacity:0}}
 @keyframes comboNote{0%{opacity:0;transform:scale(.4)}20%{opacity:1;transform:scale(1.25)}100%{opacity:0;transform:translateY(-14px) scale(1)}}
+/* In the deck the start button waits until the demo screen appears (while only the enlarged camera picture is shown it stays hidden) */
+body.cam-focus .cue-start{opacity:0;pointer-events:none;visibility:hidden}
+.cue-start{transition:opacity .6s ease}
+.position-calibration-card{margin-top:14px}
+.position-calibration-card p{margin:4px 0 12px;color:#526474;font-size:13px;line-height:1.65}
+.position-calibration-controls{display:flex;align-items:end;gap:8px;flex-wrap:wrap}
+.position-calibration-controls label{display:grid;gap:4px;font-size:12px;color:#526474}
+.position-calibration-target{position:absolute;z-index:9;width:30px;height:30px;border:4px solid #fff;border-radius:50%;background:#ff5f9b99;box-shadow:0 0 0 7px #ff5f9b55,0 0 24px #ff5f9b;translate:-50% -50%;pointer-events:none}
+body.embed .position-calibration-card{display:none}
+/* Exhibition kiosk (?kiosk=1): the presentation layout, sized to exactly the window (no scroll bars). */
+body.kiosk header,body.kiosk .app-tabs,body.kiosk .controls,body.kiosk .position-calibration-card,body.kiosk #error:empty{display:none}
+body.kiosk{height:100vh;overflow:hidden}
+body.kiosk main{height:100vh;display:flex;flex-direction:column;padding:8px 12px}
+body.kiosk .probability-layout{flex:1 1 0;min-height:0;grid-template-rows:minmax(0,1fr)}
+body.kiosk .probability-layout>*,body.kiosk .probability-main>.card,body.kiosk .camera-card{min-height:0;height:100%}
+body.kiosk .camera-card{display:flex;flex-direction:column}
+body.kiosk .camera-viewport{flex:1 1 0!important;height:auto!important;min-height:0!important}
+body.kiosk .probability-camera{display:flex;flex-direction:column;min-height:0}
+body.kiosk .camera-card{flex:1 1 0;height:auto}
+body.kiosk .probability-area-bars{grid-template-rows:repeat(12,minmax(0,1fr))}
+body.kiosk .probability-main{overflow:hidden}
+body.kiosk .area-probabilities{overflow:hidden}
+/* No camera: keep the dark stage, drop the instructions so only the fixed grid and the effects show. */
+body.kiosk.virtual-grid .camera-placeholder{color:transparent;pointer-events:none}

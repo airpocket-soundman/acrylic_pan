@@ -6,19 +6,21 @@
 #include <stdint.h>
 
 #include "apan_calibration_prior.h"
-#include "apan_odl_experiment.h"
 
 /* 1: the AxlCORE's ODL_StartTrain learns the calibration hits and keeps P and beta (the FRAM only stores the
    committed beta).  0: float32 OS-ELM on the CPU with P and beta in the FRAM (docs/odl-calibration-experiment-
    20260927.md).  The ODL experiment build keeps both paths so it can compare them. */
 #ifndef APAN_CALIBRATION_ENGINE
-#define APAN_CALIBRATION_ENGINE (!APAN_ODL_EXPERIMENT)
+#define APAN_CALIBRATION_ENGINE (1)
 #endif
 
-/* Which beta the 12-area model uses. */
+/* Which beta the 60-position model uses. */
 #define APAN_CALIBRATION_SOURCE_FACTORY (0U)
 #define APAN_CALIBRATION_SOURCE_SAVED   (1U)
 #define APAN_CALIBRATION_SOURCE_WORKING (2U)
+#define APAN_CALIBRATION_KIND_QUICK      (0U)
+#define APAN_CALIBRATION_KIND_PRECISE    (1U)
+#define APAN_CALIBRATION_KIND_NONE       (0xFFU)
 
 /* The board FRAM (MB85RS2MTA, 256 KB) holds float32 P and beta; the vendor
    firmware does not use this range. */
@@ -30,6 +32,8 @@ typedef struct
     bool saved_valid;
     uint16_t saved_count;
     uint16_t work_count;
+    uint8_t saved_kind;
+    uint8_t work_kind;
 } ApanCalibrationStatus;
 
 /* Starts the FRAM and loads the saved calibration when it belongs to
@@ -55,13 +59,20 @@ void ApanCalibrationHidden(const int16_t *input_bf16, const int16_t *alpha_bf16,
 /* Engine mode: a working calibration starts (the caller loads the factory beta and P0 into the AxlCORE), counts
    trained hits, and is committed by reading the engine's beta row by row. */
 typedef bool (*ApanCalibrationRowReader)(uint16_t row, int16_t beta_bf16[APAN_CALIBRATION_OUTPUT_SIZE]);
-bool ApanCalibrationBeginEngine(void);
+bool ApanCalibrationBeginEngine(uint8_t kind);
+/* Continue the saved calibration of the same kind: the hit count carries on from the saved count and the caller
+   loads the saved beta (ApanCalibrationSavedBetaRow) instead of the factory beta.  False when nothing of that kind
+   is saved; the working calibration is then not started. */
+bool ApanCalibrationBeginEngineContinue(uint8_t kind);
+bool ApanCalibrationSavedBetaRow(uint16_t row, int16_t beta_bf16[APAN_CALIBRATION_OUTPUT_SIZE]);
 bool ApanCalibrationNoteTrained(void);
 bool ApanCalibrationCommitEngine(ApanCalibrationRowReader read_row);
 
 /* Working calibration: factory beta and P0, then one OS-ELM step per hit. */
-bool ApanCalibrationBegin(void);
+bool ApanCalibrationBegin(uint8_t kind);
 bool ApanCalibrationUpdate(const float hidden[APAN_CALIBRATION_HIDDEN_SIZE], uint8_t target);
+bool ApanCalibrationUpdateTarget(const float hidden[APAN_CALIBRATION_HIDDEN_SIZE],
+                                 const float target[APAN_CALIBRATION_OUTPUT_SIZE]);
 bool ApanCalibrationCommit(void);
 void ApanCalibrationDiscard(void);
 void ApanCalibrationFactoryReset(void);

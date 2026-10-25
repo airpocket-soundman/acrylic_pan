@@ -12,11 +12,27 @@ from sim.odl_calibration_experiment import (
     os_elm_update,
 )
 from sim.odl_calibration_prior import (
-    DEFAULT_MODEL_HEADER,
-    DEFAULT_PRIOR_HEADER,
-    header_beta_bits,
     model_crc32,
 )
+from sim.position_odl_calibration_prior import (
+    DEFAULT_MODEL as DEFAULT_POSITION_MODEL,
+    DEFAULT_PRIOR_HEADER,
+)
+
+
+POSITION_MODEL_HEADER = Path(
+    "firmware/AcrylicPanCollector/generated/apan_position_probability_model.h"
+)
+
+
+def position_header_beta_bits(path: Path) -> np.ndarray:
+    """Read the row-major 32x60 beta deployed by the position firmware."""
+    text = path.read_text(encoding="ascii")
+    match = re.search(r"apan_position_beta\[\d+\] = \{(.*?)\};", text, re.S)
+    if match is None:
+        raise ValueError(f"{path}: apan_position_beta was not found")
+    values = [int(value, 16) for value in re.findall(r"0x[0-9A-Fa-f]{4}", match.group(1))]
+    return np.asarray(values, dtype=np.uint16)
 
 
 class OdlCalibrationExperimentTests(unittest.TestCase):
@@ -73,13 +89,22 @@ class OdlCalibrationExperimentTests(unittest.TestCase):
         self.assertEqual(len(set(chosen.tolist())), len(chosen))
         np.testing.assert_array_equal(chosen, draw_calibration(pool, 2, seed=0))
 
-    def test_firmware_prior_belongs_to_deployed_beta(self):
+    def test_firmware_prior_belongs_to_deployed_60_position_beta(self):
         prior = Path(DEFAULT_PRIOR_HEADER).read_text(encoding="ascii")
-        match = re.search(r"APAN_CALIBRATION_MODEL_CRC32 \(0x([0-9A-F]{8})UL\)", prior)
-        self.assertIsNotNone(match)
-        beta_bits = header_beta_bits(Path(DEFAULT_MODEL_HEADER))
-        self.assertEqual(beta_bits.size, 32 * 12)
-        self.assertEqual(int(match.group(1), 16), model_crc32(beta_bits))
+        crc_match = re.search(
+            r"APAN_CALIBRATION_MODEL_CRC32 \(0x([0-9A-F]{8})UL\)", prior
+        )
+        self.assertIsNotNone(crc_match)
+        self.assertIn("#define APAN_CALIBRATION_HIDDEN_SIZE 32U", prior)
+        self.assertIn("#define APAN_CALIBRATION_OUTPUT_SIZE 60U", prior)
+
+        deployed_bits = position_header_beta_bits(POSITION_MODEL_HEADER)
+        self.assertEqual(deployed_bits.size, 32 * 60)
+        with np.load(DEFAULT_POSITION_MODEL, allow_pickle=False) as model:
+            artifact_bits = np.asarray(model["beta_bfloat16"], dtype=np.uint16)
+        self.assertEqual(artifact_bits.shape, (32, 60))
+        np.testing.assert_array_equal(deployed_bits, artifact_bits.reshape(-1))
+        self.assertEqual(int(crc_match.group(1), 16), model_crc32(deployed_bits))
 
 
 if __name__ == "__main__":

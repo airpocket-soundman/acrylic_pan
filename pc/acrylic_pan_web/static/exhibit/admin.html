@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Acrylic Pan 管理</title>
+  <link rel="stylesheet" href="/exhibit/exhibit.css">
+  <link rel="stylesheet" href="/exhibit/admin.css">
+</head>
+<body>
+  <main class="admin-page">
+    <section class="admin-head">
+      <div>
+        <p class="eyebrow">SYSTEM HEALTH</p>
+        <h2>展示システム管理</h2>
+        <p id="checkedAt">安全な非破壊検査を準備しています。</p>
+      </div>
+      <button id="runDiagnostics" class="admin-button primary">自動検査を実行</button>
+    </section>
+
+    <section id="overall" class="overall checking" aria-live="polite">
+      <div class="overall-icon">…</div>
+      <div><strong>検査中</strong><span>Solist-AIとラズパイを確認しています</span></div>
+      <div id="systemInfo" class="system-info"></div>
+    </section>
+
+    <div class="diagnostic-columns">
+      <section>
+        <h3>展示に必要な項目</h3>
+        <div id="requiredChecks" class="checks"></div>
+      </section>
+      <section>
+        <h3>保守・オプション</h3>
+        <div id="optionalChecks" class="checks"></div>
+      </section>
+    </div>
+
+    <section class="system-actions">
+      <div>
+        <p class="eyebrow">MAINTENANCE</p>
+        <h3>システム操作</h3>
+        <p>誤操作防止のため、実行するボタンを3秒間長押ししてください。追加学習や収録の途中は実行できません。</p>
+      </div>
+      <div class="action-buttons">
+        <button class="hold-button service" data-action="service_restart" data-label="Web UIを再起動">
+          <span>Web UIを再起動</span><i></i>
+        </button>
+        <button class="hold-button reboot" data-action="reboot" data-label="ラズパイを再起動">
+          <span>ラズパイを再起動</span><i></i>
+        </button>
+        <button class="hold-button poweroff" data-action="poweroff" data-label="ラズパイの電源を切る">
+          <span>ラズパイの電源を切る</span><i></i>
+        </button>
+      </div>
+      <p id="actionMessage" class="action-message"></p>
+    </section>
+  </main>
+  <div id="shutdownOverlay" class="shutdown-overlay" hidden>
+    <div class="spinner"></div><strong id="shutdownTitle">処理中</strong><p id="shutdownText"></p>
+  </div>
+  <script src="/exhibit/exhibit.js"></script>
+  <script src="/exhibit/admin.js"></script>
+</body>
+</html>

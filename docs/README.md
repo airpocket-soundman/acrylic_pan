@@ -13,6 +13,8 @@ Acrylic Pan の開発に必要なドキュメントを目的別にまとめる�
 | [シミュレーション環境](simulation-environment.md) | Docker・CalculiX など振動解析で使うソフトと実行条件 |
 | [KX134-1211-EVK-001 変換配線](kx134-evk-adapter.md) | 交換用センサ評価基板の配線(実機確認済み) |
 | [Web UIの機能](webui-improvements.md) | 音色、8点フィット、ODL、接続模式図、プレゼン用の埋め込み |
+| [展示会用ページ](exhibit-kiosk.md) | 演奏・追加学習・デモ動画・管理の4ページと基板なしでの確認方法 |
+| [展示会用Raspberry Pi](exhibit-raspberry-pi.md) | MCU／Piの役割分担、自動起動、Tailscale遠隔保守、展示前チェック |
 | [決勝審査会プレゼン資料](final-presentation-plan.md) | 決勝審査会用のスライド型Webアプリ(メイン画面・プレゼンター画面)の構成と使い方 |
 | [レイテンシ](latency.md) | 打撃から発音までの経路、遅延の内訳、短縮の対策、FTDIのLatency Timer設定 |
 

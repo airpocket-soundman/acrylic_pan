@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Acrylic Pan 追加学習</title>
+  <link rel="stylesheet" href="/exhibit/exhibit.css">
+  <link rel="stylesheet" href="/exhibit/odl.css">
+</head>
+<body>
+  <div class="exhibit-body">
+    <div class="odl-layout">
+      <section class="odl-board">
+        <svg id="board" viewBox="-14 -14 428 328" role="img" aria-label="アクリル板の叩く位置"></svg>
+        <div id="instruction" class="odl-instruction" aria-live="polite">学習方式を選んでください</div>
+        <div id="rounds" class="odl-rounds" aria-label="周ごとの正解率"></div>
+        <div class="odl-progress"><div id="bar"></div></div>
+        <div id="counter" class="odl-counter"></div>
+      </section>
+      <aside class="odl-side">
+        <div class="odl-model"><span>今のモデル</span><strong id="modelState">確認中…</strong></div>
+        <h2>1. 学習方式を選ぶ</h2>
+        <div class="mode-cards" role="radiogroup" aria-label="学習方式">
+          <button type="button" class="mode-card" data-mode="quick" role="radio" aria-checked="true"><b>高速</b><span>12エリアの中心を叩く</span><small>1周 12回 × 5周 = 60回</small></button>
+          <button type="button" class="mode-card" data-mode="precise" role="radio" aria-checked="false"><b>精密</b><span>60地点を順番に叩く</span><small>1周 60回 × 5周 = 300回</small></button>
+        </div>
+        <h2>2. 学習する</h2>
+        <button id="more" type="button" class="big-button primary">＋ 追加学習（さらに5周）</button>
+        <button id="redo" type="button" class="big-button">新たに5周を取り直す</button>
+        <button id="cancel" type="button" class="big-button danger" hidden>中止（保存しない）</button>
+        <p id="hint" class="odl-hint"></p>
+        <h2>初期状態</h2>
+        <button id="reset" type="button" class="big-button danger">初期モデルに戻す</button>
+        <p id="error" class="odl-error" role="alert"></p>
+      </aside>
+    </div>
+  </div>
+  <script src="/exhibit/exhibit.js"></script>
+  <script src="/exhibit/odl.js"></script>
+</body>
+</html>

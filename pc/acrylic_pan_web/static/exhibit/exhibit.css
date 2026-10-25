@@ -1,0 +1,24 @@
+/* Exhibition kiosk shell: a top bar with three big pages, built for a touch screen. */
+:root{font-family:"Yu Gothic UI","Yu Gothic",Meiryo,"Noto Sans JP",sans-serif;color:#17202a;background:#edf2f6;--accent:#126ac2;--teal:#0d7f78;--pink:#ff5f9b}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{display:flex;flex-direction:column;overflow:hidden;user-select:none;-webkit-user-select:none;touch-action:manipulation}
+.exhibit-bar{display:flex;align-items:center;gap:18px;padding:10px 22px;background:#102733;color:#fff;flex:0 0 auto}
+.exhibit-bar h1{margin:0;font-size:22px;letter-spacing:.04em;white-space:nowrap}
+.exhibit-bar h1 small{display:block;font-size:11px;font-weight:600;letter-spacing:.14em;color:#70e2d5}
+.exhibit-nav{display:flex;gap:10px;margin-left:auto}
+.exhibit-nav a{display:flex;align-items:center;gap:8px;min-width:165px;justify-content:center;padding:14px 18px;border-radius:12px;border:2px solid #ffffff33;color:#dbe7f2;text-decoration:none;font-size:19px;font-weight:700}
+.exhibit-nav a[aria-current="page"]{background:#fff;color:#102733;border-color:#fff}
+.exhibit-nav.locked a:not([aria-current="page"]){opacity:.35;pointer-events:none}
+.exhibit-link{display:flex;align-items:center;gap:8px;font-size:13px;color:#b9c7d3;white-space:nowrap}
+.dot{width:12px;height:12px;border-radius:50%;background:#e24b4b}
+.dot.on{background:#3ddc84;box-shadow:0 0 8px #3ddc84}
+.exhibit-body{flex:1 1 auto;min-height:0;position:relative}
+.exhibit-body iframe{position:absolute;inset:0;width:100%;height:100%;border:0;background:#edf2f6}
+.big-button{font:inherit;font-size:22px;font-weight:800;padding:18px 26px;border-radius:14px;border:2px solid #aebac5;background:#fff;color:#17202a;cursor:pointer}
+.big-button:disabled{background:#e5e7eb;color:#94a3b8;border-color:#cbd5e1;cursor:not-allowed}
+.big-button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.big-button.primary:disabled{background:#9db8d6;border-color:#9db8d6;color:#eef3f8}
+.big-button.danger{border-color:#c0392b;color:#c0392b}
+.big-button.danger.armed{background:#c0392b;color:#fff}
+@media(max-width:1100px){.exhibit-nav a{min-width:0;padding:12px 14px;font-size:16px}.exhibit-bar h1 small{display:none}.exhibit-link span{display:none}}

@@ -28,6 +28,7 @@ class FakeBoard:
         self.saved_count = 0
         self.work_count = 0
         self.predicted = None
+        self.kind = 0xFF
 
     def send(self, packet):
         frame = decode_frame(packet)
@@ -37,7 +38,10 @@ class FakeBoard:
             return
         operation, argument = frame.payload[0], frame.payload[1]
         if operation == CalibrationOp.BEGIN:
-            self.source, self.work_count = 2, 0
+            self.begin_argument = argument
+            self.kind = argument & 0x0F
+            self.source = 2
+            self.work_count = self.saved_count if argument & 0x10 else 0
         elif operation == CalibrationOp.COMMIT:
             self.source, self.saved_valid, self.saved_count = 1, 1, self.work_count
         elif operation == CalibrationOp.DISCARD:
@@ -46,12 +50,15 @@ class FakeBoard:
             self.source, self.saved_valid, self.saved_count = 0, 0, 0
         queue.put(Frame(MessageType.ACK, frame.sequence, CALIBRATION_ACK_PAYLOAD.pack(
             MessageType.CALIBRATION, operation, self.source, self.saved_valid,
-            self.saved_count, self.work_count)))
+            self.saved_count, self.work_count,
+            self.kind if self.saved_valid else 0xFF,
+            self.kind if self.source == 2 else 0xFF)))
         if operation == CalibrationOp.ARM:
             trained = argument != 0xFF
             self.work_count += int(trained)
-            predicted = argument if trained else 3
-            outputs = [0.0] * 12
+            centers = (6, 21, 36, 51, 7, 22, 37, 52, 8, 23, 38, 53)
+            predicted = centers[argument] if trained and self.kind == 0 else argument if trained else 3
+            outputs = [0.0] * 60
             outputs[predicted] = 1.0
             queue.put(Frame(MessageType.CALIBRATION_RESULT, 99, CALIBRATION_RESULT_PAYLOAD.pack(
                 argument, predicted, 1 if trained else 0, self.source, self.work_count, 0,
@@ -105,6 +112,12 @@ class WebCalibrationTests(unittest.TestCase):
         self.assertFalse(status["saved_valid"])
         self.assertEqual(self.get_json("/api/calibration/state")["device_mode"], "calibration")
 
+    def test_position_calibration_script_is_served(self):
+        with urlopen(self.base + "/position-calibration.js", timeout=3) as response:
+            body = response.read()
+            self.assertEqual(response.headers["Content-Type"], "text/javascript; charset=utf-8")
+        self.assertIn(b"odlCalibrationStart", body)
+
     def test_learn_and_commit_makes_the_saved_model_active(self):
         self.post_json("/api/calibration/enter", {})
         self.assertEqual(self.post_json("/api/calibration/begin", {})["source"], "working")
@@ -117,7 +130,31 @@ class WebCalibrationTests(unittest.TestCase):
             self.assertTrue(state["result"]["trained"])
         status = self.post_json("/api/calibration/commit", {})
         self.assertEqual((status["source"], status["saved_count"]), ("saved", 12))
+        self.assertEqual(status["saved_kind"], "quick")
         self.assertEqual(self.post_json("/api/calibration/factory_reset", {})["source"], "factory")
+
+    def test_continue_flag_reaches_the_firmware_and_keeps_the_count(self):
+        self.post_json("/api/calibration/enter", {})
+        self.post_json("/api/calibration/begin", {"kind": "quick"})
+        self.assertEqual(self.board.begin_argument, 0)
+        before = self.get_json("/api/calibration/state")["result_count"]
+        self.post_json("/api/calibration/arm", {"target": 0})
+        self.wait_for_result(before + 1)
+        self.post_json("/api/calibration/commit", {})
+        status = self.post_json("/api/calibration/begin", {"kind": "quick", "continue": True})
+        self.assertEqual(self.board.begin_argument, 0x10)
+        self.assertEqual((status["source"], status["work_count"], status["work_kind"]), ("working", 1, "quick"))
+        status = self.post_json("/api/calibration/begin", {"kind": "precise", "continue": True})
+        self.assertEqual(self.board.begin_argument, 0x11)
+
+    def test_precise_mode_accepts_position_59(self):
+        self.post_json("/api/calibration/enter", {})
+        status = self.post_json("/api/calibration/begin", {"kind": "precise"})
+        self.assertEqual(status["work_kind"], "precise")
+        before = self.get_json("/api/calibration/state")["result_count"]
+        self.post_json("/api/calibration/arm", {"target": 59, "kind": "precise"})
+        result = self.wait_for_result(before + 1)["result"]
+        self.assertEqual((result["target"], result["predicted_class"]), (59, 59))
 
     def test_check_only_hit_does_not_train(self):
         self.post_json("/api/calibration/enter", {})
@@ -134,7 +171,7 @@ class WebCalibrationTests(unittest.TestCase):
     def test_arm_rejects_unknown_area(self):
         self.post_json("/api/calibration/enter", {})
         with self.assertRaises(HTTPError) as caught:
-            self.post_json("/api/calibration/arm", {"target": 12})
+            self.post_json("/api/calibration/arm", {"target": 12, "kind": "quick"})
         self.assertEqual(caught.exception.code, 400)
 
     def test_note_audio_is_served_as_wav_and_cached(self):

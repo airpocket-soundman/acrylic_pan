@@ -1,4 +1,4 @@
-"""Guided on-site calibration of the 12-area model on the Solist-AI board.
+"""Guided on-site calibration of the 60-position model on the Solist-AI board.
 
 The firmware learns each guided hit with a float32 OS-ELM (see
 docs/odl-calibration-experiment-20260927.md).  This tool checks every area
@@ -33,6 +33,7 @@ from .protocol import (
 )
 
 AREA_COUNT = 12
+POSITION_COUNT = 60
 COLUMNS = 4
 CALIBRATION_MODE = 4
 NACK_REASONS = {1: "busy", 2: "unsupported", 3: "invalid state", 4: "failed"}
@@ -50,6 +51,30 @@ class DeviceError(RuntimeError):
 def area_label(area: int) -> str:
     """1-based area number with its grid position (row 1 is the top)."""
     return f"エリア{area + 1:2d}（{area // COLUMNS + 1}行{area % COLUMNS + 1}列）"
+
+
+def _position_support() -> tuple[tuple[int, int], ...]:
+    edge = []
+    for x in (25, 75, 125, 175, 225, 275, 325, 375):
+        ys = (35, 75, 125, 175, 225, 275) if x in (225, 275) else (25, 75, 125, 175, 225, 275)
+        edge.extend((x, y) for y in ys)
+    centres = [(x, y) for x in (50, 150, 250, 350) for y in (50, 150, 250)]
+    return tuple(sorted(edge + centres))
+
+
+POSITION_SUPPORT = _position_support()
+
+
+def position_area(position: int) -> int:
+    x, y = POSITION_SUPPORT[position]
+    return (y // 100) * COLUMNS + x // 100
+
+
+def target_label(target: int, kind: str) -> str:
+    if kind == "quick":
+        return area_label(target)
+    x, y = POSITION_SUPPORT[target]
+    return f"位置{target + 1:2d}（X{x} / Y{y} mm）"
 
 
 class CalibrationClient:
@@ -124,46 +149,53 @@ class CalibrationReport:
 
 
 def _check_pass(client: CalibrationClient, prompt: Callable[[str], None],
-                report: CalibrationReport, phase: str) -> int:
+                report: CalibrationReport, phase: str, kind: str) -> int:
     correct = 0
-    for area in range(AREA_COUNT):
-        prompt(f"[{phase}] {area_label(area)} を1回叩いてください")
+    count = AREA_COUNT if kind == "quick" else POSITION_COUNT
+    for target in range(count):
+        prompt(f"[{phase}] {target_label(target, kind)} を1回叩いてください")
         result = client.hit(None)
-        correct += int(result.predicted_class == area)
-        report.hits.append({"phase": phase, "area": area,
+        predicted = position_area(result.predicted_class) if kind == "quick" else result.predicted_class
+        correct += int(predicted == target)
+        report.hits.append({"phase": phase, "target": target,
                             "predicted": result.predicted_class})
-        mark = "○" if result.predicted_class == area else f"× → {area_label(result.predicted_class)}"
+        mark = "○" if predicted == target else f"× → {target_label(predicted, kind)}"
         prompt(f"    推定 {mark}")
     return correct
 
 
 def run_calibration(client: CalibrationClient, rounds: int,
                     prompt: Callable[[str], None] = print,
-                    confirm: Callable[[str], bool] | None = None) -> CalibrationReport:
+                    confirm: Callable[[str], bool] | None = None,
+                    kind: str = "quick") -> CalibrationReport:
     """Check, train ``rounds`` passes over every area, check again, then commit or discard."""
     if rounds < 1:
         raise ValueError("rounds must be positive")
+    if kind not in ("quick", "precise"):
+        raise ValueError("kind must be quick or precise")
+    count = AREA_COUNT if kind == "quick" else POSITION_COUNT
     report = CalibrationReport(rounds)
     client.set_calibration_mode()
     report.initial_source = client.calibration(CalibrationOp.STATUS).source.name.lower()
     prompt(f"現在のモデル: {report.initial_source}")
     try:
-        report.before_correct = _check_pass(client, prompt, report, "校正前の確認")
-        client.calibration(CalibrationOp.BEGIN)
+        report.before_correct = _check_pass(client, prompt, report, "校正前の確認", kind)
+        client.calibration(CalibrationOp.BEGIN, 0 if kind == "quick" else 1)
         for round_index in range(rounds):
-            for area in range(AREA_COUNT):
-                prompt(f"[学習 {round_index + 1}/{rounds}] {area_label(area)} を叩いてください")
-                result = client.hit(area)
+            for target in range(count):
+                prompt(f"[学習 {round_index + 1}/{rounds}] {target_label(target, kind)} を叩いてください")
+                result = client.hit(target)
                 if not result.trained:
                     raise DeviceError("the firmware could not learn the hit")
                 report.training_hits += 1
-                report.training_correct_before_update += int(result.predicted_class == area)
+                predicted = position_area(result.predicted_class) if kind == "quick" else result.predicted_class
+                report.training_correct_before_update += int(predicted == target)
                 report.max_train_ms = max(report.max_train_ms, result.train_us / 1000.0)
-                report.hits.append({"phase": "train", "area": area,
+                report.hits.append({"phase": "train", "target": target,
                                     "predicted": result.predicted_class,
                                     "train_us": result.train_us})
                 prompt(f"    学習済み {result.work_count}打（更新 {result.train_us / 1000:.0f} ms）")
-        report.after_correct = _check_pass(client, prompt, report, "校正後の確認")
+        report.after_correct = _check_pass(client, prompt, report, "校正後の確認", kind)
     except BaseException:
         # Leave the board on its previous beta whatever went wrong.
         try:
@@ -172,8 +204,8 @@ def run_calibration(client: CalibrationClient, rounds: int,
             pass
         raise
 
-    summary = (f"確認打の正解: 校正前 {report.before_correct}/{AREA_COUNT}、"
-               f"校正後 {report.after_correct}/{AREA_COUNT}")
+    summary = (f"確認打の正解: 校正前 {report.before_correct}/{count}、"
+               f"校正後 {report.after_correct}/{count}")
     prompt(summary)
     keep = report.after_correct >= report.before_correct
     if confirm is not None:
@@ -195,8 +227,11 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--port", required=True)
+    parser.add_argument("--baudrate", type=int, default=960_000, help="serial speed of the firmware (960000 for the current build)")
     parser.add_argument("--rounds", type=int, default=5,
                         help="training passes over all 12 areas (default 5 = 60 hits)")
+    parser.add_argument("--kind", choices=("quick", "precise"), default="quick",
+                        help="quick: 12 area centres with soft targets; precise: all 60 points")
     parser.add_argument("--ask", action="store_true",
                         help="ask before saving instead of comparing the check accuracy")
     parser.add_argument("--status", action="store_true", help="only show the stored calibration")
@@ -205,7 +240,7 @@ def main() -> None:
     parser.add_argument("--log", type=Path, help="write the per-hit report as JSON")
     args = parser.parse_args()
 
-    with serial.Serial(args.port, 115_200, timeout=0.05, write_timeout=0.5) as port:
+    with serial.Serial(args.port, args.baudrate, timeout=0.05, write_timeout=0.5) as port:
         client = CalibrationClient(port)
         if args.status or args.factory_reset:
             client.set_calibration_mode()
@@ -217,7 +252,7 @@ def main() -> None:
         confirm = None
         if args.ask:
             confirm = lambda message: input(message + " [y/N] ").strip().lower() == "y"
-        report = run_calibration(client, args.rounds, print, confirm)
+        report = run_calibration(client, args.rounds, print, confirm, args.kind)
     if args.log is not None:
         args.log.write_text(json.dumps(asdict(report), ensure_ascii=False, indent=2) + "\n",
                             encoding="utf-8")

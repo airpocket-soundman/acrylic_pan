@@ -1,59 +1,39 @@
-#include <math.h>
 #include <stdio.h>
 #include <string.h>
 
 #include "Fram.h"
 #include "SoftSpi.h"
 #include "wdt.h"
-#include "apan_12class_model.h"
+#include "apan_position_probability_model.h"
 #include "apan_calibration.h"
-#include "apan_calibration_golden.h"
 
 #define CHECK(condition) do { if (!(condition)) { \
     fprintf(stderr, "check failed at line %d: %s\n", __LINE__, #condition); return 1; \
 } } while (0)
 
 #define FRAM_SIZE (256UL * 1024UL)
-#define WORK_BETA (APAN_CALIBRATION_FRAM_BASE + 32UL * 32UL * 4UL)
-#define SAVED_BETA (WORK_BETA + 32UL * 12UL * 4UL)
-
+#define P_BYTES (APAN_CALIBRATION_HIDDEN_SIZE * APAN_CALIBRATION_HIDDEN_SIZE * 4UL)
+#define BETA_BYTES (APAN_CALIBRATION_HIDDEN_SIZE * APAN_CALIBRATION_OUTPUT_SIZE * 4UL)
+#define SAVED_HEADER (APAN_CALIBRATION_FRAM_BASE + P_BYTES + 2UL * BETA_BYTES)
 static unsigned char fram[FRAM_SIZE];
 static int fram_initialized;
+static int16_t engine_beta[APAN_CALIBRATION_HIDDEN_SIZE][APAN_CALIBRATION_OUTPUT_SIZE];
 
 void SoftSpiPeripheralInit(void) {}
 void wdt_clear(void) {}
 void FramInit(void) { fram_initialized = 1; }
-
 void FramReadBlock(uint32_t address, void *dst, int size)
 {
     memcpy(dst, &fram[address], (size_t)size);
 }
-
 void FramWriteBlock(uint32_t address, const void *src, int size)
 {
     memcpy(&fram[address], src, (size_t)size);
 }
 
-static float bf16_to_float(uint16_t bits)
+static bool read_engine_row(uint16_t row, int16_t out[APAN_CALIBRATION_OUTPUT_SIZE])
 {
-    union { uint32_t bits; float value; } converted;
-    converted.bits = (uint32_t)bits << 16;
-    return converted.value;
-}
-
-static float fram_float(uint32_t address)
-{
-    float value;
-    memcpy(&value, &fram[address], sizeof(value));
-    return value;
-}
-
-/* Engine mode: the AxlCORE holds the working beta; the FRAM keeps only what is committed. */
-static int16_t engine_beta[32][12];
-
-static bool read_engine_row(uint16_t row_index, int16_t beta_bf16[12])
-{
-    memcpy(beta_bf16, engine_beta[row_index], sizeof(engine_beta[row_index]));
+    memcpy(out, engine_beta[row], sizeof(engine_beta[row]));
     return true;
 }
 
@@ -61,165 +41,78 @@ int main(void)
 {
     ApanCalibrationStatus status;
     float hidden[APAN_CALIBRATION_HIDDEN_SIZE];
+    float soft_target[APAN_CALIBRATION_OUTPUT_SIZE] = {0.0F};
     int16_t row[APAN_CALIBRATION_OUTPUT_SIZE];
-    int16_t wrong_beta[APAN_MODEL_HIDDEN_SIZE * APAN_MODEL_OUTPUT_SIZE];
-    double worst_beta = 0.0;
-    double worst_p = 0.0;
-    unsigned hit;
+    int16_t wrong_beta[APAN_POSITION_HIDDEN_SIZE * APAN_POSITION_OUTPUT_SIZE];
     unsigned i;
     unsigned j;
 
-    /* The generated prior belongs to the deployed factory beta. */
-    CHECK(ApanCalibrationCrc32(0UL, apan_model_beta, sizeof(apan_model_beta)) ==
+    CHECK(ApanCalibrationCrc32(0UL, apan_position_beta, sizeof(apan_position_beta)) ==
           APAN_CALIBRATION_MODEL_CRC32);
     CHECK(ApanCalibrationCrc32(0UL, "123456789", 9U) == 0xCBF43926UL);
-
-    /* A different factory model disables calibration without touching FRAM. */
-    memcpy(wrong_beta, apan_model_beta, sizeof(wrong_beta));
+    memcpy(wrong_beta, apan_position_beta, sizeof(wrong_beta));
     wrong_beta[0] ^= 1;
     CHECK(!ApanCalibrationInitialize(wrong_beta));
     CHECK(!fram_initialized);
-    CHECK(!ApanCalibrationBegin());
+    CHECK(!ApanCalibrationBegin(APAN_CALIBRATION_KIND_QUICK));
 
-    /* Blank FRAM: factory beta, nothing saved. */
-    CHECK(ApanCalibrationInitialize(apan_model_beta));
+    CHECK(ApanCalibrationInitialize(apan_position_beta));
     ApanCalibrationGetStatus(&status);
     CHECK(status.source == APAN_CALIBRATION_SOURCE_FACTORY);
-    CHECK(!status.saved_valid);
+    CHECK(status.saved_kind == APAN_CALIBRATION_KIND_NONE);
     CHECK(!ApanCalibrationActiveBetaRow(0U, row));
-    CHECK(!ApanCalibrationUpdate(apan_calibration_golden_hidden, 0U));
-    CHECK(!ApanCalibrationCommit());
 
-    /* CPU hidden layer equals the PC reference to one bfloat16 step. */
-    for (hit = 0U; hit < APAN_CALIBRATION_GOLDEN_COUNT; hit++)
-    {
-        ApanCalibrationHidden((const int16_t *)apan_calibration_golden_inputs[hit],
-                              apan_model_alpha, APAN_MODEL_INPUT_SIZE, hidden);
-        for (j = 0U; j < APAN_CALIBRATION_HIDDEN_SIZE; j++)
-        {
-            CHECK(fabsf(hidden[j] -
-                        apan_calibration_golden_hidden[hit * APAN_CALIBRATION_HIDDEN_SIZE + j]) <=
-                  0.0040F);
-        }
-    }
-
-    /* Working calibration starts from the factory beta. */
-    CHECK(ApanCalibrationBegin());
+    for (i = 0U; i < APAN_CALIBRATION_HIDDEN_SIZE; i++) { hidden[i] = 0.25F; }
+    soft_target[6] = 0.6F;
+    soft_target[0] = soft_target[1] = soft_target[9] = soft_target[10] = 0.1F;
+    CHECK(ApanCalibrationBegin(APAN_CALIBRATION_KIND_QUICK));
+    CHECK(ApanCalibrationUpdateTarget(hidden, soft_target));
     ApanCalibrationGetStatus(&status);
-    CHECK(status.source == APAN_CALIBRATION_SOURCE_WORKING);
-    CHECK(status.work_count == 0U);
-    CHECK(ApanCalibrationActiveBetaRow(3U, row));
-    CHECK(memcmp(row, &apan_model_beta[3U * APAN_MODEL_OUTPUT_SIZE], sizeof(row)) == 0);
-    CHECK(!ApanCalibrationUpdate(apan_calibration_golden_hidden, APAN_CALIBRATION_OUTPUT_SIZE));
-
-    /* float32 OS-ELM on FRAM rows reproduces the float64 PC sequence. */
-    for (hit = 0U; hit < APAN_CALIBRATION_GOLDEN_COUNT; hit++)
-    {
-        CHECK(ApanCalibrationUpdate(
-            &apan_calibration_golden_hidden[hit * APAN_CALIBRATION_HIDDEN_SIZE],
-            apan_calibration_golden_targets[hit]));
-    }
-    ApanCalibrationGetStatus(&status);
-    CHECK(status.work_count == APAN_CALIBRATION_GOLDEN_COUNT);
-    for (i = 0U; i < 32U * 12U; i++)
-    {
-        double error = fabs((double)fram_float(WORK_BETA + i * 4U) -
-                            (double)apan_calibration_golden_beta[i]);
-        if (error > worst_beta) { worst_beta = error; }
-    }
-    for (i = 0U; i < 32U * 32U; i++)
-    {
-        double error = fabs((double)fram_float(APAN_CALIBRATION_FRAM_BASE + i * 4U) -
-                            (double)apan_calibration_golden_p[i]);
-        if (error > worst_p) { worst_p = error; }
-    }
-    printf("calibration max |beta error| %.3g, max |P error| %.3g\n", worst_beta, worst_p);
-    CHECK(worst_beta < 1.0e-4);
-    CHECK(worst_p < 1.0e-5);
-
-    /* The accelerator receives the working beta rounded to bfloat16. */
-    CHECK(ApanCalibrationActiveBetaRow(5U, row));
-    for (j = 0U; j < APAN_CALIBRATION_OUTPUT_SIZE; j++)
-    {
-        float expected = fram_float(WORK_BETA + (5U * 12U + j) * 4U);
-        CHECK(fabsf(bf16_to_float((uint16_t)row[j]) - expected) <= fabsf(expected) / 256.0F);
-    }
-
-    /* Commit persists the working beta and survives a restart. */
+    CHECK(status.work_count == 1U);
+    CHECK(status.work_kind == APAN_CALIBRATION_KIND_QUICK);
+    CHECK(ApanCalibrationActiveBetaRow(0U, row));
     CHECK(ApanCalibrationCommit());
     ApanCalibrationGetStatus(&status);
     CHECK(status.source == APAN_CALIBRATION_SOURCE_SAVED);
-    CHECK(status.saved_valid);
-    CHECK(status.saved_count == APAN_CALIBRATION_GOLDEN_COUNT);
-    CHECK(memcmp(&fram[SAVED_BETA], &fram[WORK_BETA], 32U * 12U * 4U) == 0);
-    CHECK(ApanCalibrationInitialize(apan_model_beta));
+    CHECK(status.saved_count == 1U);
+    CHECK(status.saved_kind == APAN_CALIBRATION_KIND_QUICK);
+
+    CHECK(ApanCalibrationInitialize(apan_position_beta));
     ApanCalibrationGetStatus(&status);
     CHECK(status.source == APAN_CALIBRATION_SOURCE_SAVED);
-    CHECK(status.saved_count == APAN_CALIBRATION_GOLDEN_COUNT);
-
-    /* Discarding a new working calibration returns to the saved one. */
-    CHECK(ApanCalibrationBegin());
-    CHECK(ApanCalibrationUpdate(apan_calibration_golden_hidden, 0U));
+    CHECK(status.saved_kind == APAN_CALIBRATION_KIND_QUICK);
+    CHECK(ApanCalibrationBegin(APAN_CALIBRATION_KIND_PRECISE));
     ApanCalibrationDiscard();
     ApanCalibrationGetStatus(&status);
     CHECK(status.source == APAN_CALIBRATION_SOURCE_SAVED);
-    CHECK(status.work_count == 0U);
+    CHECK(status.work_kind == APAN_CALIBRATION_KIND_NONE);
 
-    /* A corrupted saved beta is rejected at start-up. */
-    fram[SAVED_BETA + 17U] ^= 0x40U;
-    CHECK(ApanCalibrationInitialize(apan_model_beta));
+    /* The persisted mode is part of the saved-record validity check. */
+    fram[SAVED_HEADER + 10U] = APAN_CALIBRATION_KIND_NONE;
+    fram[SAVED_HEADER + 11U] = 0U;
+    CHECK(ApanCalibrationInitialize(apan_position_beta));
     ApanCalibrationGetStatus(&status);
     CHECK(status.source == APAN_CALIBRATION_SOURCE_FACTORY);
     CHECK(!status.saved_valid);
-    fram[SAVED_BETA + 17U] ^= 0x40U;
-    CHECK(ApanCalibrationInitialize(apan_model_beta));
-    ApanCalibrationGetStatus(&status);
-    CHECK(status.source == APAN_CALIBRATION_SOURCE_SAVED);
 
-    /* Factory reset forgets the saved calibration permanently. */
     ApanCalibrationFactoryReset();
-    CHECK(ApanCalibrationInitialize(apan_model_beta));
-    ApanCalibrationGetStatus(&status);
-    CHECK(status.source == APAN_CALIBRATION_SOURCE_FACTORY);
-    CHECK(!status.saved_valid);
-
-    /* Engine mode: begin, count hits, commit the engine's beta, restart, discard. */
-    CHECK(ApanCalibrationInitialize(apan_model_beta));
-    CHECK(!ApanCalibrationCommitEngine(read_engine_row));            /* nothing working yet */
-    CHECK(ApanCalibrationBeginEngine());
-    ApanCalibrationGetStatus(&status);
-    CHECK(status.source == APAN_CALIBRATION_SOURCE_WORKING);
-    CHECK(status.work_count == 0U);
-    CHECK(!ApanCalibrationCommitEngine(read_engine_row));            /* no hit learned yet */
-    for (i = 0U; i < 32U; i++)
+    CHECK(ApanCalibrationInitialize(apan_position_beta));
+    CHECK(ApanCalibrationBeginEngine(APAN_CALIBRATION_KIND_PRECISE));
+    for (i = 0U; i < APAN_CALIBRATION_HIDDEN_SIZE; i++)
     {
-        for (j = 0U; j < 12U; j++) { engine_beta[i][j] = (int16_t)(0x3C00 + (int)(i * 12U + j)); }
+        for (j = 0U; j < APAN_CALIBRATION_OUTPUT_SIZE; j++)
+        {
+            engine_beta[i][j] = (int16_t)(0x3A00 + (int)((i + j) & 0x01FFU));
+        }
     }
     CHECK(ApanCalibrationNoteTrained());
-    CHECK(ApanCalibrationNoteTrained());
-    ApanCalibrationGetStatus(&status);
-    CHECK(status.work_count == 2U);
     CHECK(ApanCalibrationCommitEngine(read_engine_row));
+    CHECK(ApanCalibrationInitialize(apan_position_beta));
     ApanCalibrationGetStatus(&status);
-    CHECK(status.source == APAN_CALIBRATION_SOURCE_SAVED);
-    CHECK(status.saved_valid);
-    CHECK(status.saved_count == 2U);
-    CHECK(ApanCalibrationInitialize(apan_model_beta));               /* survives a restart */
-    ApanCalibrationGetStatus(&status);
-    CHECK(status.source == APAN_CALIBRATION_SOURCE_SAVED);
-    CHECK(status.saved_count == 2U);
-    for (i = 0U; i < 32U; i++)
-    {
-        int16_t saved[12];
-        CHECK(ApanCalibrationActiveBetaRow((uint16_t)i, saved));
-        CHECK(memcmp(saved, engine_beta[i], sizeof(saved)) == 0);   /* bfloat16 -> float32 -> bfloat16 is exact */
-    }
-    CHECK(ApanCalibrationBeginEngine());
-    ApanCalibrationDiscard();                                        /* back to the saved beta */
-    ApanCalibrationGetStatus(&status);
-    CHECK(status.source == APAN_CALIBRATION_SOURCE_SAVED);
-    CHECK(status.work_count == 0U);
+    CHECK(status.saved_kind == APAN_CALIBRATION_KIND_PRECISE);
+    CHECK(ApanCalibrationActiveBetaRow(7U, row));
+    CHECK(memcmp(row, engine_beta[7], sizeof(row)) == 0);
 
-    printf("calibration host test passed\n");
+    printf("60-position calibration host test passed\n");
     return 0;
 }
