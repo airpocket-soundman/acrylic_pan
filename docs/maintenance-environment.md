@@ -113,3 +113,15 @@ IchiPing側の記述は、同リポジトリの `docs/DEVELOPMENT.md` の「開�
 LEXIDE-Ωの使用にはキーコードが要る。取得方法は ProtoPedia の
 [作品8201](https://protopedia.net/prototype/8201) に案内がある。
 ソフトのインストーラは使用許諾への同意が要るため、PCの前でユーザーが実行する。
+
+## 導入の進み具合（2026-10-28 夜）
+
+- LEXIDE-Ω V2.3.0 を `C:\LAPIS\LEXIDE` へ導入済み。
+- ML63Q25x7_DFP は `C:\Users\yamas\AppData\Local\Arm\Packs\ROHM\` に展開し、Pack Managerで「Up to date」を確認した。
+  取り込みの画面操作が見つからなかったため、`.pack`（zip）を標準の置き場に展開して反応させた。
+- `IODriverV1.0.25.0602.zip` を `C:\Users\yamas\solist-tools\IODriver_extracted\` に展開した。基板のサンプル9本
+  （`MemsAccelerometer` など）とドライバ共通部が入っている。
+- **ファームウェアの overlay には、`AIVibrationInference` のサンプルソース一式が別に要る。**
+  手元の配布物は、ビルド済みhexと手順書だけで、ソースを含まない。データテクノ側の
+  AIVibrationInferenceHost（未取得）に含まれる可能性が高い。`install-overlay.ps1` の既定値は
+  `C:\Users\yamas\lexide\workspace_omega_v2\AIVibrationInference` を参照する。
