@@ -92,3 +92,24 @@ LEXIDE-Ωなどの導入後、次の順に行う。詳細は [開発環境](deve
 IchiPing_solist_AI も、公式Simulator、LEXIDE、ML63Q2557の書き込み環境を同じ形で使う。
 導入物は一度入れれば両方から使える。Python環境は、学習の依存が異なるため別にする。
 IchiPing側の記述は、同リポジトリの `docs/DEVELOPMENT.md` の「開発環境の共有」を参照する。
+
+## 導入ファイルの置き場（2026-10-28）
+
+`C:\Users\yamas\Downloads` にそろえた配布物のうち、インストール不要のものは
+`C:\Users\yamas\solist-tools\` に展開した。
+
+| 配布物 | 状態 | 次にすること |
+|---|---|---|
+| `LAPIS_LEXIDE_V2_3_0.zip.part00`〜`07` | **`part03` が無い** | `part03` を再取得し、`copy /b` で結合する。結合後は1,511,550,234バイト、MD5は `01c3353ce81153cc46441e676cfbbbc9` |
+| `ML63Q2500_DFP_r.1.1.0` | 展開済み | LEXIDE導入後、`ROHM.ML63Q25x7_DFP.1.1.0.pack` をPack Managerで追加 |
+| `ML63Q2500_ReferenceSoftware_v130` | 展開済み | LEXIDEで開く |
+| `IODriverSource` | 展開済み | 中の `IODriverV1.0.25.0602.zip` をサンプルへ重ねる |
+| `Solist-AI_Scope_1.2.12.3` | 展開済み | `SolistAiScopeSetup-ML63Q25xx-1.2.12.2.exe` で実機確認用ツールを導入 |
+| `AIVibrationInferenceRev.20260417` | 展開済み | ビルド済みhexと書き込み手順書。ソースは含まない |
+| `Solist-AI_Sim_SupervisedLearning` | 展開済み | `SolistAI_Sim_SLV10004_Installer_web.exe` を実行（使用許諾に同意が要る） |
+| `Solist-AI_Sim_AnomalyDetection` | 未展開 | 異常検知版。今回の用途では不要 |
+| `AISignalInferenceHost`、`AIVibrationInferenceHost` | **未取得** | データテクノ側のダウンロードが中断していた |
+
+LEXIDE-Ωの使用にはキーコードが要る。取得方法は ProtoPedia の
+[作品8201](https://protopedia.net/prototype/8201) に案内がある。
+ソフトのインストーラは使用許諾への同意が要るため、PCの前でユーザーが実行する。
