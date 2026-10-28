@@ -12,6 +12,8 @@ the firmware's deployed model header automatically.
 
 from __future__ import annotations
 
+import os
+
 import argparse
 from dataclasses import dataclass
 import hashlib
@@ -47,7 +49,19 @@ AREA_CENTRES_MM = np.asarray(
 RIDGE = 0.1
 CLASSIFICATION_ACTIVATION = "hard_sigmoid"
 XY_ACTIVATION = "sigmoid"
-DEFAULT_ALPHA = Path(r"D:\GitHub\IchiPing_solist_AI\sim_export\_alpha32_sim.npy")
+def _default_alpha() -> Path:
+    """Locate the IchiPing Solist-AI alpha file (env override, sibling repo, legacy D: path)."""
+    candidates = []
+    override = os.environ.get("ACRYLIC_PAN_ALPHA")
+    if override:
+        candidates.append(Path(override))
+    candidates.append(Path(__file__).resolve().parents[2] / "IchiPing_solist_AI" / "sim_export" / "_alpha32_sim.npy")
+    legacy = Path(r"D:\GitHub\IchiPing_solist_AI\sim_export\_alpha32_sim.npy")
+    candidates.append(legacy)
+    return next((path for path in candidates if path.exists()), legacy)
+
+
+DEFAULT_ALPHA = _default_alpha()
 DEFAULT_SESSION_IDS = (
     "20260718_074916_84b183d2",
     "20260718_080557_9524983c",

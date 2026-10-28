@@ -7,6 +7,8 @@ IchiPing validation repository and trains only beta, matching Solist-AI ELM.
 
 from __future__ import annotations
 
+import os
+
 import argparse
 import hashlib
 import json
@@ -37,7 +39,19 @@ HIDDEN_COUNT = 32
 CLASS_COUNT = 8
 RIDGE = 0.1
 SCALE_ALPHA_BF16 = 0x3E52
-DEFAULT_ALPHA = Path(r"D:\GitHub\IchiPing_solist_AI\sim_export\_alpha32_sim.npy")
+def _default_alpha() -> Path:
+    """Locate the IchiPing Solist-AI alpha file (env override, sibling repo, legacy D: path)."""
+    candidates = []
+    override = os.environ.get("ACRYLIC_PAN_ALPHA")
+    if override:
+        candidates.append(Path(override))
+    candidates.append(Path(__file__).resolve().parents[2] / "IchiPing_solist_AI" / "sim_export" / "_alpha32_sim.npy")
+    legacy = Path(r"D:\GitHub\IchiPing_solist_AI\sim_export\_alpha32_sim.npy")
+    candidates.append(legacy)
+    return next((path for path in candidates if path.exists()), legacy)
+
+
+DEFAULT_ALPHA = _default_alpha()
 
 
 def time_sample_indices() -> np.ndarray:
