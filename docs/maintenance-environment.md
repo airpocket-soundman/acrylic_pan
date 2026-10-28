@@ -100,7 +100,7 @@ IchiPing側の記述は、同リポジトリの `docs/DEVELOPMENT.md` の「開�
 
 | 配布物 | 状態 | 次にすること |
 |---|---|---|
-| `LAPIS_LEXIDE_V2_3_0.zip.part00`〜`07` | **`part03` が無い** | `part03` を再取得し、`copy /b` で結合する。結合後は1,511,550,234バイト、MD5は `01c3353ce81153cc46441e676cfbbbc9` |
+| `LAPIS_LEXIDE_V2_3_0.zip.part00`〜`07` | 結合・展開済み（MD5一致） | `solist-tools\LEXIDE_V2_3_0\LexideInstaller_20260904.exe` を実行する。標準の導入先は `C:\LAPIS\LEXIDE` |
 | `ML63Q2500_DFP_r.1.1.0` | 展開済み | LEXIDE導入後、`ROHM.ML63Q25x7_DFP.1.1.0.pack` をPack Managerで追加 |
 | `ML63Q2500_ReferenceSoftware_v130` | 展開済み | LEXIDEで開く |
 | `IODriverSource` | 展開済み | 中の `IODriverV1.0.25.0602.zip` をサンプルへ重ねる |
