@@ -9,6 +9,7 @@ Acrylic Pan の開発に必要なドキュメントを目的別にまとめる�
 |---|---|
 | [開発環境](development-environment.md) | DT-EBML63Q2557、LEXIDE、書き込み環境の構成 |
 | [収録システム・実機Web UIクイックスタート](collector-quickstart.md) | Python環境の確認、ファームのビルド・書き込み、Web UIでの収録と演奏 |
+| [展示本番用PCの保守環境](maintenance-environment.md) | このPCで学習とファームのビルドを行うための現況と手順 |
 | [Solist-AI Simulator](solist-ai-simulator.md) | 公式Simulatorの導入、CSV形式、8クラスモデルの作成手順 |
 | [シミュレーション環境](simulation-environment.md) | Docker・CalculiX など振動解析で使うソフトと実行条件 |
 | [KX134-1211-EVK-001 変換配線](kx134-evk-adapter.md) | 交換用センサ評価基板の配線(実機確認済み) |
