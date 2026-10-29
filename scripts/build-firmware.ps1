@@ -76,9 +76,22 @@ if (-not (Test-Path -LiteralPath $makefile -PathType Leaf)) {
     throw "Generated makefile not found: $makefile. Generate the $Configuration build once in LEXIDE."
 }
 
+# Use the newest installed Build Tools and point the generated build files at it,
+# so projects created with an older tools version still build.
+$toolsVersion = Get-ChildItem -LiteralPath "C:\LAPIS\LEXIDE\BuildTools" -Directory -Filter "Ver.*" |
+    Sort-Object Name -Descending | Select-Object -First 1 -ExpandProperty Name
+if (-not $toolsVersion) { throw "LEXIDE Build Tools not found under C:\LAPIS\LEXIDE\BuildTools." }
+Get-ChildItem -LiteralPath $buildDir -Recurse -File | Where-Object {
+    $_.Extension -in @(".res", ".mk") -or $_.Name -eq "makefile"
+} | ForEach-Object {
+    $text = [IO.File]::ReadAllText($_.FullName)
+    $updated = [regex]::Replace($text, "BuildTools/Ver\.\d+", "BuildTools/$toolsVersion")
+    if ($updated -ne $text) { [IO.File]::WriteAllText($_.FullName, $updated, [Text.UTF8Encoding]::new($false)) }
+}
+
 $lexidePaths = @(
     "C:\LAPIS\LEXIDE\Bin",
-    "C:\LAPIS\LEXIDE\BuildTools\Ver.20260317\Bin",
+    "C:\LAPIS\LEXIDE\BuildTools\$toolsVersion\Bin",
     "C:\LAPIS\LEXIDE\Utilities\Bin"
 )
 $env:Path = ($lexidePaths -join ";") + ";" + $env:Path
@@ -101,8 +114,13 @@ try {
         }
         Add-MissingOverlayResponses
     }
-    & $makeExe all -j
-    if ($LASTEXITCODE -ne 0) { throw "Firmware build failed with exit code $LASTEXITCODE." }
+    # make prints a harmless DOSKEY complaint on stderr; judge success by the exit code.
+    $previousPreference = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    & $makeExe all -j 2>&1 | Where-Object { $_ -notmatch "DOSKEY" }
+    $makeExit = $LASTEXITCODE
+    $ErrorActionPreference = $previousPreference
+    if ($makeExit -ne 0) { throw "Firmware build failed with exit code $makeExit." }
 } finally {
     Pop-Location
 }

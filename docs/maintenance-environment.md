@@ -138,3 +138,22 @@ LEXIDE-Ωの使用にはキーコードが要る。取得方法は ProtoPedia �
   `ARM-software/CMSIS_5` のリリース5.9.0）を取得し、`Packs\ARM\CMSIS\5.9.0` へ展開した。
 - **コンソールの `DOSKEY` の文字化けと警告。** ビルド結果には影響しない。
 - 画面なしの起動（`eclipsec.exe -application ...headlessbuild`）は、作業フォルダの初期化で止まった。ビルドは画面から行う。
+
+## 実機用ファームの再ビルド（2026-10-29）
+
+土台の `AIVibrationInference`（LEXIDEプロジェクト一式、約1.5 MBのzip）を
+`C:\Users\yamas\lexide\workspace_omega_v2\` に展開し、`install-overlay.ps1` で
+`AcrylicPanCollector_private` を作った。次のコマンドで、実機用ファームをビルドできる。
+
+```powershell
+.\scripts\build-firmware.ps1 -SourceProject C:\Users\yamas\lexide\workspace_omega_v2\AcrylicPanCollector_private
+```
+
+成果物は `.local\firmware-build\<日時>\AcrylicPanCollector_private\Debug\AIVibrationInference.hex`（約157 KB）に出る。
+元のプロジェクトは変更しない。
+
+土台のプロジェクトは Build Tools Ver.20260317 の場所を参照しており、このPCにあるのは Ver.20260904 だけだった。
+`build-firmware.ps1` は、ビルド用のコピーの参照先を、導入済みの最新版へ書き換えてからビルドするよう直した。
+また、`DOSKEY` の警告で失敗扱いにならないよう、終了コードで成否を判断するようにした。
+
+書き込みは、実機をつないだ状態で `scripts\flash-firmware.ps1` を使う。MCU-LinkとOpenOCDの動作は、このPCでは未確認である。
