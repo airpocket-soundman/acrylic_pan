@@ -125,3 +125,16 @@ LEXIDE-Ωの使用にはキーコードが要る。取得方法は ProtoPedia �
   手元の配布物は、ビルド済みhexと手順書だけで、ソースを含まない。データテクノ側の
   AIVibrationInferenceHost（未取得）に含まれる可能性が高い。`install-overlay.ps1` の既定値は
   `C:\Users\yamas\lexide\workspace_omega_v2\AIVibrationInference` を参照する。
+
+## ビルド確認（2026-10-29）
+
+基板サンプル `MemsAccelerometer` を LEXIDE-Ω V2.3.0 でビルドし、`0 errors, 3 warnings`（約35秒）で通った。
+ツール、デバイスパック、コンパイラ、リンカの経路は動作している。
+
+つまずいた点と対処は次のとおり。
+
+- **`core_cm0plus.h` が見つからない。** ROHM のデバイスパックは、ARM の `ARM.CMSIS` パック（5.9.0）を前提にする。
+  LEXIDE の索引に `ARM.CMSIS` が出ないため、公式の `ARM.CMSIS.5.9.0.pack`（約34 MB、
+  `ARM-software/CMSIS_5` のリリース5.9.0）を取得し、`Packs\ARM\CMSIS\5.9.0` へ展開した。
+- **コンソールの `DOSKEY` の文字化けと警告。** ビルド結果には影響しない。
+- 画面なしの起動（`eclipsec.exe -application ...headlessbuild`）は、作業フォルダの初期化で止まった。ビルドは画面から行う。
