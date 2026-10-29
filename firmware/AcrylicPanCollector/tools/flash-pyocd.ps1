@@ -3,7 +3,7 @@ param(
     [string]$Pack = 'C:\Users\yamas\Desktop\solist-ai\ML63Q2500_DFP_r.1.1.0\ROHM.ML63Q25x7_DFP.1.1.0.pack',
     [string]$Probe = '14OZPOHJLAY5E',
     [string]$OpenOcd = 'C:\LAPIS\LEXIDE\gdb\openocd_arm.exe',
-    [string]$Objcopy = 'C:\LAPIS\LEXIDE\BuildTools\Ver.20260317\Bin\llvm-objcopy.exe'
+    [string]$Objcopy = (Get-ChildItem -LiteralPath "C:\LAPIS\LEXIDE\BuildTools" -Directory -Filter "Ver.*" | Sort-Object Name -Descending | Select-Object -First 1 | ForEach-Object { Join-Path $_.FullName "Bin\llvm-objcopy.exe" })
 )
 
 $ErrorActionPreference = 'Stop'

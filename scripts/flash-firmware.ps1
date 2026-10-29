@@ -3,7 +3,7 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$FirmwareHex,
     [string]$OpenOcdExe = "C:\LAPIS\LEXIDE\gdb\openocd_arm.exe",
-    [string]$ObjcopyExe = "C:\LAPIS\LEXIDE\BuildTools\Ver.20260317\Bin\llvm-objcopy.exe",
+    [string]$ObjcopyExe = (Get-ChildItem -LiteralPath "C:\LAPIS\LEXIDE\BuildTools" -Directory -Filter "Ver.*" | Sort-Object Name -Descending | Select-Object -First 1 | ForEach-Object { Join-Path $_.FullName "Bin\llvm-objcopy.exe" }),
     [string]$InterfaceCfg = "C:\LAPIS\LEXIDE\Cfg\cmsis-dap.cfg",
     [string]$TargetCfg = "$env:LOCALAPPDATA\Arm\Packs\ROHM\ML63Q25x7_DFP\1.1.0\Cfg\ml63q25x7.cfg",
     [switch]$Execute
