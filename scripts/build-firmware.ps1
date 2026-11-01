@@ -81,12 +81,14 @@ if (-not (Test-Path -LiteralPath $makefile -PathType Leaf)) {
 $toolsVersion = Get-ChildItem -LiteralPath "C:\LAPIS\LEXIDE\BuildTools" -Directory -Filter "Ver.*" |
     Sort-Object Name -Descending | Select-Object -First 1 -ExpandProperty Name
 if (-not $toolsVersion) { throw "LEXIDE Build Tools not found under C:\LAPIS\LEXIDE\BuildTools." }
-Get-ChildItem -LiteralPath $buildDir -Recurse -File | Where-Object {
-    $_.Extension -in @(".res", ".mk") -or $_.Name -eq "makefile"
-} | ForEach-Object {
-    $text = [IO.File]::ReadAllText($_.FullName)
-    $updated = [regex]::Replace($text, "BuildTools/Ver\.\d+", "BuildTools/$toolsVersion")
-    if ($updated -ne $text) { [IO.File]::WriteAllText($_.FullName, $updated, [Text.UTF8Encoding]::new($false)) }
+function Update-BuildToolReferences {
+    Get-ChildItem -LiteralPath $buildDir -Recurse -File | Where-Object {
+        $_.Extension -in @(".res", ".mk") -or $_.Name -eq "makefile"
+    } | ForEach-Object {
+        $text = [IO.File]::ReadAllText($_.FullName)
+        $updated = [regex]::Replace($text, "BuildTools/Ver\.\d+", "BuildTools/$toolsVersion")
+        if ($updated -ne $text) { [IO.File]::WriteAllText($_.FullName, $updated, [Text.UTF8Encoding]::new($false)) }
+    }
 }
 
 $lexidePaths = @(
@@ -114,6 +116,9 @@ try {
         }
         Add-MissingOverlayResponses
     }
+    # `make clean` restores the original response files from the private
+    # project, so update their embedded compiler paths after that restore.
+    Update-BuildToolReferences
     # make prints a harmless DOSKEY complaint on stderr; judge success by the exit code.
     $previousPreference = $ErrorActionPreference
     $ErrorActionPreference = "Continue"

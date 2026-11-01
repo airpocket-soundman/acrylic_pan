@@ -8,6 +8,7 @@
 #include "apan_position_probability_model.h"
 #include "smpl_common.h"
 #include "wdt.h"
+#include "Fram.h"
 
 #define AI_INSTANCE (1U)
 #define AI_BUSY_LIMIT (65535UL)
@@ -18,6 +19,12 @@ static bool initialized;
 static bool calibration_initialized;
 static bool model_input_valid;
 static bool beginning;
+static uint16_t history_count;
+static uint8_t history_argument;
+static bool replaying;
+#define HISTORY_BASE 130000UL
+#define HISTORY_STRIDE 258UL
+#define HISTORY_LIMIT 500U
 static uint8_t calibration_kind = APAN_POSITION_CALIBRATION_QUICK;
 
 static bfloat16 float_to_bfloat16_rne(float value);
@@ -230,6 +237,7 @@ void ApanPositionInferenceSupport(uint8_t position_id, uint16_t *x_mm,
 
 bool ApanPositionCalibrationBegin(uint8_t argument)
 {
+    if (!replaying) { history_count = 0U; history_argument = argument; }
     const uint8_t kind = argument & (uint8_t)~APAN_POSITION_CALIBRATION_CONTINUE;
     const bool keep_saved = (argument & APAN_POSITION_CALIBRATION_CONTINUE) != 0U;
     if ((kind != APAN_POSITION_CALIBRATION_QUICK) &&
@@ -278,6 +286,12 @@ bool ApanPositionTrainLast(uint8_t target)
 #endif
     uint16_t index;
     if (!initialized || !model_input_valid) { return false; }
+    if (!replaying && history_count >= HISTORY_LIMIT) { return false; }
+    if (!replaying)
+    {
+        FramWriteBlock(HISTORY_BASE + history_count * HISTORY_STRIDE, model_input, sizeof(model_input));
+        FramWriteBlock(HISTORY_BASE + history_count * HISTORY_STRIDE + sizeof(model_input), &target, 1);
+    }
     if (((calibration_kind == APAN_POSITION_CALIBRATION_QUICK) && (target >= 12U)) ||
         ((calibration_kind == APAN_POSITION_CALIBRATION_PRECISE) &&
          (target >= APAN_POSITION_OUTPUT_COUNT))) { return false; }
@@ -307,7 +321,9 @@ bool ApanPositionTrainLast(uint8_t target)
     model_input_valid = false;
 #if APAN_CALIBRATION_ENGINE
     ODL_StartTrain(AI_INSTANCE, model_input, target_vector);
-    return wait_engine() && ApanCalibrationNoteTrained();
+    if (!wait_engine() || !ApanCalibrationNoteTrained()) { return false; }
+    if (!replaying) { history_count++; }
+    return true;
 #else
     {
         float hidden[APAN_POSITION_HIDDEN_SIZE];
@@ -317,4 +333,25 @@ bool ApanPositionTrainLast(uint8_t target)
         return true;
     }
 #endif
+}
+
+bool ApanPositionCalibrationUndo(void)
+{
+    uint16_t index, remaining;
+    uint8_t target;
+    if (history_count == 0U) { return false; }
+    remaining = history_count - 1U;
+    replaying = true;
+    if (!ApanPositionCalibrationBegin(history_argument)) { replaying = false; return false; }
+    for (index = 0U; index < remaining; index++)
+    {
+        FramReadBlock(HISTORY_BASE + index * HISTORY_STRIDE, model_input, sizeof(model_input));
+        FramReadBlock(HISTORY_BASE + index * HISTORY_STRIDE + sizeof(model_input), &target, 1);
+        model_input_valid = true;
+        if (!ApanPositionTrainLast(target)) { replaying = false; return false; }
+        wdt_clear();
+    }
+    history_count = remaining;
+    replaying = false;
+    return true;
 }

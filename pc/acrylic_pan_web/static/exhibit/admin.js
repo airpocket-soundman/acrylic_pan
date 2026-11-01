@@ -27,6 +27,8 @@
   }
 
   function render(report) {
+    const network = report.checks.find(item => item.id === 'network_connection');
+    $('networkInfo').textContent = network?.summary || 'ネットワーク情報を取得できませんでした';
     const overall = $('overall'), map = {
       pass: ['✓', '展示可能', '必要な機能はすべて正常です'],
       warn: ['!', '確認項目あり', '演奏できますが、黄色の項目を確認してください'],
@@ -101,6 +103,20 @@
   }
 
   $('runDiagnostics').onclick = diagnose;
+  $('openCollector').onclick = async event => {
+    event.preventDefault();
+    try {
+      const current = await json('/api/status');
+      const calibration = await json('/api/calibration/state');
+      if (calibration.pending || calibration.status?.source === 'working')
+        throw new Error('追加学習を保存または中止してから採取ページを開いてください。');
+      if (!current.collection?.active) {
+        await post('/api/inference/stop');
+        await post('/api/device/mode', {mode:'collection'});
+      }
+      location.href = '/collector.html';
+    } catch (error) { $('actionMessage').textContent = error.message; }
+  };
   document.querySelectorAll('.hold-button').forEach(installHold);
   (async () => { try { nonce = (await json('/api/admin/session')).nonce; await diagnose(); } catch (error) { $('checkedAt').textContent = error.message; } })();
 })();

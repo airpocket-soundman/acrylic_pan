@@ -17,6 +17,8 @@ import struct
 import threading
 import time
 import webbrowser
+import zlib
+from pc.acrylic_pan_web.calibration_profiles import CalibrationProfiles
 from typing import Any
 from urllib.parse import parse_qs, urlparse
 
@@ -143,7 +145,9 @@ PANEL_PROFILES: dict[str, PanelProfile] = {
         "400x300x5", "400 × 300 × 5 mm（60位置・12エリア）", 400.0, 300.0, 5.0, 4, 3
     ),
 }
-DEFAULT_PANEL_PROFILE_ID = "400x200x3"
+# The exhibition firmware uses the 400 x 300 mm, 60-position / 12-area model.
+# Keep the web UI aligned with it even before the serial auto-connector succeeds.
+DEFAULT_PANEL_PROFILE_ID = "400x300x5"
 
 
 def get_panel_profile(profile_id: str = DEFAULT_PANEL_PROFILE_ID) -> PanelProfile:
@@ -660,6 +664,24 @@ class AcquisitionController:
     def calibration_state(self) -> dict[str, Any]:
         with self._lock:
             return {**self.calibration, "device_mode": self.device_mode}
+
+    def profile_transfer(self, payload: bytes) -> bytes:
+        if not self.link.connected or self.device_mode != "calibration":
+            raise ValueError("先にキャリブレーションモードへ切り替えてください")
+        with self._lock:
+            sequence = self._command_sequence
+            self._command_sequence += 1
+            completed = threading.Event()
+            response = {}
+            self._control_waiters[sequence] = (completed, response)
+        self.link.send(encode_frame(Frame(MessageType.PROFILE, sequence, payload)))
+        if not completed.wait(3):
+            with self._lock:
+                self._control_waiters.pop(sequence, None)
+            raise TimeoutError("重み転送の応答がありません。対応ファームを確認してください")
+        if response.get("type") != "ack" or response["payload"][:1] != bytes([MessageType.PROFILE]):
+            raise ValueError("ファームが重み転送を拒否しました")
+        return response["payload"][1:]
 
     def calibration_request(self, operation: CalibrationOp, argument: int = 0) -> dict[str, Any]:
         """Send one CALIBRATION request and return the status carried by its ACK."""
@@ -1686,10 +1708,40 @@ class ApiHandler(BaseHTTPRequestHandler):
 
     def _calibration_post(self, action: str, body: dict[str, Any]) -> dict[str, Any]:
         controller = self.controller
+        profiles = CalibrationProfiles()
+        if action == "profile_export":
+            import base64
+            profile = profiles.load(str(body["id"]))
+            return {**profile, "beta": base64.b64encode(profile["beta"]).decode("ascii")}
+        if action == "profile_import":
+            import base64
+            record = body["profile"]
+            beta = base64.b64decode(record["beta"], validate=True)
+            if record.get("version") != 1 or zlib.crc32(beta) != record["beta_crc"]:
+                raise ValueError("重みファイルが破損しています")
+            return profiles.save(str(record["name"]), beta, int(record["model_crc"]),
+                                 str(record["kind"]), int(record["count"]))
+        if action == "profiles":
+            return {"profiles": profiles.list(), "directory": str(profiles.root)}
+        if action == "profile_save":
+            metadata = controller.profile_transfer(bytes([0]))
+            model_crc, kind, count = struct.unpack("<IBH", metadata)
+            beta = b"".join(controller.profile_transfer(bytes([1, row])) for row in range(32))
+            return profiles.save(str(body.get("name", "ODL")), beta, model_crc,
+                                 ("quick", "precise")[kind], count)
+        if action == "profile_restore":
+            profile = profiles.load(str(body["id"]))
+            kind = ("quick", "precise").index(profile["kind"])
+            controller.profile_transfer(bytes([2]) + struct.pack("<IBH", profile["model_crc"], kind, profile["count"]))
+            for row in range(32):
+                controller.profile_transfer(bytes([3, row]) + profile["beta"][row * 120:(row + 1) * 120])
+            controller.profile_transfer(bytes([4]) + struct.pack("<I", zlib.crc32(profile["beta"])))
+            return controller.calibration_request(CalibrationOp.STATUS)
         operations = {
             "status": CalibrationOp.STATUS, "begin": CalibrationOp.BEGIN,
             "commit": CalibrationOp.COMMIT, "discard": CalibrationOp.DISCARD,
             "factory_reset": CalibrationOp.FACTORY_RESET,
+            "undo": CalibrationOp.UNDO,
         }
         if action == "enter":
             controller.set_mode("calibration")
@@ -1717,6 +1769,9 @@ class ApiHandler(BaseHTTPRequestHandler):
         path = urlparse(self.path).path
         try:
             body = self._request_json()
+            if path == "/api/browser-diagnostic":
+                print("browser-diagnostic:", str(body)[:2000], flush=True)
+                return self._json({"ok": True})
             if path == "/api/admin/diagnostics":
                 self._require_admin_request(body)
                 return self._json(run_diagnostics(self.controller, self.video_dir))

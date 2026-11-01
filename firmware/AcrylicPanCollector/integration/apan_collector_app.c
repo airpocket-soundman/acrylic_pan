@@ -56,6 +56,8 @@ static volatile bool baud_apply_pending;
 #define APAN_BAUD_SWITCH_DELAY_TICKS 3UL
 static volatile uint8_t pending_calibration_op;
 static volatile uint8_t pending_calibration_argument;
+static uint8_t profile_payload[132];
+static uint16_t profile_size;
 static uint8_t calibration_target = APAN_CALIBRATION_CHECK_ONLY;
 static uint8_t command_buffer[16];
 static uint8_t command_length;
@@ -95,6 +97,7 @@ enum
     COMMAND_SET_MODE,
     COMMAND_SET_CONFIG,
     COMMAND_CALIBRATION,
+    COMMAND_PROFILE,
     COMMAND_UNKNOWN
 };
 
@@ -275,6 +278,11 @@ static void queue_binary_command(const ApanCommandFrame *frame)
             command = COMMAND_CALIBRATION;
             pending_calibration_op = (frame->payload_size == 2U) ? frame->payload[0] : 0xFFU;
             pending_calibration_argument = (frame->payload_size == 2U) ? frame->payload[1] : 0U;
+            break;
+        case APAN_MESSAGE_PROFILE:
+            command = COMMAND_PROFILE;
+            profile_size = frame->payload_size;
+            memcpy(profile_payload, frame->payload, profile_size);
             break;
         default: command = COMMAND_UNKNOWN; break;
     }
@@ -725,10 +733,13 @@ static uint8_t handle_calibration(uint32_t request_sequence, uint8_t operation,
         acknowledge_calibration(request_sequence, operation);
         return 0U;
     }
-    if (operation > APAN_CALIBRATION_OP_FACTORY_RESET) { return 2U; }
+    if (operation > 6U) { return 2U; }
     if (!collector_stopped) { return 1U; }
     switch (operation)
     {
+        case 6U:
+            if (!ApanPositionCalibrationUndo()) { return 3U; }
+            break;
         case APAN_CALIBRATION_OP_BEGIN:
             if (operating_mode != APAN_MODE_CALIBRATION) { return 3U; }
             if (!ApanPositionCalibrationBegin(argument)) { return 4U; }
@@ -1139,6 +1150,53 @@ void ApanCollectorAppProcess(void)
                 write_protocol(APAN_MESSAGE_ACK, request_sequence, payload, 3U);
             }
             break;
+        case COMMAND_PROFILE:
+        {
+            uint8_t out[132];
+            int16_t row[60];
+            bool ok = false;
+            uint16_t size = 1U;
+            uint8_t op = profile_size ? profile_payload[0] : 255U;
+            ApanCalibrationStatus state;
+            out[0] = APAN_MESSAGE_PROFILE;
+            ApanCalibrationGetStatus(&state);
+            if (collector_stopped && operating_mode == APAN_MODE_CALIBRATION)
+            {
+                if (op == 0U && profile_size == 1U)
+                {
+                    put_u32(&out[1], APAN_CALIBRATION_MODEL_CRC32);
+                    out[5] = state.saved_kind;
+                    put_u16(&out[6], state.saved_count);
+                    size = 8U; ok = state.saved_valid;
+                }
+                else if (op == 1U && profile_size == 2U)
+                {
+                    ok = ApanCalibrationSavedBetaRow(profile_payload[1], row);
+                    memcpy(&out[1], row, sizeof(row)); size = 121U;
+                }
+                else if (op == 2U && profile_size == 8U)
+                {
+                    uint32_t crc; uint16_t count;
+                    memcpy(&crc, &profile_payload[1], 4U);
+                    memcpy(&count, &profile_payload[6], 2U);
+                    ok = ApanCalibrationImportBegin(crc, profile_payload[5], count);
+                }
+                else if (op == 3U && profile_size == 122U)
+                {
+                    memcpy(row, &profile_payload[2], sizeof(row));
+                    ok = ApanCalibrationImportRow(profile_payload[1], row);
+                }
+                else if (op == 4U && profile_size == 5U)
+                {
+                    uint32_t crc; memcpy(&crc, &profile_payload[1], 4U);
+                    ok = ApanCalibrationImportFinish(crc);
+                    if (ok) { ApanPositionInferenceInitialize(); }
+                }
+            }
+            write_protocol(ok ? APAN_MESSAGE_ACK : APAN_MESSAGE_NACK,
+                           request_sequence, out, ok ? size : 1U);
+            break;
+        }
         case COMMAND_CALIBRATION:
         {
             uint8_t reason = handle_calibration(request_sequence, pending_calibration_op,

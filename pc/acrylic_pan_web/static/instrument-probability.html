@@ -79,5 +79,6 @@
     </div>
     <div id="odlCalibrationProgress" class="calibration-status" aria-live="polite"></div>
   </section>
+<script>const reportCamera=()=>fetch('/api/browser-diagnostic',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({state:document.getElementById('cameraState')?.textContent,error:document.getElementById('error')?.textContent,handler:!!document.getElementById('cameraStart')?.onclick,devices:document.getElementById('cameraDevice')?.innerText})});window.addEventListener('error',e=>fetch('/api/browser-diagnostic',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({error:e.message,line:e.lineno})}));setTimeout(reportCamera,5000);document.addEventListener('click',e=>{if(e.target.id==='cameraStart')setTimeout(reportCamera,3000);});</script>
 </main><script>{const q=new URLSearchParams(location.search);if(q.has('embed')){document.body.classList.add('embed');if(!q.has('nofit'))document.body.classList.add('fit');}if(q.has('bare'))document.body.classList.add('bare');if(q.has('kiosk')){document.body.classList.add('kiosk','fit');}}</script><script src="/panel-profile.js?v=20260720-1"></script><script src="/server-audio.js?v=20261015-6"></script><script src="/instrument-probability.js?v=20261024-14"></script><script src="/position-calibration.js?v=20261024-1"></script></body>
 </html>

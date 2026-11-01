@@ -69,11 +69,11 @@ body.embed .camera-card>.position-heading,body.embed .camera-card>.camera-contro
 .cue-start:hover{background:#ff3d86}
 .cue-start[hidden]{display:none}
 /* Burst when the area is struck (judged by the timing error; see cueJudge) */
-.cue-fx{position:absolute;pointer-events:none;z-index:5}
+.cue-fx{position:absolute;pointer-events:none;z-index:5;will-change:transform,opacity}
 .cue-flash{inset:0;background:#fff;box-shadow:0 0 30px #fff}
 .cue-ring{inset:0;box-sizing:border-box;border:6px solid #fff;border-radius:2px}
 .cue-ring.gold{border-color:#ffe04b;box-shadow:0 0 18px #ffe04b}
-.cue-spark{left:50%;top:50%;border-radius:50%;box-shadow:0 0 8px currentColor}
+.cue-spark{left:50%;top:50%;border-radius:50%}
 .cue-label{left:50%;top:50%;white-space:nowrap;font-weight:900;color:#fff;-webkit-text-stroke:2px #071d29;paint-order:stroke fill;text-shadow:0 2px 10px #0009}
 .cue-label.gold{color:#ffe04b}
 /* Full-screen (embedded) layout: keep the song controls to two rows so the page stays inside 1920x1080 */
@@ -81,7 +81,7 @@ body.fit .song-assist{grid-template-columns:repeat(5,minmax(0,1fr));gap:6px 8px}
 body.fit .song-assist>strong{grid-column:span 2}
 body.fit .song-assist>.song-actions{grid-column:span 3;justify-self:end;flex-wrap:nowrap}
 /* Bigger bursts for GREAT / GOOD, a glow under them, and the combo display at the top left of the camera picture */
-.cue-glow{inset:-12%;border-radius:12px;background:radial-gradient(circle,var(--glow,#fff) 0%,#fff0 70%);filter:blur(6px);z-index:4}
+.cue-glow{inset:-12%;border-radius:12px;background:radial-gradient(circle,var(--glow,#fff) 0%,#fff0 70%);z-index:4}
 .cue-combo{position:absolute;left:18px;top:14px;z-index:8;display:flex;flex-direction:column;align-items:flex-start;pointer-events:none;opacity:0;transition:opacity .25s ease;font-family:"Segoe UI","Yu Gothic UI",sans-serif;line-height:1}
 .cue-combo.on{opacity:1}
 .cue-combo .num{font-weight:900;font-size:clamp(64px,8vw,132px);font-style:italic;color:#fff;-webkit-text-stroke:3px #ff5f9b;text-shadow:0 0 22px #ff5f9bcc,0 5px 16px #000a;transform-origin:left bottom}
@@ -113,7 +113,7 @@ body.embed .position-calibration-card{display:none}
 /* Exhibition kiosk (?kiosk=1): the presentation layout, sized to exactly the window (no scroll bars). */
 body.kiosk header,body.kiosk .app-tabs,body.kiosk .controls,body.kiosk .position-calibration-card,body.kiosk #error:empty{display:none}
 body.kiosk{height:100vh;overflow:hidden}
-body.kiosk main{height:100vh;display:flex;flex-direction:column;padding:8px 12px}
+body.kiosk main{width:100%;max-width:none;margin:0;height:100vh;display:flex;flex-direction:column;padding:8px 12px}
 body.kiosk .probability-layout{flex:1 1 0;min-height:0;grid-template-rows:minmax(0,1fr)}
 body.kiosk .probability-layout>*,body.kiosk .probability-main>.card,body.kiosk .camera-card{min-height:0;height:100%}
 body.kiosk .camera-card{display:flex;flex-direction:column}
@@ -123,5 +123,8 @@ body.kiosk .camera-card{flex:1 1 0;height:auto}
 body.kiosk .probability-area-bars{grid-template-rows:repeat(12,minmax(0,1fr))}
 body.kiosk .probability-main{overflow:hidden}
 body.kiosk .area-probabilities{overflow:hidden}
+body.kiosk .probability-main{display:none}
+body.kiosk.camera-overlay-mode .probability-layout{grid-template-columns:minmax(0,1fr)}
+body.kiosk .probability-layout{width:100%}
 /* No camera: keep the dark stage, drop the instructions so only the fixed grid and the effects show. */
 body.kiosk.virtual-grid .camera-placeholder{color:transparent;pointer-events:none}

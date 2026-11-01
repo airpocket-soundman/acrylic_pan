@@ -78,5 +78,9 @@ void ApanCalibrationDiscard(void);
 void ApanCalibrationFactoryReset(void);
 
 uint32_t ApanCalibrationCrc32(uint32_t crc, const void *data, size_t size);
+/* Staged import never replaces the saved slot until all rows validate. */
+bool ApanCalibrationImportBegin(uint32_t model_crc, uint8_t kind, uint16_t count);
+bool ApanCalibrationImportRow(uint16_t row, const int16_t *beta);
+bool ApanCalibrationImportFinish(uint32_t crc);
 
 #endif

@@ -28,6 +28,14 @@
         <button id="more" type="button" class="big-button primary">＋ 追加学習（さらに5周）</button>
         <button id="redo" type="button" class="big-button">新たに5周を取り直す</button>
         <button id="cancel" type="button" class="big-button danger" hidden>中止（保存しない）</button>
+        <button id="undo" type="button" class="big-button" hidden>一つ前へ戻る</button>
+        <h2>保存した重み</h2>
+        <input id="profileName" placeholder="保存名（例：展示会場・マレットA）" maxlength="120">
+        <button id="profileSave" type="button" class="big-button">現在の重みをこの端末に保存</button>
+        <select id="profileList" aria-label="保存した重み"></select>
+        <button id="profileRestore" type="button" class="big-button">選んだ重みをボードへ戻す</button>
+        <button id="profileDownload" type="button" class="big-button">選んだ重みをファイルに保存</button>
+        <label>重みファイルを選んで読み込む<input id="profileFile" type="file" accept=".json,application/json"></label>
         <p id="hint" class="odl-hint"></p>
         <h2>初期状態</h2>
         <button id="reset" type="button" class="big-button danger">初期モデルに戻す</button>

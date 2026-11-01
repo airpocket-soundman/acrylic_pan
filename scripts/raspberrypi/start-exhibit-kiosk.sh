@@ -6,6 +6,10 @@ set -euo pipefail
 PORT="${EXHIBIT_PORT:-8765}"
 URL="http://127.0.0.1:$PORT/exhibit/play.html"
 CHROMIUM="$(command -v chromium-browser || command -v chromium)"
+DISPLAY_ARGS=()
+if [[ -n "${WAYLAND_DISPLAY:-}" ]]; then
+  DISPLAY_ARGS+=(--ozone-platform=wayland)
+fi
 
 # labwc and an XDG desktop can both process their respective autostart files.
 # Keep only one kiosk instance even when both mechanisms fire.
@@ -26,10 +30,11 @@ fi
 # The profile folder is kept apart so that a crash never shows the "restore pages" bar.
 rm -rf "$HOME/.config/acrylic-pan-chromium/Default/Sessions" 2>/dev/null
 exec "$CHROMIUM" \
+  "${DISPLAY_ARGS[@]}" \
   --kiosk "$URL" \
   --user-data-dir="$HOME/.config/acrylic-pan-chromium" \
   --password-store=basic \
-  --lang=ja --disable-translate --disable-features=Translate,TranslateUI \
+  --lang=ja --disable-translate --disable-features=Translate,TranslateUI,WebRtcPipeWireCamera \
   --noerrdialogs --disable-infobars --disable-session-crashed-bubble --no-first-run \
   --autoplay-policy=no-user-gesture-required \
   --use-fake-ui-for-media-stream \

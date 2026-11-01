@@ -38,6 +38,9 @@ static uint16_t saved_count;
 static uint16_t work_count;
 static uint8_t saved_kind;
 static uint8_t work_kind;
+static uint16_t import_rows;
+static uint32_t import_crc;
+static bool import_active;
 /* Work vectors are static so a calibration hit does not deepen the stack. */
 static float p_h[HIDDEN];
 static float error[OUTPUTS];
@@ -375,4 +378,46 @@ void ApanCalibrationFactoryReset(void)
     saved_kind = APAN_CALIBRATION_KIND_NONE;
     work_kind = APAN_CALIBRATION_KIND_NONE;
     source = APAN_CALIBRATION_SOURCE_FACTORY;
+}
+
+bool ApanCalibrationImportBegin(uint32_t model_crc, uint8_t kind, uint16_t count)
+{
+    if (!enabled || model_crc != APAN_CALIBRATION_MODEL_CRC32 || kind > 1U) { return false; }
+    import_active = true;
+    import_rows = 0U;
+    import_crc = 0UL;
+    work_kind = kind;
+    work_count = count;
+    return true;
+}
+
+bool ApanCalibrationImportRow(uint16_t row, const int16_t *beta)
+{
+    uint16_t k;
+    if (!import_active || row != import_rows || row >= HIDDEN || beta == NULL) { return false; }
+    for (k = 0U; k < OUTPUTS; k++)
+    {
+        if (((uint16_t)beta[k] & 0x7F80U) == 0x7F80U) { return false; }
+        beta_row[k] = bf16_to_float(beta[k]);
+    }
+    FramWriteBlock(fram_row(FRAM_WORK_BETA, row, BETA_ROW_BYTES), beta_row, (int)BETA_ROW_BYTES);
+    import_crc = ApanCalibrationCrc32(import_crc, beta, OUTPUTS * sizeof(int16_t));
+    import_rows++;
+    return true;
+}
+
+bool ApanCalibrationImportFinish(uint32_t crc)
+{
+    uint16_t r;
+    if (!import_active || import_rows != HIDDEN || crc != import_crc) { return false; }
+    invalidate_saved();
+    for (r = 0U; r < HIDDEN; r++)
+    {
+        FramReadBlock(fram_row(FRAM_WORK_BETA, r, BETA_ROW_BYTES), beta_row, (int)BETA_ROW_BYTES);
+        FramWriteBlock(fram_row(FRAM_SAVED_BETA, r, BETA_ROW_BYTES), beta_row, (int)BETA_ROW_BYTES);
+        wdt_clear();
+    }
+    import_rows = 0U;
+    import_active = false;
+    return finish_commit();
 }

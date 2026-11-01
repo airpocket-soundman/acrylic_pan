@@ -40,6 +40,7 @@ class MessageType(IntEnum):
     AI_SELFTEST = 0x14
     SET_MODE = 0x15
     CALIBRATION = 0x16
+    PROFILE = 0x17
     EVENT_DATA = 0x20
     AI_RESULT = 0x21
     INFERENCE_EVENT = 0x22
@@ -114,6 +115,7 @@ class CalibrationOp(IntEnum):
     COMMIT = 3
     DISCARD = 4
     FACTORY_RESET = 5
+    UNDO = 6
 
 
 class CalibrationSource(IntEnum):

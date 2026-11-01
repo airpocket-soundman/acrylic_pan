@@ -45,7 +45,10 @@ def evaluate(model_path: Path, sessions_root: Path, session_ids: tuple[str, ...]
     distance = np.linalg.norm(expected - dataset.xy_mm, axis=1)
     predicted = np.argmax(probability, axis=1)
     area = lambda xy: (np.clip(xy[:, 1] // 100, 0, 2) * 4 + np.clip(xy[:, 0] // 100, 0, 3)).astype(int)
-    area_hit = area(support[predicted]) == area(dataset.xy_mm)
+    point_area_hit = area(support[predicted]) == area(dataset.xy_mm)
+    area_probability = np.stack([probability[:, area(support) == index].sum(axis=1)
+                                 for index in range(12)], axis=1)
+    area_hit = np.argmax(area_probability, axis=1) == area(dataset.xy_mm)
     centre = np.asarray(dataset.point_names) == "center"
     holdout = dataset.repetitions % 5 == 0
 
@@ -54,6 +57,7 @@ def evaluate(model_path: Path, sessions_root: Path, session_ids: tuple[str, ...]
             "count": int(mask.sum()),
             "top1_position_accuracy": round(float(np.mean(predicted[mask] == truth[mask])), 4),
             "area_accuracy": round(float(np.mean(area_hit[mask])), 4),
+            "top1_point_area_accuracy": round(float(np.mean(point_area_hit[mask])), 4),
             "mean_distance_mm": round(float(np.mean(distance[mask])), 2),
             "median_distance_mm": round(float(np.median(distance[mask])), 2),
             "within_25mm": round(float(np.mean(distance[mask] <= 25.0)), 4),
@@ -61,7 +65,9 @@ def evaluate(model_path: Path, sessions_root: Path, session_ids: tuple[str, ...]
 
     return {"model": str(model_path), "sessions": list(session_ids),
             "all": summary(np.ones(len(distance), dtype=bool)), "holdout_rep_mod5": summary(holdout),
-            "centre": summary(centre), "corner": summary(~centre)}
+            "centre": summary(centre), "corner": summary(~centre),
+            "per_position": [{"xy_mm": support[index].tolist(), **summary(truth == index)}
+                             for index in range(len(support)) if np.any(truth == index)]}
 
 
 def main() -> None:

@@ -18,6 +18,7 @@
   const KIND = { quick: '高速', precise: '精密' };
 
   let mode = 'quick', running = false, cancelled = false, saved = null;
+  let undoRequested = false;
   let pointNodes = [], cellNodes = [], resultNodes = [], pulseNode = null;
 
   function node(name, attrs, parent) {
@@ -91,15 +92,15 @@
       chip.className = 'round-chip';
       chip.innerHTML = `<i></i><b>${round + 1}周目</b><strong>—</strong><small>&nbsp;</small>`;
       box.appendChild(chip);
-      roundStats.push({ hits: 0, total: 0 });
+      roundStats.push({ hits: 0, areas: 0, total: 0 });
       return chip;
     });
   }
   function showRound(round, finished) {
-    const { hits, total } = roundStats[round], chip = roundChips[round];
+    const { hits, areas, total } = roundStats[round], chip = roundChips[round];
     const percent = total ? Math.round(100 * hits / total) : 0;
-    chip.querySelector('strong').textContent = total ? `${percent}%` : '—';
-    chip.querySelector('small').textContent = total ? `${hits} / ${total} 正解` : ' ';
+    chip.querySelector('strong').textContent = total ? `${mode==='precise'?'地点 ':''}${percent}%` : '—';
+    chip.querySelector('small').textContent = total ? (mode==='precise'?`地点 ${hits}/${total}・12エリア ${Math.round(100*areas/total)}% (${areas}/${total})`:`${hits} / ${total} 正解`) : ' ';
     chip.querySelector('i').style.width = `${percent}%`;
     chip.classList.toggle('live', !finished);
     chip.classList.toggle('done', finished);
@@ -130,6 +131,11 @@
     $('redo').disabled = running;
     $('reset').disabled = running || !(saved && saved.saved_valid);
     $('cancel').hidden = !running;
+    $('undo').hidden = !running;
+    $('profileSave').disabled = running || !saved?.saved_valid;
+    $('profileRestore').disabled = running;
+    $('profileDownload').disabled = running;
+    $('profileFile').disabled = running;
     $('hint').textContent = running || !saved ? ''
       : can ? `今の${KIND[mode]}学習の続きから、さらに${ROUNDS}周を学習します。`
       : saved.saved_valid
@@ -162,6 +168,7 @@
   async function waitResult(before) {
     for (let waited = 0; waited < 180000; waited += 150) {
       if (cancelled) throw new Error('中止しました');
+      if (undoRequested) return null;
       const state = await call('/api/calibration/state');
       if (state.error) throw new Error(state.error);
       if (state.result_count > before) return state.result;
@@ -183,7 +190,7 @@
 
   async function train(keepSaved) {
     if (running) return;
-    cancelled = false; running = true; updateButtons();
+    cancelled = false; undoRequested = false; running = true; updateButtons();
     $('error').textContent = '';
     drawBoard();
     drawRounds();
@@ -194,9 +201,13 @@
       showSaved(await enter());
       showSaved(await call('/api/calibration/begin', { kind: mode, continue: keepSaved }));
       began = true; running = true; updateButtons();
-      for (let round = 0; round < ROUNDS; round++) {
+      const results = [];
+      while (done < total) {
+        const round = Math.floor(done / targets.length);
+        const target = done % targets.length;
         resetPoints();
-        for (const target of targets) {
+        for (let i = 0; i < target; i++) pointNodes[i].setAttribute('class', 'pt done');
+        {
           const position = mode === 'quick' ? centres[target] : target;
           setCurrent(target, position);
           setMessage(`ここを叩いてください  X ${support[position][0]} / Y ${support[position][1]} mm`);
@@ -204,11 +215,31 @@
           const state = await call('/api/calibration/state');
           await call('/api/calibration/arm', { target, kind: mode });
           const result = await waitResult(state.result_count);
+          if (undoRequested) {
+            undoRequested = false;
+            await call('/api/command', {command:'stop'});
+            await sleep(200);
+            const latest = await call('/api/calibration/state');
+            if (latest.result_count > state.result_count && latest.result?.trained) await call('/api/calibration/undo', {});
+            if (done > 0) {
+              await call('/api/calibration/undo', {});
+              done--; results.pop();
+              matched = results.filter(r=>r.hit).length;
+              roundStats.forEach(s => {s.hits=0;s.areas=0;s.total=0;});
+              results.forEach((r,i) => {const s=roundStats[Math.floor(i/targets.length)];s.total++;if(r.hit)s.hits++;if(r.area)s.areas++;});
+              roundStats.forEach((s,i) => showRound(i, i < Math.floor(done/targets.length)));
+            }
+            $('bar').style.width = `${100 * done / total}%`;
+            continue;
+          }
           if (!result.trained) throw new Error('ファームウェアが打撃を学習できませんでした。');
           done++;
           const predicted = result.predicted_class;
           const hit = mode === 'quick' ? areaOf(predicted) === areaOf(position) : predicted === position;
           if (hit) matched++;
+          const areaHit=areaOf(predicted)===areaOf(position);
+          results.push({hit,area:areaHit});
+          if(areaHit)roundStats[round].areas++;
           roundStats[round].total++;
           if (hit) roundStats[round].hits++;
           showRound(round, false);
@@ -224,7 +255,7 @@
       const status = await call('/api/calibration/commit', {});
       began = false; showSaved(status);
       setMessage(`学習完了 — 保存しました（合計${status.saved_count}回）`, 'hit-ok');
-      $('counter').textContent = `全${ROUNDS}周の正解率 ${Math.round(100 * matched / total)}%（叩いた時点の判定）`;
+      $('counter').textContent = `全${ROUNDS}周 ${mode==='precise'?'60地点一致率':'正解率'} ${Math.round(100 * matched / total)}%`+(mode==='precise'?` ／ 12エリア一致率 ${Math.round(100*results.filter(r=>r.area).length/total)}%`:'')+'（学習前の判定）';
     } catch (error) {
       $('error').textContent = error.message;
       if (began) { try { showSaved(await call('/api/calibration/discard', {})); } catch (_) { /* ignore */ } }
@@ -284,6 +315,32 @@
   $('more').onclick = () => train(true);
   $('redo').onclick = () => train(false);
   $('cancel').onclick = () => { cancelled = true; };
+  $('undo').onclick = () => { undoRequested = true; };
+  async function loadProfiles() {
+    const data=await call('/api/calibration/profiles',{});
+    $('profileList').replaceChildren(...data.profiles.map(p=>{const option=document.createElement('option');option.value=p.id;option.textContent=`${p.name} (${p.created_at.slice(0,10)}・${p.count}回)`;return option;}));
+  }
+  async function profileAction(action) {
+    if(running)return;
+    running=true;updateButtons();
+    try {
+      await enter();
+      const result=await call('/api/calibration/'+action, action==='profile_save'?{name:$('profileName').value}:{id:$('profileList').value});
+      if(action==='profile_restore')showSaved(result);
+      await loadProfiles();setMessage(action==='profile_save'?'この端末に重みを保存しました（再起動後も残ります）':'保存した重みをボードへ復元しました');
+    }catch(error){$('error').textContent=error.message;}
+    finally{running=false;updateButtons();await leave();}
+  }
+  $('profileSave').onclick=()=>profileAction('profile_save');
+  $('profileRestore').onclick=()=>profileAction('profile_restore');
+  $('profileDownload').onclick=async()=>{
+    try{const p=await call('/api/calibration/profile_export',{id:$('profileList').value});const url=URL.createObjectURL(new Blob([JSON.stringify(p,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download=p.name.replace(/[\\/:*?"<>|]/g,'_')+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}catch(e){$('error').textContent=e.message;}
+  };
+  $('profileFile').onchange=async()=>{
+    const file=$('profileFile').files[0];if(!file||running)return;
+    try{if(file.size>32768)throw new Error('重みファイルが大きすぎます');const profile=JSON.parse(await file.text());const savedProfile=await call('/api/calibration/profile_import',{profile});await loadProfiles();$('profileList').value=savedProfile.id;await profileAction('profile_restore');}catch(e){$('error').textContent=e.message;}finally{$('profileFile').value='';}
+  };
+  loadProfiles().catch(error=>{$('error').textContent=error.message;});
   $('reset').onclick = factoryReset;
 
   drawBoard(); drawRounds(); updateButtons();

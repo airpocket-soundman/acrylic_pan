@@ -44,6 +44,31 @@ def _check(identifier: str, label: str, status: str, summary: str,
     }
 
 
+def network_status() -> dict[str, Any]:
+    """Inspect the serving host; never return credentials or saved profiles."""
+    ssid = ""
+    addresses = []
+    if platform.system() == "Linux":
+        ok, output = _command(["nmcli", "-t", "--escape", "no", "-f", "IN-USE,SSID", "device", "wifi", "list", "--rescan", "no"])
+        if ok:
+            ssid = next((line[2:] for line in output.splitlines() if line.startswith("*:")), "")
+        ok, output = _command(["ip", "-j", "address", "show", "up"])
+        if ok:
+            try:
+                addresses = [entry["local"] for interface in json.loads(output)
+                             for entry in interface.get("addr_info", [])
+                             if entry.get("family") == "inet" and entry.get("scope") == "global"]
+            except (ValueError, KeyError, TypeError):
+                pass
+    else:
+        try:
+            addresses = sorted({item[4][0] for item in socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET)
+                                if not item[4][0].startswith("127.")})
+        except OSError:
+            pass
+    return {"ssid": ssid, "addresses": addresses}
+
+
 def run_diagnostics(controller: Any, video_dir: Path) -> dict[str, Any]:
     """Return one complete, display-oriented health report.
 
@@ -52,6 +77,13 @@ def run_diagnostics(controller: Any, video_dir: Path) -> dict[str, Any]:
     saved model is changed by this routine.
     """
     checks: list[dict[str, Any]] = []
+    network = network_status()
+    checks.append(_check(
+        "network_connection", "接続先SSID・IPアドレス", "pass" if network["addresses"] else "warn",
+        "SSID: " + (network["ssid"] or "未接続／取得不可") + " ／ IP: "
+        + ("、".join(network["addresses"]) or "取得不可"),
+        required=False, details=network,
+    ))
     status = controller.status()
     ports = available_ports()
 

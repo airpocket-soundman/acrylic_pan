@@ -24,5 +24,6 @@ void ApanPositionInferenceSupport(uint8_t position_id, uint16_t *x_mm,
 bool ApanPositionCalibrationBegin(uint8_t argument);
 bool ApanPositionTrainLast(uint8_t target);
 bool ApanPositionCalibrationCommit(void);
+bool ApanPositionCalibrationUndo(void);
 
 #endif
