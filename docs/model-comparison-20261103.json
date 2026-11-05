@@ -1,0 +1,402 @@
+{
+  "protocol": "docs/dataset-evaluation-protocol-20261103.md",
+  "evaluation_count": 2400,
+  "models": {
+    "3000": {
+      "sets": [
+        {
+          "dataset": "evaluation_raspi_20261101",
+          "sessions": [
+            "20261101_205325_5da04f89",
+            "20261101_205445_8d0fb44f"
+          ],
+          "count": 600,
+          "top1_position_accuracy": 0.9167,
+          "area_accuracy": 0.9667,
+          "top1_point_area_accuracy": 0.965,
+          "mean_distance_mm": 18.31,
+          "median_distance_mm": 2.85,
+          "within_25mm": 0.8133
+        },
+        {
+          "dataset": "evaluation_raspi_20261102",
+          "sessions": [
+            "20261102_204909_fd1fc956",
+            "20261102_205020_01c87275"
+          ],
+          "count": 600,
+          "top1_position_accuracy": 0.8633,
+          "area_accuracy": 0.9583,
+          "top1_point_area_accuracy": 0.95,
+          "mean_distance_mm": 17.27,
+          "median_distance_mm": 3.07,
+          "within_25mm": 0.8017
+        },
+        {
+          "dataset": "evaluation_raspi_20261102_set3",
+          "sessions": [
+            "20261102_213233_e1ea6e4b",
+            "20261102_213341_6a9bc8a9"
+          ],
+          "count": 600,
+          "top1_position_accuracy": 0.8333,
+          "area_accuracy": 0.8967,
+          "top1_point_area_accuracy": 0.8967,
+          "mean_distance_mm": 30.8,
+          "median_distance_mm": 7.35,
+          "within_25mm": 0.7233
+        },
+        {
+          "dataset": "evaluation_raspi_20261103",
+          "sessions": [
+            "20261103_204957_ea106c32",
+            "20261103_205119_08f0fb88"
+          ],
+          "count": 600,
+          "top1_position_accuracy": 0.8867,
+          "area_accuracy": 0.9333,
+          "top1_point_area_accuracy": 0.93,
+          "mean_distance_mm": 23.06,
+          "median_distance_mm": 2.97,
+          "within_25mm": 0.81
+        }
+      ],
+      "aggregate": {
+        "top1_position_accuracy": 0.875,
+        "area_accuracy": 0.93875,
+        "mean_distance_mm": 22.36,
+        "within_25mm": 0.787075
+      }
+    },
+    "6000": {
+      "sets": [
+        {
+          "dataset": "evaluation_raspi_20261101",
+          "sessions": [
+            "20261101_205325_5da04f89",
+            "20261101_205445_8d0fb44f"
+          ],
+          "count": 600,
+          "top1_position_accuracy": 0.9117,
+          "area_accuracy": 0.9667,
+          "top1_point_area_accuracy": 0.9633,
+          "mean_distance_mm": 12.98,
+          "median_distance_mm": 0.7,
+          "within_25mm": 0.8617
+        },
+        {
+          "dataset": "evaluation_raspi_20261102",
+          "sessions": [
+            "20261102_204909_fd1fc956",
+            "20261102_205020_01c87275"
+          ],
+          "count": 600,
+          "top1_position_accuracy": 0.925,
+          "area_accuracy": 0.9917,
+          "top1_point_area_accuracy": 0.9917,
+          "mean_distance_mm": 5.92,
+          "median_distance_mm": 0.4,
+          "within_25mm": 0.925
+        },
+        {
+          "dataset": "evaluation_raspi_20261102_set3",
+          "sessions": [
+            "20261102_213233_e1ea6e4b",
+            "20261102_213341_6a9bc8a9"
+          ],
+          "count": 600,
+          "top1_position_accuracy": 0.905,
+          "area_accuracy": 0.94,
+          "top1_point_area_accuracy": 0.9383,
+          "mean_distance_mm": 19.35,
+          "median_distance_mm": 1.12,
+          "within_25mm": 0.8333
+        },
+        {
+          "dataset": "evaluation_raspi_20261103",
+          "sessions": [
+            "20261103_204957_ea106c32",
+            "20261103_205119_08f0fb88"
+          ],
+          "count": 600,
+          "top1_position_accuracy": 0.9183,
+          "area_accuracy": 0.965,
+          "top1_point_area_accuracy": 0.9633,
+          "mean_distance_mm": 11.8,
+          "median_distance_mm": 0.42,
+          "within_25mm": 0.8983
+        }
+      ],
+      "aggregate": {
+        "top1_position_accuracy": 0.915,
+        "area_accuracy": 0.96585,
+        "mean_distance_mm": 12.5125,
+        "within_25mm": 0.879575
+      }
+    },
+    "9000": {
+      "sets": [
+        {
+          "dataset": "evaluation_raspi_20261101",
+          "sessions": [
+            "20261101_205325_5da04f89",
+            "20261101_205445_8d0fb44f"
+          ],
+          "count": 600,
+          "top1_position_accuracy": 0.9483,
+          "area_accuracy": 0.9783,
+          "top1_point_area_accuracy": 0.9783,
+          "mean_distance_mm": 9.49,
+          "median_distance_mm": 0.3,
+          "within_25mm": 0.895
+        },
+        {
+          "dataset": "evaluation_raspi_20261102",
+          "sessions": [
+            "20261102_204909_fd1fc956",
+            "20261102_205020_01c87275"
+          ],
+          "count": 600,
+          "top1_position_accuracy": 0.9883,
+          "area_accuracy": 0.995,
+          "top1_point_area_accuracy": 0.995,
+          "mean_distance_mm": 3.0,
+          "median_distance_mm": 0.09,
+          "within_25mm": 0.9767
+        },
+        {
+          "dataset": "evaluation_raspi_20261102_set3",
+          "sessions": [
+            "20261102_213233_e1ea6e4b",
+            "20261102_213341_6a9bc8a9"
+          ],
+          "count": 600,
+          "top1_position_accuracy": 0.9383,
+          "area_accuracy": 0.9483,
+          "top1_point_area_accuracy": 0.9517,
+          "mean_distance_mm": 11.53,
+          "median_distance_mm": 0.23,
+          "within_25mm": 0.9083
+        },
+        {
+          "dataset": "evaluation_raspi_20261103",
+          "sessions": [
+            "20261103_204957_ea106c32",
+            "20261103_205119_08f0fb88"
+          ],
+          "count": 600,
+          "top1_position_accuracy": 0.9583,
+          "area_accuracy": 0.97,
+          "top1_point_area_accuracy": 0.9683,
+          "mean_distance_mm": 8.26,
+          "median_distance_mm": 0.13,
+          "within_25mm": 0.9383
+        }
+      ],
+      "aggregate": {
+        "top1_position_accuracy": 0.9583,
+        "area_accuracy": 0.9729,
+        "mean_distance_mm": 8.07,
+        "within_25mm": 0.929575
+      }
+    },
+    "12000": {
+      "sets": [
+        {
+          "dataset": "evaluation_raspi_20261101",
+          "sessions": [
+            "20261101_205325_5da04f89",
+            "20261101_205445_8d0fb44f"
+          ],
+          "count": 600,
+          "top1_position_accuracy": 0.96,
+          "area_accuracy": 0.9767,
+          "top1_point_area_accuracy": 0.9733,
+          "mean_distance_mm": 8.58,
+          "median_distance_mm": 0.22,
+          "within_25mm": 0.93
+        },
+        {
+          "dataset": "evaluation_raspi_20261102",
+          "sessions": [
+            "20261102_204909_fd1fc956",
+            "20261102_205020_01c87275"
+          ],
+          "count": 600,
+          "top1_position_accuracy": 0.9883,
+          "area_accuracy": 0.9967,
+          "top1_point_area_accuracy": 0.9967,
+          "mean_distance_mm": 2.3,
+          "median_distance_mm": 0.06,
+          "within_25mm": 0.98
+        },
+        {
+          "dataset": "evaluation_raspi_20261102_set3",
+          "sessions": [
+            "20261102_213233_e1ea6e4b",
+            "20261102_213341_6a9bc8a9"
+          ],
+          "count": 600,
+          "top1_position_accuracy": 0.9583,
+          "area_accuracy": 0.97,
+          "top1_point_area_accuracy": 0.9717,
+          "mean_distance_mm": 8.74,
+          "median_distance_mm": 0.14,
+          "within_25mm": 0.915
+        },
+        {
+          "dataset": "evaluation_raspi_20261103",
+          "sessions": [
+            "20261103_204957_ea106c32",
+            "20261103_205119_08f0fb88"
+          ],
+          "count": 600,
+          "top1_position_accuracy": 0.9667,
+          "area_accuracy": 0.9767,
+          "top1_point_area_accuracy": 0.9767,
+          "mean_distance_mm": 6.96,
+          "median_distance_mm": 0.07,
+          "within_25mm": 0.9483
+        }
+      ],
+      "aggregate": {
+        "top1_position_accuracy": 0.968325,
+        "area_accuracy": 0.9800249999999999,
+        "mean_distance_mm": 6.645,
+        "within_25mm": 0.943325
+      }
+    },
+    "15000": {
+      "sets": [
+        {
+          "dataset": "evaluation_raspi_20261101",
+          "sessions": [
+            "20261101_205325_5da04f89",
+            "20261101_205445_8d0fb44f"
+          ],
+          "count": 600,
+          "top1_position_accuracy": 0.9617,
+          "area_accuracy": 0.9817,
+          "top1_point_area_accuracy": 0.9783,
+          "mean_distance_mm": 8.59,
+          "median_distance_mm": 0.2,
+          "within_25mm": 0.9267
+        },
+        {
+          "dataset": "evaluation_raspi_20261102",
+          "sessions": [
+            "20261102_204909_fd1fc956",
+            "20261102_205020_01c87275"
+          ],
+          "count": 600,
+          "top1_position_accuracy": 0.99,
+          "area_accuracy": 0.9983,
+          "top1_point_area_accuracy": 0.9983,
+          "mean_distance_mm": 1.98,
+          "median_distance_mm": 0.04,
+          "within_25mm": 0.9833
+        },
+        {
+          "dataset": "evaluation_raspi_20261102_set3",
+          "sessions": [
+            "20261102_213233_e1ea6e4b",
+            "20261102_213341_6a9bc8a9"
+          ],
+          "count": 600,
+          "top1_position_accuracy": 0.96,
+          "area_accuracy": 0.9717,
+          "top1_point_area_accuracy": 0.97,
+          "mean_distance_mm": 8.26,
+          "median_distance_mm": 0.09,
+          "within_25mm": 0.9233
+        },
+        {
+          "dataset": "evaluation_raspi_20261103",
+          "sessions": [
+            "20261103_204957_ea106c32",
+            "20261103_205119_08f0fb88"
+          ],
+          "count": 600,
+          "top1_position_accuracy": 0.9733,
+          "area_accuracy": 0.98,
+          "top1_point_area_accuracy": 0.9817,
+          "mean_distance_mm": 5.67,
+          "median_distance_mm": 0.05,
+          "within_25mm": 0.95
+        }
+      ],
+      "aggregate": {
+        "top1_position_accuracy": 0.97125,
+        "area_accuracy": 0.9829249999999999,
+        "mean_distance_mm": 6.125,
+        "within_25mm": 0.945825
+      }
+    },
+    "18000": {
+      "sets": [
+        {
+          "dataset": "evaluation_raspi_20261101",
+          "sessions": [
+            "20261101_205325_5da04f89",
+            "20261101_205445_8d0fb44f"
+          ],
+          "count": 600,
+          "top1_position_accuracy": 0.9667,
+          "area_accuracy": 0.9817,
+          "top1_point_area_accuracy": 0.9817,
+          "mean_distance_mm": 7.73,
+          "median_distance_mm": 0.28,
+          "within_25mm": 0.9317
+        },
+        {
+          "dataset": "evaluation_raspi_20261102",
+          "sessions": [
+            "20261102_204909_fd1fc956",
+            "20261102_205020_01c87275"
+          ],
+          "count": 600,
+          "top1_position_accuracy": 0.99,
+          "area_accuracy": 0.9967,
+          "top1_point_area_accuracy": 0.9967,
+          "mean_distance_mm": 2.39,
+          "median_distance_mm": 0.04,
+          "within_25mm": 0.9833
+        },
+        {
+          "dataset": "evaluation_raspi_20261102_set3",
+          "sessions": [
+            "20261102_213233_e1ea6e4b",
+            "20261102_213341_6a9bc8a9"
+          ],
+          "count": 600,
+          "top1_position_accuracy": 0.9583,
+          "area_accuracy": 0.9733,
+          "top1_point_area_accuracy": 0.9733,
+          "mean_distance_mm": 9.08,
+          "median_distance_mm": 0.08,
+          "within_25mm": 0.92
+        },
+        {
+          "dataset": "evaluation_raspi_20261103",
+          "sessions": [
+            "20261103_204957_ea106c32",
+            "20261103_205119_08f0fb88"
+          ],
+          "count": 600,
+          "top1_position_accuracy": 0.97,
+          "area_accuracy": 0.98,
+          "top1_point_area_accuracy": 0.98,
+          "mean_distance_mm": 5.46,
+          "median_distance_mm": 0.05,
+          "within_25mm": 0.955
+        }
+      ],
+      "aggregate": {
+        "top1_position_accuracy": 0.97125,
+        "area_accuracy": 0.9829249999999999,
+        "mean_distance_mm": 6.165,
+        "within_25mm": 0.9475
+      }
+    }
+  }
+}

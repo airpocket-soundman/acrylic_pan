@@ -118,6 +118,9 @@ body.kiosk .probability-layout{flex:1 1 0;min-height:0;grid-template-rows:minmax
 body.kiosk .probability-layout>*,body.kiosk .probability-main>.card,body.kiosk .camera-card{min-height:0;height:100%}
 body.kiosk .camera-card{display:flex;flex-direction:column}
 body.kiosk .camera-viewport{flex:1 1 0!important;height:auto!important;min-height:0!important}
+/* The exhibition camera is mounted upside down.  Keep the stream itself upright
+   without changing the calibration coordinates or the UI overlays. */
+body.kiosk .camera-viewport video{transform:rotate(180deg)}
 body.kiosk .probability-camera{display:flex;flex-direction:column;min-height:0}
 body.kiosk .camera-card{flex:1 1 0;height:auto}
 body.kiosk .probability-area-bars{grid-template-rows:repeat(12,minmax(0,1fr))}

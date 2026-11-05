@@ -1,0 +1,119 @@
+{
+  "15000": {
+    "sets": {
+      "evaluation_raspi_20261101": {
+        "count": 600,
+        "correct": 577,
+        "area_correct": 589,
+        "within25": 556,
+        "distance_sum": 5151.438431408338
+      },
+      "evaluation_raspi_20261102": {
+        "count": 600,
+        "correct": 594,
+        "area_correct": 599,
+        "within25": 590,
+        "distance_sum": 1185.1788291869807
+      },
+      "evaluation_raspi_20261102_set3": {
+        "count": 600,
+        "correct": 576,
+        "area_correct": 583,
+        "within25": 554,
+        "distance_sum": 4956.880208862636
+      },
+      "evaluation_raspi_20261103": {
+        "count": 600,
+        "correct": 584,
+        "area_correct": 588,
+        "within25": 570,
+        "distance_sum": 3404.552014008522
+      }
+    },
+    "totals": {
+      "count": 2400,
+      "correct": 2331,
+      "area_correct": 2359,
+      "within25": 2270,
+      "distance_sum": 14698.049483466475
+    }
+  },
+  "18000": {
+    "sets": {
+      "evaluation_raspi_20261101": {
+        "count": 600,
+        "correct": 580,
+        "area_correct": 589,
+        "within25": 559,
+        "distance_sum": 4635.219336642832
+      },
+      "evaluation_raspi_20261102": {
+        "count": 600,
+        "correct": 594,
+        "area_correct": 598,
+        "within25": 590,
+        "distance_sum": 1436.8099986739135
+      },
+      "evaluation_raspi_20261102_set3": {
+        "count": 600,
+        "correct": 575,
+        "area_correct": 584,
+        "within25": 552,
+        "distance_sum": 5448.719108900592
+      },
+      "evaluation_raspi_20261103": {
+        "count": 600,
+        "correct": 582,
+        "area_correct": 588,
+        "within25": 573,
+        "distance_sum": 3277.4077421928832
+      }
+    },
+    "totals": {
+      "count": 2400,
+      "correct": 2331,
+      "area_correct": 2359,
+      "within25": 2274,
+      "distance_sum": 14798.15618641022
+    }
+  },
+  "21000": {
+    "sets": {
+      "evaluation_raspi_20261101": {
+        "count": 600,
+        "correct": 584,
+        "area_correct": 590,
+        "within25": 557,
+        "distance_sum": 4948.616674858807
+      },
+      "evaluation_raspi_20261102": {
+        "count": 600,
+        "correct": 597,
+        "area_correct": 599,
+        "within25": 590,
+        "distance_sum": 1167.3182163377753
+      },
+      "evaluation_raspi_20261102_set3": {
+        "count": 600,
+        "correct": 575,
+        "area_correct": 582,
+        "within25": 552,
+        "distance_sum": 5591.879348895483
+      },
+      "evaluation_raspi_20261103": {
+        "count": 600,
+        "correct": 586,
+        "area_correct": 588,
+        "within25": 576,
+        "distance_sum": 2674.9655516558573
+      }
+    },
+    "totals": {
+      "count": 2400,
+      "correct": 2342,
+      "area_correct": 2359,
+      "within25": 2275,
+      "distance_sum": 14382.779791747924
+    }
+  }
+}
