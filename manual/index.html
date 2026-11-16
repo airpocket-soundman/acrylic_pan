@@ -27,6 +27,8 @@
 <p class="caption">UI画像は対象実装をWindows上のChromeで表示して撮影しました。演奏・追加学習は付属の疑似基板での表示例、採取・管理は基板未接続時の表示です。カメラ映像は未接続です。ラズパイでは画面寸法や接続状態により配置・表示内容が変わります。</p></div>
 
 <section class="chapter" id="quick"><h2><span class="num">QUICK START</span>まず演奏する</h2><p>初期セットアップ済みのラズパイを使う場合の手順です。初回導入は<a href="#pi">付録A</a>を先に行ってください。</p>
+<div class="note"><p><strong>デモ用ラズパイのログイン情報</strong><br>ユーザー名：<code>solistai</code><br>パスワード：<code>solistai</code><br>この装置のデモ用設定です。</p></div>
+
 <div class="grid"><div class="step-card"><b>STEP 01</b><h3>接続する</h3><p>板とフレームを安定して設置。センサ基板をラズパイへUSB接続し、モニター・スピーカーをつなぎます。</p></div><div class="step-card"><b>STEP 02</b><h3>電源を入れる</h3><p>周辺機器とラズパイの電源を入れます。自動で「演奏」画面が開き、「センサ接続中」になるのを待ちます。</p></div><div class="step-card"><b>STEP 03</b><h3>叩いて確かめる</h3><p>音量を下げてから、板のエリア中心を軽く1打。音が鳴り、対応エリアが光ることを確認して演奏します。</p></div><div class="step-card"><b>STEP 04</b><h3>安全に終了する</h3><p>「管理」→「ラズパイの電源を切る」を3秒長押し。終了案内に従い、アクセスLEDの点滅が止まってから電源を外します。</p></div></div>
 <div class="warning"><p><strong>電源ケーブルをいきなり抜かないでください。</strong>収録データや保存中の設定が破損する原因になります。認識が不安定なときは強く叩き続けず、支持状態を確認してから<a href="#odl">現場キャリブレーション</a>を行います。</p></div></section>
 
@@ -54,12 +56,16 @@
 <ol><li>ラズパイとSolist-AIを、データ通信対応のUSB Type-A–Type-Cケーブルで接続します。</li><li>Solist-AIと加速度センサを専用ケーブルで接続します。端子の向きは実機の表示と配線資料で確認します。</li><li>マウスとカメラを、ラズパイのUSB Type-A端子へそれぞれ接続します。</li><li>ラズパイとモバイルモニターをHDMI micro–miniケーブルで接続します。</li><li>配線を確認してから、ラズパイのUSB Type-C電源端子へ電源を入力します。起動後の確認は<a href="#startup">第4章</a>へ進みます。</li></ol>
 <div class="photo" id="photo-p03"><span class="photo-id">PHOTO P03 · 配線写真予定</span><strong>センサ取付とセンサ基板の接続</strong><p>センサの向き、取付位置、ケーブルの経路、基板側の接続端子が分かる接写。端子名が読める明るさで、基板とセンサをそれぞれ撮影してください。</p><small>通電せずに撮影。端子名が隠れない角度で。</small></div>
 <div class="photo" id="photo-p04"><span class="photo-id">PHOTO P04 · 接続写真予定</span><strong>ラズパイの各端子と機器間の配線</strong><p>ラズパイ側のUSB Type-A（Solist-AI・マウス・カメラ）、micro HDMI、電源用Type-Cと、Solist-AI側のType-C、モバイルモニター側のmini HDMIが分かる写真。機器間の配線全体と各端子の接写を撮影してください。</p><small>ケーブルの両端と端子形状が分かる構図。ラズパイへの給電は配線後に行います。</small></div>
-<h3 id="debug-network">3.6 デバッグ時のPC接続</h3><p>デバッグ時は、次のいずれかの方法でラズパイとPCを接続します。</p><ul><li><strong>直結する場合：</strong>ラズパイとPCをEthernetケーブルで直接接続します。</li><li><strong>ネットワーク経由の場合：</strong>ラズパイとPCを、有線LAN（Ethernet）またはWi-Fiで同じネットワークへ接続します。</li></ul>
+<h3 id="debug-network">3.6 デバッグ時のPC接続</h3>
+<div class="note"><p><strong>デモ用ラズパイのログイン情報</strong><br>ユーザー名：<code>solistai</code><br>パスワード：<code>solistai</code><br>この装置のデモ用設定です。</p></div>
+<p>デバッグ時は、次のいずれかの方法でラズパイとPCを接続します。</p><ul><li><strong>直結する場合：</strong>ラズパイとPCをEthernetケーブルで直接接続します。</li><li><strong>ネットワーク経由の場合：</strong>ラズパイとPCを、有線LAN（Ethernet）またはWi-Fiで同じネットワークへ接続します。</li></ul>
 <figure class="wiring-figure"><img src="assets/debug-network.svg" width="1000" height="560" alt="デバッグ用接続の模式図。Ethernet直結と、ルーターまたはアクセスポイント経由の有線LAN・Wi-Fi接続の2方式。"><figcaption>図3-2 デバッグ時のネットワーク接続。通常のスタンドアロン演奏ではPCとの接続は不要です。</figcaption></figure>
-<p>接続後、双方のIPアドレスと通信できることを確認します。直結時もネットワーク設定が必要です。ラズパイ上のWebサーバーはlocalhost待受のため、PCから画面を確認する場合はSSHポート転送を使用します。</p><pre><code># PCの端末で実行。ユーザー名と接続先を実際の値へ置き換える
-ssh -L 8765:127.0.0.1:8765 &lt;ユーザー&gt;@&lt;ラズパイのIPアドレス&gt;</code></pre><p>SSH接続中、PCのブラウザで <code>http://127.0.0.1:8765/exhibit/play.html</code> を開きます。PC側で同じ8765番のサーバーが動いている場合は、先に停止するか転送元ポートを変更してください。</p></section>
+<p>SSHログインでパスワードを求められたら <code>solistai</code> を入力します。接続後、双方のIPアドレスと通信できることを確認します。直結時もネットワーク設定が必要です。ラズパイ上のWebサーバーはlocalhost待受のため、PCから画面を確認する場合はSSHポート転送を使用します。</p><pre><code># PCの端末で実行。接続先をラズパイのIPアドレスへ置き換える
+ssh -L 8765:127.0.0.1:8765 solistai@&lt;ラズパイのIPアドレス&gt;</code></pre><p>SSH接続中、PCのブラウザで <code>http://127.0.0.1:8765/exhibit/play.html</code> を開きます。PC側で同じ8765番のサーバーが動いている場合は、先に停止するか転送元ポートを変更してください。</p></section>
 
-<section class="chapter" id="startup"><h2><span class="num">04 / POWER ON</span>電源を入れて演奏する</h2><ol><li>モニターとスピーカーを使える状態にし、スピーカーの音量を下げます。</li><li>ラズパイへ電源を接続します。初期設定済みなら、デスクトップへの自動ログイン後に「演奏」画面が全画面で開きます。</li><li>画面右上が緑の<strong>「センサ接続中」</strong>になるまで待ちます。</li><li>画面を一度クリックまたはタッチします。ブラウザが音声の開始操作を求める場合に備えた操作です。</li><li>板のエリア中心を軽く叩き、音と表示が反応することを確認します。12エリアを順に確認し、音量を調整します。</li></ol>
+<section class="chapter" id="startup"><h2><span class="num">04 / POWER ON</span>電源を入れて演奏する</h2>
+<div class="note"><p><strong>デモ用ラズパイのログイン情報</strong><br>ユーザー名：<code>solistai</code><br>パスワード：<code>solistai</code><br>この装置のデモ用設定です。</p></div>
+<ol><li>モニターとスピーカーを使える状態にし、スピーカーの音量を下げます。</li><li>ラズパイへ電源を接続します。初期設定済みなら、デスクトップへの自動ログイン後に「演奏」画面が全画面で開きます。</li><li>画面右上が緑の<strong>「センサ接続中」</strong>になるまで待ちます。</li><li>画面を一度クリックまたはタッチします。ブラウザが音声の開始操作を求める場合に備えた操作です。</li><li>板のエリア中心を軽く叩き、音と表示が反応することを確認します。12エリアを順に確認し、音量を調整します。</li></ol>
 <figure class="screen"><button type="button" aria-label="演奏画面を拡大"><img src="assets/play.png" width="1440" height="1000" alt="演奏画面。上部の追加学習タブと右上の接続表示を番号で示す。"></button><figcaption>図4-1 演奏画面。付属の疑似基板で撮影した表示例です。カメラ停止時は4×3のグリッドを表示します。</figcaption></figure>
 <ul class="callouts"><li><span class="badge">1</span><strong>「追加学習」</strong>：現場キャリブレーションへ移動します。普通に演奏するときは「演奏」のままで使います。</li><li><span class="badge">2</span><strong>接続表示</strong>：「センサ接続中」を確認します。「センサ未接続」ならUSB配線を、「サーバ未接続」ならWebサーバーを確認します。</li></ul>
 <div class="note"><p>展示版は基板に接続できると自動的に演奏を開始します。PC用の通常画面では「接続」→「演奏開始」が必要です。<a href="#windows">付録B</a>を参照してください。</p></div></section>
@@ -112,8 +118,8 @@ ssh -L 8765:127.0.0.1:8765 &lt;ユーザー&gt;@&lt;ラズパイのIPアドレ�
 <ul class="callouts"><li><span class="badge">1</span><strong>セッション</strong>：確認する収録単位を選びます。イベント行を選ぶと下の波形・FFTに表示されます。</li><li><span class="badge">2</span><strong>一覧更新</strong>：指定保存先のデータを読み直します。</li><li><span class="badge">3</span><strong>セッション削除</strong>：セッション全体を削除します。確認後は取り消せません。</li><li><span class="badge">4</span><strong>表示中のデータを削除</strong>：選択した1件を削除します。確認後は取り消せません。</li></ul>
 <p>二重打撃、別の場所への打撃、机を叩いた振動、飽和した波形などを確認します。除外した場合は件数不足を記録し、必要なら取り直します。採取中の削除はできません。</p><p>保存されるのは各セッションの <code>session.json</code>、<code>manifest.jsonl</code>、<code>manifest.csv</code>、<code>events/*.npz</code> です。<strong>セッションフォルダごと</strong>バックアップし、これらをばらばらに編集しないでください。manifestの件数とイベント実数の不整合は学習時の読込エラーになります。</p>
 <pre><code># ラズパイから開発PCへコピーする例（端末で実行）
-scp -r &lt;ユーザー&gt;@&lt;ラズパイ&gt;:~/acrylic_pan/data/raw/manual_training data/raw/
-scp -r &lt;ユーザー&gt;@&lt;ラズパイ&gt;:~/acrylic_pan/data/raw/manual_evaluation data/raw/</code></pre></section>
+scp -r solistai@&lt;ラズパイ&gt;:~/acrylic_pan/data/raw/manual_training data/raw/
+scp -r solistai@&lt;ラズパイ&gt;:~/acrylic_pan/data/raw/manual_evaluation data/raw/</code></pre></section>
 
 <section class="chapter" id="retrain"><h2><span class="num">09 / RETRAINING</span>モデルを再学習する</h2><p>この章は開発・保守担当者向けです。収録データからPC上で候補モデルを作り、独立した評価データで確認したうえで、モデルとODL初期行列を一緒に更新します。</p>
 <h3>9.1 現在の搭載モデル</h3><div class="model-stats"><div><strong>8セット</strong><small>T1〜T8 / 学習用16セッション</small></div><div><strong>24,000打</strong><small>60地点 × 50打 × 8セット</small></div><div><strong>128–32–60</strong><small>入力・隠れ・出力</small></div></div>
@@ -182,7 +188,9 @@ README、docs、scripts、sim、firmwareを読み、次を確認してくださ�
 <tr><td>管理画面の電源断が失敗</td><td>ラズパイ用の管理ヘルパーの導入状態を確認。Windows上の画面ではラズパイの電源断はできません。</td></tr>
 </tbody></table></div><p>解決しない場合は、発生時刻、操作、画面表示、基板・マレット・設置条件、ログを記録して保守担当者へ伝えます。確認中に収録データを削除したり、無関係な設定をまとめて変更したりしないでください。</p></section>
 
-<section class="chapter" id="pi"><h2><span class="num">APPENDIX A / RASPBERRY PI</span>ラズパイの初期セットアップ</h2><p>Raspberry Pi OS 64bit・デスクトップ付きが対象です。導入時はネットワークが必要です。ここでのコマンドは<strong>ラズパイのターミナル</strong>で実行します。</p><h3>A.1 導入する</h3>
+<section class="chapter" id="pi"><h2><span class="num">APPENDIX A / RASPBERRY PI</span>ラズパイの初期セットアップ</h2><p>Raspberry Pi OS 64bit・デスクトップ付きが対象です。導入時はネットワークが必要です。ここでのコマンドは<strong>ラズパイのターミナル</strong>で実行します。</p>
+<div class="note"><p><strong>デモ用ラズパイのログイン情報</strong><br>ユーザー名：<code>solistai</code><br>パスワード：<code>solistai</code><br>この装置のデモ用設定です。</p></div>
+<h3>A.1 導入する</h3>
 <pre><code>git clone https://github.com/airpocket-soundman/acrylic_pan.git ~/acrylic_pan
 cd ~/acrylic_pan
 git switch main
