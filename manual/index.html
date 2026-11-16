@@ -47,16 +47,24 @@
 <div class="photo" id="photo-p08"><span class="photo-id">PHOTO P08 · ダンパーバーの設置写真予定</span><strong>ダンパーバーの上面とアクリル板の接触状態</strong><p>アクリル板とダンパーバーの設置角度、上面が板と水平になり、板が軽く押し付けられている状態が分かる側面写真。接触部分の接写も撮影してください。</p><small>板とバーの両方が写る横からの構図。接触部が隠れない角度で。</small></div>
 <h3 id="mount-camera">3.4 カメラの取り付け</h3><p><strong>カメラがアクリル板全体を視野に収められるように角度を調節します。</strong>取り付け後の映像表示と8点フィットは<a href="#camera">第6章</a>を参照してください。</p>
 <div class="photo" id="photo-p05"><span class="photo-id">PHOTO P05 · カメラの取り付け写真予定</span><strong>板全体を映すカメラの取り付け位置と角度</strong><p>カメラ本体・固定具・アクリル板全体を一緒に写し、距離と角度が分かる写真。演奏者が立つ側も分かるようにしてください。</p><small>横位置。実際に板全体を視野に収められる設置状態を撮影。</small></div>
-<h3>3.5 ケーブルを接続する</h3>
-<div class="diagram" role="img" aria-label="配線の関係">アクリル板のセンサ ─ センサケーブル ─ Solist-AI基板
-                                          │ USB（データ通信・給電）
-                                      Raspberry Pi
-                                      ├ HDMI → モニター
-                                      ├ 音声 → スピーカー
-                                      └ USB  → カメラ（任意）</div>
-<ol><li>センサケーブルを基板の指定端子へ接続します。端子の向き・ピン配置は実機の表示と配線資料で確認します。</li><li>Solist-AI基板をラズパイへ、通信対応USBケーブルで接続します。</li><li>モニター・スピーカー・カメラを接続します。ケーブルを固定し、板の振動や人の動きで抜けないようにします。</li><li>電源を入れる前に接続を見直します。USB給電の重複や異なる端子への挿入を避けてください。</li></ol>
+<h3 id="wiring">3.5 ケーブルの接続関係</h3>
+<p>ラズパイを中心に、次のように各機器を接続します。<strong>機器間の配線を済ませてから、最後にラズパイのUSB Type-C電源端子へ給電します。</strong></p>
+<div class="table-wrap"><table><thead><tr><th>接続する機器</th><th>ケーブル・接続端子</th></tr></thead><tbody><tr><td>ラズパイ ⇔ Solist-AI</td><td>USB Type-A–Type-Cケーブル。ラズパイ側がType-A、Solist-AI側がType-Cです。</td></tr><tr><td>Solist-AI ⇔ 加速度センサ</td><td>専用ケーブルで接続します。</td></tr><tr><td>ラズパイ ⇔ マウス</td><td>ラズパイのUSB Type-A端子へ接続します。</td></tr><tr><td>ラズパイ ⇔ カメラ</td><td>ラズパイのUSB Type-A端子へ接続します。</td></tr><tr><td>ラズパイ ⇔ モバイルモニター</td><td>HDMI micro–miniケーブル。ラズパイ側がmicro HDMI、モバイルモニター側がmini HDMIです。</td></tr><tr><td>電源 → ラズパイ</td><td>上記の配線後、ラズパイのUSB Type-C電源端子から電源を入力します。</td></tr></tbody></table></div>
+<div class="diagram" role="img" aria-label="ラズパイと各機器の接続関係">加速度センサ ─ 専用ケーブル ─ Solist-AI
+                                 │ USB Type-C
+                           USB A–Cケーブル
+                                 │ USB Type-A
+                             ラズパイ
+                             ├ USB Type-A → マウス
+                             ├ USB Type-A → カメラ
+                             └ micro HDMI ─ HDMI micro–mini ─ mini HDMI
+                                                              │
+                                                       モバイルモニター
+
+最後に給電：電源 ─ USB Type-C → ラズパイの電源端子</div>
+<ol><li>ラズパイとSolist-AIを、データ通信対応のUSB Type-A–Type-Cケーブルで接続します。</li><li>Solist-AIと加速度センサを専用ケーブルで接続します。端子の向きは実機の表示と配線資料で確認します。</li><li>マウスとカメラを、ラズパイのUSB Type-A端子へそれぞれ接続します。</li><li>ラズパイとモバイルモニターをHDMI micro–miniケーブルで接続します。</li><li>配線を確認してから、ラズパイのUSB Type-C電源端子へ電源を入力します。起動後の確認は<a href="#startup">第4章</a>へ進みます。</li></ol>
 <div class="photo" id="photo-p03"><span class="photo-id">PHOTO P03 · 配線写真予定</span><strong>センサ取付とセンサ基板の接続</strong><p>センサの向き、取付位置、ケーブルの経路、基板側の接続端子が分かる接写。端子名が読める明るさで、基板とセンサをそれぞれ撮影してください。</p><small>通電せずに撮影。端子名が隠れない角度で。</small></div>
-<div class="photo" id="photo-p04"><span class="photo-id">PHOTO P04 · 接続写真予定</span><strong>ラズパイの各ポートと全ケーブル</strong><p>Solist-AIのUSB、カメラのUSB、HDMI、音声、電源の接続先が見える写真。ラズパイの背面側と、モニター・スピーカーまでの全体配線を撮影してください。</p><small>ケーブルを整理し、両端の接続先が分かるように撮影。</small></div></section>
+<div class="photo" id="photo-p04"><span class="photo-id">PHOTO P04 · 接続写真予定</span><strong>ラズパイの各端子と機器間の配線</strong><p>ラズパイ側のUSB Type-A（Solist-AI・マウス・カメラ）、micro HDMI、電源用Type-Cと、Solist-AI側のType-C、モバイルモニター側のmini HDMIが分かる写真。機器間の配線全体と各端子の接写を撮影してください。</p><small>ケーブルの両端と端子形状が分かる構図。ラズパイへの給電は配線後に行います。</small></div></section>
 
 <section class="chapter" id="startup"><h2><span class="num">04 / POWER ON</span>電源を入れて演奏する</h2><ol><li>モニターとスピーカーを使える状態にし、スピーカーの音量を下げます。</li><li>ラズパイへ電源を接続します。初期設定済みなら、デスクトップへの自動ログイン後に「演奏」画面が全画面で開きます。</li><li>画面右上が緑の<strong>「センサ接続中」</strong>になるまで待ちます。</li><li>画面を一度クリックまたはタッチします。ブラウザが音声の開始操作を求める場合に備えた操作です。</li><li>板のエリア中心を軽く叩き、音と表示が反応することを確認します。12エリアを順に確認し、音量を調整します。</li></ol>
 <figure class="screen"><button type="button" aria-label="演奏画面を拡大"><img src="assets/play.png" width="1440" height="1000" alt="演奏画面。上部の追加学習タブと右上の接続表示を番号で示す。"></button><figcaption>図4-1 演奏画面。付属の疑似基板で撮影した表示例です。カメラ停止時は4×3のグリッドを表示します。</figcaption></figure>
