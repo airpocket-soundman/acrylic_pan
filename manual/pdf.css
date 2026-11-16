@@ -1,0 +1,51 @@
+/* Additional layout for the downloadable A4 portrait edition. */
+@media print {
+  html{scroll-behavior:auto}body{font-size:9.5pt;line-height:1.6}
+  .cover{min-height:0;break-after:page;padding:12mm 0 0;margin:0}
+  .cover h1{font-size:43pt}.cover .lead{font-size:13pt}
+  .cover .photo{min-height:53mm;margin:9mm 0}
+  .pdf-toc{break-after:page;padding-top:4mm}
+  .pdf-toc h2{font-size:23pt;margin:0 0 8mm}
+  .pdf-toc ol{list-style:none;padding:0;margin:0}
+  .pdf-toc li{padding:1.3mm 0;border-bottom:1px solid #d7e2e4;break-inside:avoid}
+  .pdf-toc a{display:flex;justify-content:space-between;gap:6mm;color:#15313c;text-decoration:none;font-size:10pt}
+  .pdf-toc .toc-page{font-family:Arial,sans-serif;font-weight:700}
+  .pdf-toc .note{padding:3mm 4mm;margin:6mm 0 3mm;font-size:9pt}
+  .pdf-toc .caption{font-size:8pt;line-height:1.6}
+  .chapter h2{margin:0 0 6mm;line-height:1.4;break-after:avoid}
+  .chapter h3{margin:6mm 0 3mm;break-after:avoid}
+  .chapter h4{break-after:avoid}p{margin:3mm 0}
+  figure.screen{margin:5mm 0;padding:2mm}
+  figure.screen img{max-height:160mm;object-fit:contain}
+  figure.screen figcaption{font-size:8pt;padding-top:2mm;line-height:1.6}
+  .wiring-figure{margin:5mm 0}.wiring-figure img{max-height:160mm}
+  .wiring-figure figcaption{font-size:8pt}
+  .callouts{margin:3mm 0}.callouts li{font-size:9pt;padding:2mm 0 2mm 9mm;line-height:1.6;break-inside:avoid}
+  .callouts .badge{top:3mm;width:6mm;height:6mm;font-size:9pt}
+  .photo{min-height:48mm;margin:5mm 0;padding:6mm}
+  .photo strong{font-size:13pt}.photo p{font-size:9pt}.photo small{font-size:8pt}
+  .note,.warning{font-size:9.5pt;padding:4mm 5mm;margin:5mm 0}
+  .table-wrap{margin:4mm 0}table{font-size:9pt}th,td{padding:3mm}
+  .model-stats{margin:5mm 0}.model-stats div{padding:5mm 3mm}
+  .flow div{font-size:9pt;padding:4mm 3mm;min-width:0}
+  pre{font-size:8pt;line-height:1.7;padding:4mm 5mm;margin:4mm 0;break-inside:avoid}
+  .sources,.source-list li,.caption{font-size:8pt}
+  details{margin:3mm 0}.chapter .grid{gap:4mm}.step-card{padding:4mm}
+  .step-card h3{font-size:13pt;margin:2mm 0}.step-card p{font-size:10pt}
+  footer{font-size:8pt;margin-top:8mm}
+  .panel-map{break-inside:avoid;max-width:130mm}.panel-map div{padding:3mm 2mm}
+  #trouble table{font-size:8.5pt}#trouble th,#trouble td{padding:2mm 2.5mm}
+  #windows{font-size:9pt}#windows pre{font-size:7.6pt;padding:3mm 4mm}
+  #windows h3{margin:4mm 0 2mm}
+  #connect .photo{min-height:40mm;padding:4mm}
+  #connect .wiring-figure img{max-height:110mm}
+  #connect .wiring-figure:nth-of-type(2) img{max-height:90mm}
+  #startup .screen{break-before:page}#startup .screen img{max-height:145mm}
+  #collect .screen img{max-height:125mm}
+  #collect .screen:first-of-type img{max-height:55mm}
+  #collect pre{font-size:7.6pt;padding:3mm 4mm}
+  #retrain details table{font-size:8.5pt}
+  #retrain details th,#retrain details td{padding:2mm 3mm}
+  #exhibit .screen img{max-height:115mm}
+  .pdf-prompt{break-inside:avoid}
+}
