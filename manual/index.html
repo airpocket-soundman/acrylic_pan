@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="Solistpanの操作マニュアル。ラズパイでの演奏、追加学習、データ採取、再学習、展示運用までを画面付きで説明します。">
+<title>Solistpan 操作マニュアル</title><link rel="stylesheet" href="style.css">
+</head>
+<body id="top">
+<a class="skip" href="#content">本文へ移動</a>
+<header class="top"><a class="brand" href="#top">Solistpan<small>OPERATION MANUAL</small></a><div class="tools"><a href="../index.html">開発資料へ</a><button id="print" type="button">印刷 / PDF保存</button><button class="menu" type="button" aria-controls="toc" aria-expanded="false">目次</button></div></header>
+<div class="layout">
+<aside class="toc" id="toc" aria-label="マニュアル目次"><p>CONTENTS</p><nav>
+<a href="#quick"><span>START</span>まず演奏する</a>
+<a href="#about"><span>01</span>Solistpanについて</a><a href="#safety"><span>02</span>安全に使うために</a>
+<a href="#connect"><span>03</span>準備と接続</a><a href="#startup"><span>04</span>電源を入れて演奏する</a>
+<a href="#play"><span>05</span>演奏画面の使い方</a><a href="#camera"><span>06</span>カメラ映像の設定</a>
+<a href="#odl"><span>07</span>現場キャリブレーション</a><a href="#collect"><span>08</span>学習用データの採取</a>
+<a href="#retrain"><span>09</span>モデルの再学習</a><a href="#exhibit"><span>10</span>展示で使う</a>
+<a href="#shutdown"><span>11</span>終了と保管</a><a href="#trouble"><span>12</span>困ったときは</a>
+<a class="minor" href="#pi"><span>A</span>ラズパイ初期セットアップ</a><a href="#windows"><span>B</span>Windows PCで使う</a>
+<a href="#spec"><span>C</span>仕様・モデル・参照資料</a><a href="#photos"><span>PHOTO</span>撮影する写真の一覧</a>
+</nav><div class="edition">HTML 初版 · 2026.11.16<br>対象：2点支持 / 60位置モデル<br>画面はクリックで拡大できます。</div></aside>
+<main id="content">
+<div class="cover"><div class="eyebrow">PLAY · CALIBRATE · COLLECT · TRAIN</div><h1>Solistpan<small>操作・運用マニュアル</small></h1><p class="lead">アクリル板を叩いて、音を奏でる。<br>設置から演奏、現場の調整、モデルの再学習まで。</p><div class="tags"><span>Raspberry Pi スタンドアロン運用</span><span>400 × 300 × 5 mm / 12エリア</span><span>Solist-AI 128–32–60</span></div><p class="meta">初版：2026年11月16日 ｜ 対象実装：main / b0fb2b1<br>HTML版。印刷用スタイルはA4縦。写真は撮影後に差し替える予定です。</p>
+<div class="photo" id="photo-p01"><span class="photo-id">PHOTO P01 · 外観写真予定</span><strong>装置全体 / 演奏する人から見た姿</strong><p>フレーム、アクリル板、センサ、ラズパイ、モニター、スピーカー、マレットが一緒に入る斜め前からの横位置写真。</p><small>撮影：横位置 4:3 または 3:2。背景を整理し、装置全体を切らずに入れる。</small></div>
+<div class="note"><p><strong>このマニュアルの読み方</strong><br>通常の演奏は第4〜6章、現場の調整は第7章。学習データを増やす場合は第8〜9章へ進んでください。画面中のオレンジの番号は、直後の説明と対応しています。</p></div>
+<p class="caption">UI画像は対象実装をWindows上のChromeで表示して撮影しました。演奏・追加学習は付属の疑似基板での表示例、採取・管理は基板未接続時の表示です。カメラ映像は未接続です。ラズパイでは画面寸法や接続状態により配置・表示内容が変わります。</p></div>
+
+<section class="chapter" id="quick"><h2><span class="num">QUICK START</span>まず演奏する</h2><p>初期セットアップ済みのラズパイを使う場合の手順です。初回導入は<a href="#pi">付録A</a>を先に行ってください。</p>
+<div class="grid"><div class="step-card"><b>STEP 01</b><h3>接続する</h3><p>板とフレームを安定して設置。センサ基板をラズパイへUSB接続し、モニター・スピーカーをつなぎます。</p></div><div class="step-card"><b>STEP 02</b><h3>電源を入れる</h3><p>周辺機器とラズパイの電源を入れます。自動で「演奏」画面が開き、「センサ接続中」になるのを待ちます。</p></div><div class="step-card"><b>STEP 03</b><h3>叩いて確かめる</h3><p>音量を下げてから、板のエリア中心を軽く1打。音が鳴り、対応エリアが光ることを確認して演奏します。</p></div><div class="step-card"><b>STEP 04</b><h3>安全に終了する</h3><p>「管理」→「ラズパイの電源を切る」を3秒長押し。終了案内に従い、アクセスLEDの点滅が止まってから電源を外します。</p></div></div>
+<div class="warning"><p><strong>電源ケーブルをいきなり抜かないでください。</strong>収録データや保存中の設定が破損する原因になります。認識が不安定なときは強く叩き続けず、支持状態を確認してから<a href="#odl">現場キャリブレーション</a>を行います。</p></div></section>
+
+<section class="chapter" id="about"><h2><span class="num">01 / OVERVIEW</span>Solistpanについて</h2><p>Solistpanは、1個の加速度センサでアクリル板の振動を読み取り、叩いた位置を音へ変換する楽器です。板の振動の違いをSolist-AIが判別し、60地点の位置確率を12エリアにまとめて発音します。</p>
+<div class="flow" aria-label="装置の役割分担"><div><strong>アクリル板</strong>叩いた位置ごとに異なる振動</div><span>→</span><div><strong>KX134 / Solist-AI基板</strong>打撃検出・位置推論・ODL</div><span>→</span><div><strong>Raspberry Pi</strong>画面表示・発音・カメラ・動画</div></div>
+<p>通常の展示では、Windows PCやインターネットへの接続は必要ありません。ラズパイはUSB経由で推論結果を受け取ります。基礎モデルの再学習とファームウェアの更新には開発用PCを使います。</p>
+<h3>各部の名前と役割</h3><div class="table-wrap"><table><thead><tr><th>部分</th><th>役割</th></tr></thead><tbody><tr><td>アクリル板・フレーム</td><td>演奏面。400 × 300 × 5 mmの板を2点で支持します。</td></tr><tr><td>KX134-1211</td><td>板の振動を取得する加速度センサ。取付状態を変えると振動特性も変わります。</td></tr><tr><td>DT-EBML63Q2557 / Solist-AI</td><td>振動の特徴から60位置を推論。現場キャリブレーションもこの基板上で行います。</td></tr><tr><td>ラズパイ・モニター</td><td>演奏・追加学習・デモ動画・管理画面を表示します。</td></tr><tr><td>スピーカー・USBカメラ</td><td>発音と板の映像表示。カメラなしでも演奏できます。</td></tr></tbody></table></div>
+<h3>エリアの並び</h3><p>板を演奏する側から見て、左上がエリア1、右下がエリア12です。自由演奏では次の半音階になります。曲を選ぶと割り当てが変わるため、画面の案内を見て演奏します。</p>
+<div class="panel-map" aria-label="12エリアと自由演奏の音階"><div>1<small>C4</small></div><div>2<small>C♯4</small></div><div>3<small>D4</small></div><div>4<small>D♯4</small></div><div>5<small>E4</small></div><div>6<small>F4</small></div><div>7<small>F♯4</small></div><div>8<small>G4</small></div><div>9<small>G♯4</small></div><div>10<small>A4</small></div><div>11<small>A♯4</small></div><div>12<small>B4</small></div></div></section>
+
+<section class="chapter" id="safety"><h2><span class="num">02 / HANDLING</span>安全に使うために</h2><ul><li>板・フレームを平らで安定した場所に置き、がたつきや緩みを確認します。板の上に体重をかけたり、物を置いたりしないでください。</li><li>板にひび、欠け、大きな傷がある場合は使用を止めます。端面、固定具、センサ、ケーブルの取付部分は叩きません。</li><li>指定のマレットで軽く叩きます。強い打撃や金属工具の使用は避けてください。反応しないときは接続や設定を確認します。</li><li>配線・支持位置・センサの付け替えは電源を切ってから行います。ケーブルを張った状態で配置しないでください。</li><li>スピーカーの音量は小さい状態から調整します。飲み物や水分を電子基板の近くに置かないでください。</li><li>再起動・電源断・データ削除・モデル書き込みは管理者が行います。来場者には演奏に必要な操作だけを案内します。</li></ul>
+<div class="note"><p><strong>支持位置は認識精度に関係します。</strong>フレームへの固定やダンパーの状態を変えた場合は、まず12エリアを試奏し、必要なら現場キャリブレーションで補正します。</p></div></section>
+
+<section class="chapter" id="connect"><h2><span class="num">03 / SETUP</span>準備と接続</h2><h3>用意するもの</h3><ul class="checklist"><li>アクリル板、フレーム、マレット、センサ、センサケーブル、Solist-AI基板</li><li>Raspberry Pi 4、対応する電源、セットアップ済みストレージ</li><li>モニター、対応するHDMIケーブル、モニター用電源、マウスまたはタッチ操作環境</li><li>スピーカーと音声ケーブル・電源（HDMI音声を使う場合は構成に合わせる）</li><li>データ通信対応のUSBケーブル、必要に応じてUSBカメラ</li></ul>
+<div class="diagram" role="img" aria-label="配線の関係">アクリル板のセンサ ─ センサケーブル ─ Solist-AI基板
+                                          │ USB（データ通信・給電）
+                                      Raspberry Pi
+                                      ├ HDMI → モニター
+                                      ├ 音声 → スピーカー
+                                      └ USB  → カメラ（任意）</div>
+<ol><li>板をフレームの所定位置で2点支持し、センサと配線が演奏の邪魔にならないことを確認します。</li><li>センサケーブルを基板の指定端子へ接続します。端子の向き・ピン配置は実機の表示と配線資料で確認します。</li><li>Solist-AI基板をラズパイへ、通信対応USBケーブルで接続します。</li><li>モニター・スピーカー・カメラを接続します。ケーブルを固定し、板の振動や人の動きで抜けないようにします。</li><li>電源を入れる前に接続を見直します。USB給電の重複や異なる端子への挿入を避けてください。</li></ol>
+<div class="photo" id="photo-p02"><span class="photo-id">PHOTO P02 · 設置写真予定</span><strong>板の2点支持・固定位置・ダンパー</strong><p>演奏する側から見た板全体と、2か所の支持部が分かる写真。支持部、センサ、叩かない固定領域を後から矢印で示します。支持部の拡大写真もあると説明しやすくなります。</p><small>横位置。支持部と板の境界にピントを合わせる。</small></div>
+<div class="photo" id="photo-p03"><span class="photo-id">PHOTO P03 · 配線写真予定</span><strong>センサ取付とセンサ基板の接続</strong><p>センサの向き、取付位置、ケーブルの経路、基板側の接続端子が分かる接写。端子名が読める明るさで、基板とセンサをそれぞれ撮影してください。</p><small>通電せずに撮影。端子名が隠れない角度で。</small></div>
+<div class="photo" id="photo-p04"><span class="photo-id">PHOTO P04 · 接続写真予定</span><strong>ラズパイの各ポートと全ケーブル</strong><p>Solist-AIのUSB、カメラのUSB、HDMI、音声、電源の接続先が見える写真。ラズパイの背面側と、モニター・スピーカーまでの全体配線を撮影してください。</p><small>ケーブルを整理し、両端の接続先が分かるように撮影。</small></div></section>
+
+<section class="chapter" id="startup"><h2><span class="num">04 / POWER ON</span>電源を入れて演奏する</h2><ol><li>モニターとスピーカーを使える状態にし、スピーカーの音量を下げます。</li><li>ラズパイへ電源を接続します。初期設定済みなら、デスクトップへの自動ログイン後に「演奏」画面が全画面で開きます。</li><li>画面右上が緑の<strong>「センサ接続中」</strong>になるまで待ちます。</li><li>画面を一度クリックまたはタッチします。ブラウザが音声の開始操作を求める場合に備えた操作です。</li><li>板のエリア中心を軽く叩き、音と表示が反応することを確認します。12エリアを順に確認し、音量を調整します。</li></ol>
+<figure class="screen"><button type="button" aria-label="演奏画面を拡大"><img src="assets/play.png" width="1440" height="1000" alt="演奏画面。上部の追加学習タブと右上の接続表示を番号で示す。"></button><figcaption>図4-1 演奏画面。付属の疑似基板で撮影した表示例です。カメラ停止時は4×3のグリッドを表示します。</figcaption></figure>
+<ul class="callouts"><li><span class="badge">1</span><strong>「追加学習」</strong>：現場キャリブレーションへ移動します。普通に演奏するときは「演奏」のままで使います。</li><li><span class="badge">2</span><strong>接続表示</strong>：「センサ接続中」を確認します。「センサ未接続」ならUSB配線を、「サーバ未接続」ならWebサーバーを確認します。</li></ul>
+<div class="note"><p>展示版は基板に接続できると自動的に演奏を開始します。PC用の通常画面では「接続」→「演奏開始」が必要です。<a href="#windows">付録B</a>を参照してください。</p></div></section>
+
+<section class="chapter" id="play"><h2><span class="num">05 / PLAY</span>演奏画面の使い方</h2><p>板のエリアを叩くと推定されたエリアが反応し、そのエリアの音が鳴ります。画面のカメラ枠は、カメラが停止中でもエリアのグリッドとして使えます。表示中の確率やエリアは推論結果であり、必ず正しい位置を示すとは限りません。</p>
+<h3>音色・音量・曲を選ぶ</h3><figure class="screen"><button type="button" aria-label="演奏設定を拡大"><img src="assets/music.png" alt="演奏画面下部。音色、音量、曲、音の長さ、曲の速さ、教示、手本、最初からの各操作に番号を付けた画像。"></button><figcaption>図5-1 画面下部の演奏設定。曲「エリーゼのために」を選んだ実際のUIです。</figcaption></figure>
+<ul class="callouts"><li><span class="badge">1</span><strong>音色</strong>：スチールドラム、ピアノ、チェンバロ、ギター、ドラムから選びます。</li><li><span class="badge">2</span><strong>音量</strong>：スライダーで調整します。大きな音を避けるため、スピーカー側も小音量から調整してください。</li><li><span class="badge">3</span><strong>演奏補助</strong>：「自由演奏」または曲を選びます。曲を変えたら画面の音階・次のエリア表示を確認します。</li><li><span class="badge">4</span><strong>音の長さ</strong>：発音の長さを調整します。長すぎて音が重なる場合は短くします。</li><li><span class="badge">5</span><strong>曲の速さ</strong>：手本演奏・タイミング教示の速さを調整します。初めてなら遅めにします。</li><li><span class="badge">6</span><strong>教示スタート</strong>：曲を選んで押すと、カウントダウンとタイミングの案内が始まります。示されたエリアをタイミングに合わせて叩きます。表示上の判定やコンボを目安に練習できます。</li><li><span class="badge">7</span><strong>手本演奏</strong>：曲の手本を自動で鳴らします。もう一度押すと停止します。</li><li><span class="badge">8</span><strong>最初から</strong>：曲の進行を先頭に戻します。曲をやり直すときに使います。</li></ul>
+<h3>練習の順序</h3><ol><li>「自由演奏」で12エリアの場所と反応を確かめます。</li><li>曲を選び、「手本演奏」で旋律を聴きます。</li><li>手本を止め、案内されたエリアをゆっくり叩きます。</li><li>慣れたら「教示スタート」でタイミングに合わせます。難しいときは「曲の速さ」を下げます。</li></ol><p>音が出ない場合は、<a href="#trouble">第12章</a>の「音が出ない」を確認してください。</p></section>
+
+<section class="chapter" id="camera"><h2><span class="num">06 / CAMERA</span>カメラ映像の設定</h2><p>カメラは板全体が見える位置に固定します。演奏者の手やマレットで板全体が隠れ続けない角度にしてください。映像の位置合わせは表示用であり、AIモデルの学習や精度そのものは変更しません。</p>
+<figure class="screen"><button type="button" aria-label="カメラ操作を拡大"><img src="assets/camera.png" alt="カメラ選択、カメラ開始、8点フィット、フィット消去、停止を番号で示した操作欄。"></button><figcaption>図6-1 カメラ操作欄。撮影時はカメラ未接続のため「停止」「8点フィット」は無効です。カメラ開始後に使えるようになります。</figcaption></figure>
+<ul class="callouts"><li><span class="badge">1</span><strong>カメラ</strong>：接続したUSBカメラを選びます。番号は接続環境により変わります。</li><li><span class="badge">2</span><strong>カメラ開始</strong>：映像を表示します。通常ブラウザで許可を求められた場合は、この装置で使うカメラへのアクセスを許可します。</li><li><span class="badge">3</span><strong>8点フィット</strong>：映像内の板とエリア枠を合わせます。下記の順にクリックします。</li><li><span class="badge">4</span><strong>フィット消去</strong>：位置合わせをやり直すときに使います。</li><li><span class="badge">5</span><strong>停止</strong>：カメラを止めます。展示画面は定型グリッド表示へ戻ります。</li></ul>
+<h3>8点フィットの手順</h3><ol><li>「カメラ開始」で板全体を映し、「8点フィット」を押します。</li><li>画面の指示に従い、<strong>左上 → 右上 → 右下 → 左下</strong>の順で板の四隅をクリックします。</li><li>続いて、<strong>左側の上段境界 → 右側の上段境界 → 左側の下段境界 → 右側の下段境界</strong>をクリックします。4×3のエリアを分ける、左右の端の2本の横境界です。</li><li>表示された枠が板と重なることを確認し、必要なら四隅と境界のハンドルをドラッグして調整します。</li><li>何か所か叩き、映像とエリア表示の対応を確認します。カメラを動かしたときは再調整します。</li></ol><p>フィット設定はそのブラウザに保存されます。ブラウザの保存データを削除したり、別端末に移ったりした場合は合わせ直します。</p>
+<div class="photo" id="photo-p05"><span class="photo-id">PHOTO P05 · カメラ設置写真予定</span><strong>板全体が映るカメラの位置</strong><p>カメラ本体・固定具・板を一緒に写し、距離と角度が分かる写真。演奏者が立つ側も分かるようにしてください。</p><small>横位置。実際に安定して撮影できた設置状態を撮る。</small></div></section>
+
+<section class="chapter" id="odl"><h2><span class="num">07 / ON-DEVICE LEARNING</span>現場キャリブレーション（追加学習）</h2><p>設置し直した、固定の状態が変わった、マレットを替えたなどの理由で認識がずれるとき、Solist-AI基板上でモデルを調整します。これをODL（オンデバイス学習）と呼びます。新しい基礎モデルをPCで作る<a href="#retrain">再学習</a>とは別の操作です。</p>
+<div class="table-wrap"><table><thead><tr><th>方式</th><th>叩く場所</th><th>展示画面の1回の操作</th><th>使い方</th></tr></thead><tbody><tr><td>高速</td><td>12エリアの中心</td><td>12打 × 5周＝60打</td><td>まず短時間で設置の違いを補正するとき</td></tr><tr><td>精密</td><td>中心12点＋四隅48点の60地点</td><td>60打 × 5周＝300打</td><td>中心以外も含めて調整するとき</td></tr></tbody></table></div>
+<figure class="screen"><button type="button" aria-label="追加学習の方式選択画面を拡大"><img src="assets/odl.png" alt="追加学習画面。高速、精密、新たに5周、さらに5周の位置を示す。"></button><figcaption>図7-1 追加学習の開始前。疑似基板・初期モデルの表示例です。</figcaption></figure>
+<ul class="callouts"><li><span class="badge">1</span><strong>高速</strong>：12中心点を案内します。</li><li><span class="badge">2</span><strong>精密</strong>：60地点を案内します。</li><li><span class="badge">3</span><strong>新たに5周を取り直す</strong>：基礎モデルから学習し直します。完了すると基板の保存済み校正を置き換えます。</li><li><span class="badge">4</span><strong>追加学習（さらに5周）</strong>：基板に保存済みの校正を引き継ぎます。同じ方式の校正が保存されている場合だけ使えます。</li></ul>
+<h3>学習を実行する</h3><ol><li>今の状態に戻したい場合は、下の「保存した重み」で先にバックアップします。</li><li>上部の「追加学習」へ移動し、「高速」または「精密」を選びます。</li><li>初めてなら「新たに5周を取り直す」、同じ方式の続きなら「追加学習（さらに5周）」を押します。</li><li>板の図で強調された地点を1回ずつ叩きます。受信が終わり、次の案内に変わってから次を叩きます。</li><li>5周終わり、<strong>「学習完了 — 保存しました」</strong>と表示されるまで待ちます。</li><li>「演奏」へ戻り、12エリアの中心とその周辺を試奏します。改善しなければ、保存した重みを戻すか初期モデルへ戻します。</li></ol>
+<figure class="screen"><button type="button" aria-label="追加学習中の画面を拡大"><img src="assets/odl-running.png" alt="追加学習中の指示、打数表示、中止、一つ前へ戻るのボタンを番号で示す。"></button><figcaption>図7-2 学習中の表示。疑似基板による例であり、表示された正解率は性能評価値ではありません。</figcaption></figure>
+<ul class="callouts"><li><span class="badge">1</span><strong>指示とマーカー</strong>：実物の板で、その位置を叩きます。画面自体を押して学習する操作ではありません。</li><li><span class="badge">2</span><strong>進行状況</strong>：周回数・打数を確認します。周ごとの判定は学習の進み具合の目安です。</li><li><span class="badge">3</span><strong>中止（保存しない）</strong>：今回の作業を中止し、途中結果を保存しません。</li><li><span class="badge">4</span><strong>一つ前へ戻る</strong>：誤った場所を叩いた場合に使います。画面が戻した地点を案内してから再度叩きます。</li></ul>
+<div class="warning"><p><strong>展示用画面は5周完了後に自動で保存します。</strong>前後の独立テストを比較して自動的に採否判定する画面ではありません。悪化した場合に備え、変更前の重みを保存してください。学習中はページ移動・USB取り外し・電源断を避けます。</p></div>
+<h3>校正結果を保存・復元する</h3><figure class="screen"><button type="button" aria-label="重み保存欄を拡大"><img src="assets/odl-profiles.png" alt="追加学習画面の保存名、端末保存、保存リスト、ボード復元、JSON保存、JSON読み込み、初期モデル復帰を示す。"></button><figcaption>図7-3 右側の欄を下へスクロールした状態。基板の有効な校正がないため保存操作は無効の表示例です。</figcaption></figure>
+<ul class="callouts"><li><span class="badge">1</span><strong>保存名</strong>：会場・マレット・日付など、後から分かる名前を入力します。</li><li><span class="badge">2</span><strong>現在の重みをこの端末に保存</strong>：基板の校正をラズパイ／PC側へ保存します。端末再起動後も残ります。</li><li><span class="badge">3</span><strong>保存した重みの一覧</strong>：復元または書き出したい保存項目を選びます。</li><li><span class="badge">4</span><strong>選んだ重みをボードへ戻す</strong>：選んだ校正を接続中の基板へ復元します。</li><li><span class="badge">5</span><strong>選んだ重みをファイルに保存</strong>：JSONファイルとしてダウンロードし、別媒体へバックアップできます。</li><li><span class="badge">6</span><strong>重みファイルを選んで読み込む</strong>：JSONを読み込み、端末に登録して基板へ復元します。読み込むだけで基板も変更される点に注意してください。</li><li><span class="badge">7</span><strong>初期モデルに戻す</strong>：基板の保存済み校正を無効にし、基礎モデルに戻します。確認のため2回押します。</li></ul>
+<p>基板の有効な校正保存枠は1件です。複数の校正を残すときは端末側の保存とJSONを使います。基礎モデルが変わると重みの互換性がなくなる場合があり、CRCによる確認が行われます。</p></section>
+
+<section class="chapter" id="collect"><h2><span class="num">08 / DATA COLLECTION</span>学習用データを採取する</h2><p>基礎モデルを作り直すための振動データを、ガイドに従って収録します。ODLで保存した重みとは別のデータです。採取はラズパイでもWindowsでも行えます。ラズパイでは「管理」→<strong>「学習用データ採取」</strong>で開きます。</p>
+<h3>8.1 学習用と評価用を先に分ける</h3><p>1セットは、中心12地点の収録と四隅48地点の収録を合わせた60地点です。<strong>ファイル上は中心と四隅の2セッション</strong>になります。始める前に保存先と用途を決め、評価用は学習用と混ぜません。</p>
+<div class="table-wrap"><table><thead><tr><th>用途</th><th>各位置の回数</th><th>中心セッション</th><th>四隅セッション</th><th>1セット</th></tr></thead><tbody><tr><td>学習用</td><td>50打</td><td>12 × 50＝600打</td><td>48 × 50＝2,400打</td><td>3,000打 / 2セッション</td></tr><tr><td>独立評価用</td><td>10打</td><td>12 × 10＝120打</td><td>48 × 10＝480打</td><td>600打 / 2セッション</td></tr></tbody></table></div>
+<div class="note"><p>保存先の例：学習用は <code>data/raw/manual_training</code>、評価用は <code>data/raw/manual_evaluation</code>。これは実行中のサーバーが動く端末上のパスです。ラズパイで採取したデータは、見ているWindows PCではなくラズパイに保存されます。</p></div>
+<h3>8.2 接続と保存先を設定する</h3><figure class="screen"><button type="button" aria-label="採取ページの接続設定を拡大"><img src="assets/collection-connect.png" alt="採取画面の板仕様、ポート、更新、接続、ボード確認、保存先を示す。"></button><figcaption>図8-1 採取画面の上部。実機未接続の表示例。保存先は説明用の入力例です。</figcaption></figure>
+<ul class="callouts"><li><span class="badge">1</span><strong>板仕様</strong>：「400 × 300 × 5 mm（60位置・12エリア）」を選びます。図が4列×3行になることを確認します。</li><li><span class="badge">2</span><strong>COMポート</strong>：実機のポートを選びます。WindowsはCOM番号、ラズパイは <code>/dev/ttyACM*</code> などです。</li><li><span class="badge">3</span><strong>更新</strong>：USBを挿し直したときなどにポート一覧を読み直します。</li><li><span class="badge">4</span><strong>接続</strong>：まだ接続していない場合に押します。別アプリがポートを使っている場合は閉じます。</li><li><span class="badge">5</span><strong>ボード確認</strong>：基板が応答することを確認します。</li><li><span class="badge">6</span><strong>保存先</strong>：用途別のフォルダを入力します。採取後に表示されるセッションIDも控えます。</li></ul>
+<h3>8.3 中心と四隅を別々に採る</h3><figure class="screen"><button type="button" aria-label="ガイド採取の画面を拡大"><img src="assets/collection-guide.png" alt="位置パターン、各位置の回数、採取開始、採取停止、1件取り消し、打点図を番号で示す。"></button><figcaption>図8-2 四隅パターン・50回を選んだ開始前の画面。実機未接続のため採取ボタンは無効です。画面の固定具付近では打点がずれています。実際のマーカー位置に従ってください。</figcaption></figure>
+<ul class="callouts"><li><span class="badge">1</span><strong>位置パターン</strong>：最初は「A: エリア中心 1点」、次のセッションで「B: 50 mm格子 四隅 4点」を選びます。</li><li><span class="badge">2</span><strong>各位置の回数</strong>：学習用は50、評価用は10を入力します。</li><li><span class="badge">3</span><strong>採取開始</strong>：ガイド収録を開始します。新しい採取runとして生成されたセッションIDと保存先を確認します。</li><li><span class="badge">4</span><strong>採取停止</strong>：途中でやめる場合に押します。必要件数を満たした完成セットとして扱わないでください。</li><li><span class="badge">5</span><strong>直前の1件を取り消して再測定</strong>：直前に誤った地点を叩いたときに使います。図の案内が戻ってから取り直します。</li><li><span class="badge">6</span><strong>打点図</strong>：強調された点を叩き、受信と次の待ち受けを確認してから次へ進みます。回数・全体進捗を確認します。</li></ul>
+<ol><li>実際に使う支持状態・マレットで設置し、周囲の衝撃や机への接触を避けます。</li><li>学習用の保存先で中心パターン・50回を収録します。各エリア50打、合計600打を確認します。</li><li>別の採取runで四隅パターン・50回を収録します。合計2,400打を確認し、中心と四隅の2セッションを1セットとして記録します。</li><li>評価用は別の保存先で中心・四隅を各10回収録します。合計600打を確認します。</li><li>日付、支持状態、マレット、採取者、用途、中心／四隅のセッションIDを記録します。</li></ol>
+<div class="photo" id="photo-p06"><span class="photo-id">PHOTO P06 · 採取姿勢の写真予定</span><strong>中心・四隅の正しい叩き方</strong><p>同じエリアの中心と四隅にマレットを当てる位置が分かる写真。板の番号・目印とマレット先端が見える俯瞰写真を、中心1枚・四隅の例1枚で撮影してください。</p><small>支持位置は演奏時と同じ。板を手で押さえない状態で撮影。</small></div>
+<h3>8.4 波形を確認し、バックアップする</h3><figure class="screen"><button type="button" aria-label="収録済みデータの操作欄を拡大"><img src="assets/collection-library.png" alt="収録済みデータ欄。セッション選択、一覧更新、セッション削除、表示中データ削除の位置を示す。"></button><figcaption>図8-3 収録データの閲覧・削除欄。撮影環境には収録データがないため一覧は空です。</figcaption></figure>
+<ul class="callouts"><li><span class="badge">1</span><strong>セッション</strong>：確認する収録単位を選びます。イベント行を選ぶと下の波形・FFTに表示されます。</li><li><span class="badge">2</span><strong>一覧更新</strong>：指定保存先のデータを読み直します。</li><li><span class="badge">3</span><strong>セッション削除</strong>：セッション全体を削除します。確認後は取り消せません。</li><li><span class="badge">4</span><strong>表示中のデータを削除</strong>：選択した1件を削除します。確認後は取り消せません。</li></ul>
+<p>二重打撃、別の場所への打撃、机を叩いた振動、飽和した波形などを確認します。除外した場合は件数不足を記録し、必要なら取り直します。採取中の削除はできません。</p><p>保存されるのは各セッションの <code>session.json</code>、<code>manifest.jsonl</code>、<code>manifest.csv</code>、<code>events/*.npz</code> です。<strong>セッションフォルダごと</strong>バックアップし、これらをばらばらに編集しないでください。manifestの件数とイベント実数の不整合は学習時の読込エラーになります。</p>
+<pre><code># ラズパイから開発PCへコピーする例（端末で実行）
+scp -r &lt;ユーザー&gt;@&lt;ラズパイ&gt;:~/acrylic_pan/data/raw/manual_training data/raw/
+scp -r &lt;ユーザー&gt;@&lt;ラズパイ&gt;:~/acrylic_pan/data/raw/manual_evaluation data/raw/</code></pre></section>
+
+<section class="chapter" id="retrain"><h2><span class="num">09 / RETRAINING</span>モデルを再学習する</h2><p>この章は開発・保守担当者向けです。収録データからPC上で候補モデルを作り、独立した評価データで確認したうえで、モデルとODL初期行列を一緒に更新します。</p>
+<h3>9.1 現在の搭載モデル</h3><div class="model-stats"><div><strong>8セット</strong><small>T1〜T8 / 学習用16セッション</small></div><div><strong>24,000打</strong><small>60地点 × 50打 × 8セット</small></div><div><strong>128–32–60</strong><small>入力・隠れ・出力</small></div></div>
+<p><strong>1セットは中心と四隅の2セッションです。</strong>最新配備モデルは2026年11月1日〜5日収録のT1〜T8を使用し、2026年11月5日に基板へ書き込んだ記録があります。工場βのCRC32は <code>0xEF3DC389</code> です。</p>
+<div class="table-wrap"><table><thead><tr><th>区分</th><th>セット / セッション</th><th>件数</th><th>使用方法</th></tr></thead><tbody><tr><td>学習用</td><td>T1〜T8 / 16セッション</td><td>24,000打</td><td>基礎モデルの学習に使用</td></tr><tr><td>独立評価用</td><td>E1〜E4 / 8セッション</td><td>2,400打</td><td>学習・標準化係数・蒸留教師の学習に不使用</td></tr></tbody></table></div>
+<p>独立評価2,400打に対するPCシミュレーションでは、<strong>60位置精度97.250%、12エリア精度98.417%、平均距離誤差6.184 mm</strong>です。公式Simulatorの実行値や、書き込み後の実機通信試験の結果ではありません。配備記録ではバイナリ照合と書き込み照合済みですが、書き込み直後のシリアル動作確認は未実施とされています。</p>
+<p class="sources">根拠：<a href="https://github.com/airpocket-soundman/acrylic_pan/blob/b0fb2b1/docs/device-deployment-20261105.md">配備記録</a>、<a href="https://github.com/airpocket-soundman/acrylic_pan/blob/b0fb2b1/docs/capacity-comparison-t8-20261105.md">精度の記録（24,000打・隠れ32の行）</a>。</p>
+<details><summary>学習用16セッションのIDを確認する</summary><div class="table-wrap"><table><thead><tr><th>セット</th><th>中心 / 四隅のセッションID</th></tr></thead><tbody>
+<tr><td>T1</td><td><code>20261101_195747_732dc622</code><br><code>20261101_200409_bd8186a8</code></td></tr><tr><td>T2</td><td><code>20261102_185605_ab2d7390</code><br><code>20261102_190132_d56127fe</code></td></tr><tr><td>T3</td><td><code>20261102_205927_3a0bfe2b</code><br><code>20261102_210517_43fe6700</code></td></tr><tr><td>T4</td><td><code>20261103_193903_70647316</code><br><code>20261103_194422_cb514bb0</code></td></tr><tr><td>T5</td><td><code>20261103_201104_5bfa30bd</code><br><code>20261103_201610_061ef5b9</code></td></tr><tr><td>T6</td><td><code>20261104_201234_55f30e5c</code><br><code>20261104_201915_101fc433</code></td></tr><tr><td>T7</td><td><code>20261105_190133_6b691207</code><br><code>20261105_191139_f2d0028d</code></td></tr><tr><td>T8</td><td><code>20261105_194325_3c60eb92</code><br><code>20261105_194942_0523c534</code></td></tr>
+</tbody></table></div></details>
+<h3>9.2 学習環境とデータを準備する</h3><ol><li>開発PCにリポジトリ、Python環境、<code>requirements.txt</code>の依存パッケージを用意します。ファーム更新には別途LEXIDEのベンダープロジェクト、ビルドツール、MCU-Linkが必要です。</li><li>学習用フォルダと独立評価用フォルダを分けます。学習用の「all」は、そのフォルダ内の完了セッションすべてを意味します。評価用を同じフォルダへ置かないでください。</li><li>中心と四隅の対応、板仕様、セッションの完了状態、件数を確認します。60地点すべてを含むデータを使います。</li><li>公式Simulator由来の固定αが <code>data/dummy_model/model.npz</code> に含まれていることを確認します。<code>alpha</code>行列の先頭128×32が使われます。乱数で代用すると同じモデル条件になりません。</li><li>変更前に使用中のファームウェア、生成ヘッダー、PCモデル、校正JSONを保存します。</li></ol>
+<p>最新モデルの元データは <code>data/archives/20261103/T1_train.zip</code>〜<code>T8_train.zip</code>、評価用は <code>E1_evaluation.zip</code>〜<code>E4_evaluation.zip</code>です。<code>manifest.json</code>に用途・件数・SHA-256があります。展開時も元のセッションフォルダ構造を保ちます。</p>
+<h3>9.3 新しい候補モデルを学習する</h3><p>次は、採取したデータで128–32–60の候補を作る汎用コマンドです。リポジトリ直下で実行します。<code>python</code>は依存パッケージを導入済みのPythonに置き換えてください。最初は出力を候補フォルダへ置き、搭載用ファイルを直接上書きしません。</p>
+<pre><code>python -m sim.device_position_probability --sessions data/raw/manual_training --session-ids all --output-dir artifacts/manual_candidate/device_position --header artifacts/manual_candidate/apan_position_probability_model.h</code></pre>
+<p>出力は <code>model.npz</code>、<code>training_report.json</code>、指定したモデルヘッダーです。処理内では反復番号を使う内部評価を行った後、選んだ学習データ全件で最終候補を学習します。内部評価の結果だけで独立評価の代わりにしないでください。</p>
+<div class="note"><p><strong>最新配備モデルを厳密に再生成する場合</strong><br>最新24,000打版は <code>scripts/capacity_comparison.py</code> → <code>scripts/capacity_add_t8.py</code> の実験系列で生成され、160エポック・蒸留比率0.25の設定を使用しています。上の汎用CLIは同じ構造の候補作成手順で、配備バイナリをそのまま再現する保証はありません。厳密な再現には、配備時のデータ、特徴キャッシュ、学習条件をそろえ、<a href="https://github.com/airpocket-soundman/acrylic_pan/blob/b0fb2b1/scripts/capacity_add_t8.py">生成スクリプト</a>と配備記録を照合します。</p></div>
+<h3>9.4 独立データで比較する</h3><pre><code>python -m sim.evaluate_device_model --model artifacts/manual_candidate/device_position/model.npz --sessions data/raw/manual_evaluation --session-ids all &gt; artifacts/manual_candidate/independent_evaluation.json</code></pre>
+<p>現在使用中のモデルにも<strong>同じ評価セッション</strong>を入力し、60位置Top-1、12エリア精度、平均距離誤差、25 mm以内率、地点別の失敗傾向を比較します。学習レポートの <code>session_ids</code> と評価用IDに重複がないことを確認します。悪化した候補は配備せず、収録条件・誤ラベル・データ偏りを見直します。</p>
+<h3>9.5 モデルとODL初期行列を反映する</h3><p>採用後に、候補モデルに対応するODL初期行列を生成します。学習時と同じセッションを指定します。</p><pre><code>python -m sim.position_odl_calibration_prior --sessions data/raw/manual_training --session-ids all --model artifacts/manual_candidate/device_position/model.npz --prior-header artifacts/manual_candidate/apan_calibration_prior.h</code></pre>
+<ol><li>採用した <code>apan_position_probability_model.h</code> と <code>apan_calibration_prior.h</code> を、両方とも <code>firmware/AcrylicPanCollector/generated/</code> へ反映します。モデルと初期行列を別世代で混ぜません。</li><li>Windowsの開発環境でクリーンビルドします。下のパスは実際のベンダープロジェクトへ置き換えます。</li></ol>
+<pre><code>.\scripts\build-firmware.ps1 -SourceProject &lt;LEXIDEのベンダープロジェクト&gt; -Clean
+.\scripts\flash-firmware.ps1 -FirmwareHex &lt;ビルドで生成されたHEX&gt; -Execute</code></pre>
+<p>書き込み前にWebサーバーなどのポート使用を止め、対象基板とMCU-Linkの接続を確認します。ビルド結果のリンクマップに <code>ApanCollectorAppInitialize</code> と <code>apan_position_beta</code> が入り、βとCRCが意図した候補に一致することを確認します。</p>
+<h3>9.6 更新後の確認と復旧</h3><ul class="checklist"><li>書き込み・照合が成功し、基板を再起動できる。</li><li>USB接続、演奏、12エリア反応、音声が動作する。</li><li>新しい基礎モデルでODLの開始・中止・保存ができる。</li><li>電源を入れ直しても基礎モデルと有効な校正が意図どおり使われる。</li><li>モデル、データID、評価JSON、ヘッダー、CRC、Gitコミット、HEX/ELFをまとめて保存した。</li></ul>
+<p>問題があれば保存した動作確認済みのHEXを書き戻します。ソースを戻すだけでは基板は戻りません。モデルのCRCが変わると既存校正が無効になるため、復旧・更新後は校正状態も確認します。</p></section>
+
+<section class="chapter" id="exhibit"><h2><span class="num">10 / EXHIBITION</span>展示で使う</h2><h3>開場前の点検</h3><ul class="checklist"><li>配線が抜けかけていない。板・フレーム・センサに緩みがない。</li><li>電源投入から演奏画面まで自動で立ち上がる。</li><li>12エリアで発音と表示を確認し、適切な音量になっている。</li><li>カメラを使う場合は映像とフィットが合っている。</li><li>管理画面の必須項目に赤がない。黄色は内容を読み、使用する機能に問題がない。</li><li>ネットワークなしでも、演奏・音声・必要な動画が使える。</li></ul>
+<h3>デモ動画を見せる</h3><p>上部の「デモ動画」で再生画面へ移動します。動画を出るときは「演奏」へ戻ります。動画はラズパイ上の <code>web/assets/pv/</code> のMP4を使います。別フォルダはサーバーの <code>--video-dir</code> で指定できます。</p>
+<figure class="screen"><button type="button" aria-label="デモ動画画面を拡大"><img src="assets/video.png" alt="実際のPV動画を表示したデモ画面。再生停止、シーク、リピートを番号で示す。"></button><figcaption>図10-1 デモ動画画面。登録済みの作品PVを表示しています。</figcaption></figure>
+<ul class="callouts"><li><span class="badge">1</span><strong>再生・一時停止</strong>：動画を再生／停止します。自動再生されないときもこのボタンを押します。</li><li><span class="badge">2</span><strong>シークバー</strong>：見せたい位置へ移動します。</li><li><span class="badge">3</span><strong>リピート</strong>：複数本では全リピート・1本リピート・リピートなしを切り替えます。1本だけの場合は1本リピート／なしです。</li></ul>
+<h3>管理画面で点検する</h3><figure class="screen"><button type="button" aria-label="管理画面を拡大"><img src="assets/admin.png" alt="展示管理画面。自動検査、学習用データ採取、必須項目、保守項目を番号で示す。端末固有情報は伏せている。"></button><figcaption>図10-2 Windows・基板未接続時の管理画面。赤はこの撮影条件による表示です。ネットワーク・端末固有情報を含む領域は灰色で伏せています。</figcaption></figure>
+<ul class="callouts"><li><span class="badge">1</span><strong>自動検査を実行</strong>：開いたときの自動検査を、必要に応じてやり直します。</li><li><span class="badge">2</span><strong>学習用データ採取</strong>：第8章の収録画面を開きます。</li><li><span class="badge">3</span><strong>展示に必要な項目</strong>：通信、入力、音声などを確認します。赤があれば、各項目の対処内容を確認します。</li><li><span class="badge">4</span><strong>保守・オプション</strong>：カメラや遠隔保守などです。未使用の任意機能は黄色でも展示できる場合があります。</li></ul>
+<p>KX134の実打確認には、板を叩いて取得した推論結果が必要です。固定入力の自己診断だけでは合格になりません。演奏中の検査は演奏を止めず直近の状態を使うため、完全な通信往復検査が必要なら演奏を停止して再検査します。</p><p>「管理」タブは来場者にも見えるため、管理操作を来場者に任せないよう配置・運用を決めます。展示中のプログラム更新やファーム書き込みは避け、変更後は開場前の点検をやり直してください。</p></section>
+
+<section class="chapter" id="shutdown"><h2><span class="num">11 / SHUTDOWN</span>終了と保管</h2><figure class="screen"><button type="button" aria-label="管理画面のシステム操作を拡大"><img src="assets/shutdown.png" alt="Web UI再起動、ラズパイ再起動、ラズパイ電源断の3ボタンを番号で示す。"></button><figcaption>図11-1 管理画面下部のシステム操作。撮影のためにボタンの長押し操作は実行していません。</figcaption></figure>
+<ul class="callouts"><li><span class="badge">1</span><strong>Web UIを再起動</strong>：Webサーバーだけを再起動します。画面の不調への対処に使います。</li><li><span class="badge">2</span><strong>ラズパイを再起動</strong>：OS全体を再起動します。終了して持ち帰る操作とは異なります。</li><li><span class="badge">3</span><strong>ラズパイの電源を切る</strong>：使用を終えるときに3秒間長押しします。</li></ul>
+<ol><li>採取や追加学習を完了または中止し、必要なデータを保存します。</li><li>「管理」を開き、<strong>「ラズパイの電源を切る」を3秒間長押し</strong>します。</li><li>画面の終了案内を確認します。OSの終了とストレージのアクセスLEDの点滅停止を確認してから電源を外します。</li><li>周辺機器の電源を切り、コネクタを持ってケーブルを外します。</li><li>板を柔らかい布で清掃し、センサや端子を保護して運搬します。アクリル対応が確認できない溶剤は使わないでください。</li></ol><p>追加学習・収録中はシステム操作が無効になります。反応がない場合は、第12章の確認を行ってください。</p>
+<div class="photo" id="photo-p07"><span class="photo-id">PHOTO P07 · 収納写真予定</span><strong>収納・運搬時の収め方</strong><p>板、フレーム、センサ基板、ラズパイ、ケーブルを、実際のケースや保護材へ収めた状態。板の端とセンサを保護する方法が見える写真。</p><small>上から全体を撮影。重ねる順序がある場合は途中の写真も。</small></div></section>
+
+<section class="chapter" id="trouble"><h2><span class="num">12 / TROUBLESHOOTING</span>困ったときは</h2><div class="table-wrap"><table><thead><tr><th>症状</th><th>順に確認すること</th></tr></thead><tbody>
+<tr><td>演奏画面が開かない</td><td>電源・モニター入力を確認。ラズパイのDesktop Autologin、自動起動サービス、ブラウザ自動起動を<a href="#pi">付録A</a>で確認します。</td></tr>
+<tr><td>「サーバ未接続」</td><td>管理画面へ接続できるか確認。端末で <code>systemctl status acrylic-pan-exhibit</code> とログを確認します。</td></tr>
+<tr><td>「センサ未接続」</td><td>通信対応USBケーブル、基板の給電、接続先ポートを確認。別のアプリが同じシリアルポートを使っていないか確認します。</td></tr>
+<tr><td>音が出ない</td><td>画面を一度操作。音量スライダー、スピーカー電源・音量、OSのHDMI／3.5mm出力先、ブラウザのミュートを確認します。「手本演奏」でも無音か切り分けます。</td></tr>
+<tr><td>音は鳴るが場所が違う</td><td>板の向き・支持位置・マレットを確認。曲を選ぶと音の割り当てが変わります。自由演奏で確認し、必要なら第7章のODLを行います。</td></tr>
+<tr><td>連打がうまく検出されない</td><td>強打をやめ、打撃を少し離して確認。固定部の緩み、板の残留振動、ケーブルが板へ触れていないか確認します。</td></tr>
+<tr><td>カメラが映らない</td><td>USB接続、カメラ選択、「カメラ開始」、ブラウザの許可を確認。他アプリでカメラを使用していれば閉じます。</td></tr>
+<tr><td>映像とエリア枠がずれる</td><td>カメラの固定を確認し、「8点フィット」をやり直します。AIモデルの再学習は不要です。</td></tr>
+<tr><td>追加学習ボタンが無効</td><td>「さらに5周」は同方式の保存済み校正が必要です。初回や方式変更時は「新たに5周を取り直す」を使います。</td></tr>
+<tr><td>追加学習後に悪化した</td><td>取り違えた打点がないか確認。保存していた重みを復元するか、「初期モデルに戻す」で基礎モデルを確認します。</td></tr>
+<tr><td>デモ動画がない</td><td>ラズパイ内の <code>web/assets/pv/</code> にMP4があるか確認。ページ上の再生ボタンも押します。</td></tr>
+<tr><td>採取データをPCで見つけられない</td><td>サーバーが動いた端末の保存先を確認。ラズパイ上の保存データは第8章の方法でPCへコピーします。</td></tr>
+<tr><td>学習データの読込で失敗</td><td>セッション完了状態、板仕様、イベント数、manifest整合性を確認。バックアップからフォルダ単位で復元します。</td></tr>
+<tr><td>管理画面の電源断が失敗</td><td>ラズパイ用の管理ヘルパーの導入状態を確認。Windows上の画面ではラズパイの電源断はできません。</td></tr>
+</tbody></table></div><p>解決しない場合は、発生時刻、操作、画面表示、基板・マレット・設置条件、ログを記録して保守担当者へ伝えます。確認中に収録データを削除したり、無関係な設定をまとめて変更したりしないでください。</p></section>
+
+<section class="chapter" id="pi"><h2><span class="num">APPENDIX A / RASPBERRY PI</span>ラズパイの初期セットアップ</h2><p>Raspberry Pi OS 64bit・デスクトップ付きが対象です。導入時はネットワークが必要です。ここでのコマンドは<strong>ラズパイのターミナル</strong>で実行します。</p><h3>A.1 導入する</h3>
+<pre><code>git clone https://github.com/airpocket-soundman/acrylic_pan.git ~/acrylic_pan
+cd ~/acrylic_pan
+git switch main
+bash scripts/raspberrypi/install-exhibit.sh</code></pre>
+<p>導入スクリプトはPython環境、FluidSynthなどの依存、シリアル用dialoutグループ、管理操作の固定ヘルパー、<code>acrylic-pan-exhibit</code>のsystemdサービス、ブラウザの自動起動を設定します。管理者権限の入力が求められます。</p>
+<ol><li><code>sudo raspi-config</code> のBoot / Auto Loginで<strong>Desktop Autologin</strong>を有効にします。</li><li>OSの音声出力先を実際のスピーカー（HDMI／3.5mmなど）に合わせます。</li><li>基板・周辺機器を接続し、<code>sudo reboot</code>で再起動します。</li></ol>
+<h3>A.2 自動起動を確認する</h3><pre><code>systemctl is-enabled acrylic-pan-exhibit
+systemctl is-active acrylic-pan-exhibit
+curl -fsS http://127.0.0.1:8765/api/status
+journalctl -u acrylic-pan-exhibit -b --no-pager -n 50</code></pre><p><code>enabled</code>と<code>active</code>を確認します。サーバーはログイン前から起動し、Chromiumはデスクトップの自動ログイン後に開きます。手動で開く場合は <code>http://127.0.0.1:8765/exhibit/play.html</code> です。</p>
+<p>最後にネットワークを切った状態で再起動し、演奏・音声・カメラ・動画の必要機能を確認します。これがスタンドアロン運用の確認になります。</p>
+<h3>A.3 保守コマンド</h3><pre><code># ログを追う
+journalctl -u acrylic-pan-exhibit -f
+# Webサーバーだけ再起動
+sudo systemctl restart acrylic-pan-exhibit
+# キオスク画面を開き直す
+bash scripts/raspberrypi/start-exhibit-kiosk.sh
+# シリアル機器の固定名と権限を確認
+ls -l /dev/serial/by-id/
+groups</code></pre><p>USBシリアル機器が複数ある場合はサービスの <code>--auto-connect</code> に対象機器の固定パスを指定します。設定変更後はsystemdの再読込・サービス再起動と接続確認を行います。キオスク表示を閉じる場合はキーボードの <kbd>Alt+F4</kbd> を使います。</p><p>コード更新時は変更前の状態を保存し、<code>git pull --ff-only</code>の後にサービスを再起動して点検します。ソースを更新するだけでは基板のファームウェアは更新されません。遠隔保守が必要な場合は<a href="https://github.com/airpocket-soundman/acrylic_pan/blob/b0fb2b1/docs/exhibit-raspberry-pi.md">詳細セットアップ資料</a>を参照してください。</p></section>
+
+<section class="chapter" id="windows"><h2><span class="num">APPENDIX B / WINDOWS</span>Windows PCで使う</h2><p>Windowsでも同じ基板を接続し、通常の楽器画面や採取画面を使用できます。以下はリポジトリ直下のPowerShellで実行する例です。Pythonの場所は導入した環境に合わせます。</p><h3>B.1 通常の楽器画面</h3><pre><code>.\scripts\run-monitor.ps1 -Python C:\ProgramData\anaconda3\python.exe -Page instrument-probability.html</code></pre><ol><li>ブラウザで <code>http://127.0.0.1:8765/instrument-probability.html</code> を開きます。</li><li>板仕様「400 × 300 × 5 mm」、実機のCOMポートを選びます。</li><li>確率推論元を「デバイス（Solist-AI・60クラス）」にして「接続」→「演奏開始」を押します。</li><li>採取するときは「学習データ採取」タブへ移動し、第8章に従います。</li></ol><p>COM番号はPCごとに違います。固定のCOM3を前提にせず、ポート一覧やデバイスマネージャーで確認してください。停止は起動したPowerShellで <kbd>Ctrl+C</kbd> です。</p>
+<h3>B.2 展示画面を試す</h3><p>リポジトリの <code>.venv\Scripts\python.exe</code> に依存が導入済みなら次を使えます。</p><pre><code># 実機を使う
+.\scripts\run-exhibit.ps1
+# 基板なしで追加学習などの画面を試す（実際の学習・認識の評価には使わない）
+.\scripts\run-exhibit.ps1 -FakeBoard</code></pre><p>展示画面は <code>http://127.0.0.1:8765/exhibit/play.html</code> です。同じポートで2つのサーバーを同時に起動しないでください。</p>
+<h3>B.3 本番用プレゼンテーション</h3><pre><code>.\scripts\run-presentation.ps1 -Python C:\ProgramData\anaconda3\python.exe</code></pre><p>メイン：<code>http://127.0.0.1:8780/presentation/index.html</code><br>発表者：<code>http://127.0.0.1:8780/presentation/presenter.html</code></p><p><kbd>→</kbd>で次へ、<kbd>←</kbd>で前へ、<kbd>F</kbd>で全画面、<kbd>P</kbd>で発表者画面を開きます。プレゼン内の楽器デモを使う場合は、8765番の楽器サーバーも起動します。</p>
+<div class="note"><p><strong>公開マニュアルと実機UIの違い</strong><br>GitHub Pagesにあるこのページは静的な説明書です。ここから基板へ接続したりラズパイの電源を操作したりはしません。実機操作には、装置上で動くPythonサーバーとそのローカル画面を使います。</p></div></section>
+
+<section class="chapter" id="spec"><h2><span class="num">APPENDIX C / REFERENCE</span>仕様・モデル・参照資料</h2><div class="table-wrap"><table><thead><tr><th>項目</th><th>対象構成</th></tr></thead><tbody><tr><td>パネル</td><td>400 × 300 × 5 mm、2点支持、4列×3行</td></tr><tr><td>加速度センサ</td><td>KX134-1211 × 1、Z軸、25.6 kHz、±32 g</td></tr><tr><td>MCU / AI</td><td>ML63Q2557 / Solist-AI、入力128・隠れ32・出力60</td></tr><tr><td>データ採取波形</td><td>2,048点 / 80 ms、プリトリガ64点</td></tr><tr><td>推論時の波形</td><td>512点 / 20 msから特徴を抽出</td></tr><tr><td>最新モデルの学習データ</td><td>T1〜T8、8セット＝16セッション、24,000打</td></tr><tr><td>独立評価データ</td><td>E1〜E4、4セット＝8セッション、2,400打</td></tr><tr><td>工場βの識別子</td><td>CRC32 <code>0xEF3DC389</code>（2026-11-05配備記録）</td></tr><tr><td>接続</td><td>USBシリアル、通常接続後960 kbpsへ切替</td></tr><tr><td>ラズパイの役割</td><td>Webサーバー、表示、発音、カメラ、動画。通常のAI推論・ODLは基板側。</td></tr></tbody></table></div>
+<p>固定αは公式Simulator由来、学習対象はβです。PCでの比較計算はbfloat16の境界を再現しますが、アクセラレータの途中の丸めまで完全に一致するとは限らないため、配備時は実機確認も行います。</p>
+<h3>画面・操作説明の参照元</h3><ul class="source-list"><li><a href="https://github.com/airpocket-soundman/acrylic_pan/blob/b0fb2b1/pc/acrylic_pan_web/static/exhibit/odl.js">追加学習の現行実装</a>／<a href="https://github.com/airpocket-soundman/acrylic_pan/blob/b0fb2b1/pc/acrylic_pan_web/static/exhibit/odl.html">保存・復元のボタン</a></li><li><a href="https://github.com/airpocket-soundman/acrylic_pan/blob/b0fb2b1/docs/exhibit-kiosk.md">展示画面の構成・管理診断</a></li><li><a href="https://github.com/airpocket-soundman/acrylic_pan/blob/b0fb2b1/docs/exhibit-raspberry-pi.md">ラズパイ導入・自動起動</a></li><li><a href="https://github.com/airpocket-soundman/acrylic_pan/blob/b0fb2b1/pc/acrylic_pan_web/static/collector.html">採取画面の現行実装</a></li><li><a href="https://github.com/airpocket-soundman/acrylic_pan/blob/b0fb2b1/docs/dataset-evaluation-protocol-20261103.md">データセットと評価方法</a>／<a href="https://github.com/airpocket-soundman/acrylic_pan/blob/b0fb2b1/data/archives/20261103/manifest.json">アーカイブの件数・セッション・ハッシュ</a></li><li><a href="https://github.com/airpocket-soundman/acrylic_pan/blob/b0fb2b1/docs/device-deployment-20261105.md">最新モデルの配備記録</a></li><li><a href="assets/capture-notes.json">UI画像の撮影条件・対応箇所</a></li></ul><p class="caption">参照リンクは対象実装のコミットに固定しています。資料内の他の構成ではなく、このマニュアルが対象とする最新搭載構成を参照してください。</p></section>
+
+<section class="chapter" id="photos"><h2><span class="num">PHOTO REQUEST</span>撮影する写真の一覧</h2><p>写真をいただいた後、同じIDの矩形枠へ差し替え、名称や接続先の矢印を追加します。横位置で、長辺2,000ピクセル以上を目安に元の画像をお渡しください。顔、SSID、パスワード、住所などが写らない構図でお願いします。</p><div class="table-wrap"><table><thead><tr><th>ID</th><th>撮影対象</th><th>必要な内容</th></tr></thead><tbody><tr><td><a href="#photo-p01">P01</a></td><td>装置全体</td><td>斜め前から。板・フレーム・端末・音響・マレットを1枚に。</td></tr><tr><td><a href="#photo-p02">P02</a></td><td>2点支持と固定部</td><td>全体と支持部の接写。ダンパー、センサ、固定領域の位置。</td></tr><tr><td><a href="#photo-p03">P03</a></td><td>センサと基板</td><td>取付方向、端子名、ケーブル経路。基板側・センサ側をそれぞれ。</td></tr><tr><td><a href="#photo-p04">P04</a></td><td>ラズパイの配線</td><td>USB、HDMI、音声、電源と各ケーブルの接続先。</td></tr><tr><td><a href="#photo-p05">P05</a></td><td>カメラ設置</td><td>板に対するカメラの距離・角度・固定方法。</td></tr><tr><td><a href="#photo-p06">P06</a></td><td>採取時の打点</td><td>中心と四隅を叩く位置、マレット先端と目印が見える写真。</td></tr><tr><td><a href="#photo-p07">P07</a></td><td>収納と運搬</td><td>保護材とケース内の収め方。板・センサを保護する部分。</td></tr></tbody></table></div><p class="caption">UIのスクリーンショットは本版に掲載済みです。外観写真はまだ掲載していません。</p></section>
+<footer>Solistpan 操作・運用マニュアル / HTML 初版 2026.11.16<br>実装・学習記録と照合して作成。写真枠は撮影後の差し替え用です。<br><a class="back-top" href="#top">↑ 先頭へ戻る</a></footer>
+</main></div><dialog id="zoom" aria-label="操作画面の拡大表示"><button type="button">閉じる</button><img alt=""><p></p></dialog><script src="manual.js"></script>
+</body></html>

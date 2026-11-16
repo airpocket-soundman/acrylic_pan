@@ -1,0 +1,582 @@
+{
+  "environment": "Windows / Chrome headless, 1440x1000; actual application UI; play and ODL use bundled fake board, camera not connected; other pages disconnected; administrator network fields masked; orange numbers added after capture",
+  "source_commit": "b0fb2b1",
+  "captures": [
+    {
+      "file": "play.png",
+      "url": "http://127.0.0.1:8876/exhibit/play.html",
+      "callouts": [
+        {
+          "number": 1,
+          "bounds": {
+            "x": 795.078125,
+            "y": 10,
+            "width": 165,
+            "height": 58
+          }
+        },
+        {
+          "number": 2,
+          "bounds": {
+            "x": 1348.078125,
+            "y": 30.5,
+            "width": 69.921875,
+            "height": 17
+          }
+        }
+      ]
+    },
+    {
+      "file": "music.png",
+      "url": "http://127.0.0.1:8876/exhibit/play.html",
+      "callouts": [
+        {
+          "number": 1,
+          "bounds": {
+            "x": 36,
+            "y": 892,
+            "width": 267.1875,
+            "height": 34
+          }
+        },
+        {
+          "number": 2,
+          "bounds": {
+            "x": 313.1875,
+            "y": 892,
+            "width": 263.203125,
+            "height": 32
+          }
+        },
+        {
+          "number": 3,
+          "bounds": {
+            "x": 586.390625,
+            "y": 892,
+            "width": 267.203125,
+            "height": 34
+          }
+        },
+        {
+          "number": 4,
+          "bounds": {
+            "x": 863.59375,
+            "y": 892,
+            "width": 267.203125,
+            "height": 32
+          }
+        },
+        {
+          "number": 5,
+          "bounds": {
+            "x": 1138.796875,
+            "y": 892,
+            "width": 267.203125,
+            "height": 32
+          }
+        },
+        {
+          "number": 6,
+          "bounds": {
+            "x": 1212.515625,
+            "y": 932,
+            "width": 99.484375,
+            "height": 37
+          }
+        },
+        {
+          "number": 7,
+          "bounds": {
+            "x": 1318,
+            "y": 932,
+            "width": 86,
+            "height": 37
+          }
+        },
+        {
+          "number": 8,
+          "bounds": {
+            "x": 1128.078125,
+            "y": 932,
+            "width": 78.4375,
+            "height": 37
+          }
+        }
+      ]
+    },
+    {
+      "file": "camera.png",
+      "url": "http://127.0.0.1:8876/exhibit/play.html",
+      "callouts": [
+        {
+          "number": 1,
+          "bounds": {
+            "x": 26,
+            "y": 800,
+            "width": 1029.0625,
+            "height": 33
+          }
+        },
+        {
+          "number": 2,
+          "bounds": {
+            "x": 1063.0625,
+            "y": 796,
+            "width": 88.09375,
+            "height": 37
+          }
+        },
+        {
+          "number": 3,
+          "bounds": {
+            "x": 1221.15625,
+            "y": 796,
+            "width": 88.734375,
+            "height": 37
+          }
+        },
+        {
+          "number": 4,
+          "bounds": {
+            "x": 1317.890625,
+            "y": 796,
+            "width": 96.109375,
+            "height": 37
+          }
+        },
+        {
+          "number": 5,
+          "bounds": {
+            "x": 1159.15625,
+            "y": 796,
+            "width": 54,
+            "height": 37
+          }
+        }
+      ]
+    },
+    {
+      "file": "odl.png",
+      "url": "http://127.0.0.1:8876/exhibit/odl.html",
+      "callouts": [
+        {
+          "number": 1,
+          "bounds": {
+            "x": 1022.8125,
+            "y": 213,
+            "width": 195.59375,
+            "height": 117
+          }
+        },
+        {
+          "number": 2,
+          "bounds": {
+            "x": 1228.40625,
+            "y": 213,
+            "width": 195.59375,
+            "height": 117
+          }
+        },
+        {
+          "number": 3,
+          "bounds": {
+            "x": 1022.8125,
+            "y": 461,
+            "width": 401.1875,
+            "height": 70
+          }
+        },
+        {
+          "number": 4,
+          "bounds": {
+            "x": 1022.8125,
+            "y": 381,
+            "width": 401.1875,
+            "height": 70
+          }
+        }
+      ]
+    },
+    {
+      "file": "odl-running.png",
+      "url": "http://127.0.0.1:8876/exhibit/odl.html",
+      "callouts": [
+        {
+          "number": 1,
+          "bounds": {
+            "x": 31,
+            "y": 758.3125,
+            "width": 958.8125,
+            "height": 44.1875
+          }
+        },
+        {
+          "number": 2,
+          "bounds": {
+            "x": 31,
+            "y": 943.8125,
+            "width": 958.8125,
+            "height": 25.1875
+          }
+        },
+        {
+          "number": 3,
+          "bounds": {
+            "x": 1022.8125,
+            "y": 541,
+            "width": 401.1875,
+            "height": 70
+          }
+        },
+        {
+          "number": 4,
+          "bounds": {
+            "x": 1022.8125,
+            "y": 621,
+            "width": 401.1875,
+            "height": 70
+          }
+        }
+      ]
+    },
+    {
+      "file": "odl-profiles.png",
+      "url": "http://127.0.0.1:8876/exhibit/odl.html",
+      "callouts": [
+        {
+          "number": 1,
+          "bounds": {
+            "x": 1022.8125,
+            "y": 436,
+            "width": 401.1875,
+            "height": 21
+          }
+        },
+        {
+          "number": 2,
+          "bounds": {
+            "x": 1022.8125,
+            "y": 467,
+            "width": 401.1875,
+            "height": 70
+          }
+        },
+        {
+          "number": 3,
+          "bounds": {
+            "x": 1022.8125,
+            "y": 547,
+            "width": 401.1875,
+            "height": 19
+          }
+        },
+        {
+          "number": 4,
+          "bounds": {
+            "x": 1022.8125,
+            "y": 576,
+            "width": 401.1875,
+            "height": 70
+          }
+        },
+        {
+          "number": 5,
+          "bounds": {
+            "x": 1022.8125,
+            "y": 656,
+            "width": 401.1875,
+            "height": 70
+          }
+        },
+        {
+          "number": 6,
+          "bounds": {
+            "x": 1022.8125,
+            "y": 757,
+            "width": 253,
+            "height": 26
+          }
+        },
+        {
+          "number": 7,
+          "bounds": {
+            "x": 1022.8125,
+            "y": 883.1875,
+            "width": 401.1875,
+            "height": 70
+          }
+        }
+      ]
+    },
+    {
+      "file": "collection-connect.png",
+      "url": "http://127.0.0.1:8877/collector.html",
+      "callouts": [
+        {
+          "number": 1,
+          "bounds": {
+            "x": 186.390625,
+            "y": 168,
+            "width": 316,
+            "height": 39
+          }
+        },
+        {
+          "number": 2,
+          "bounds": {
+            "x": 586.921875,
+            "y": 168,
+            "width": 87,
+            "height": 39
+          }
+        },
+        {
+          "number": 3,
+          "bounds": {
+            "x": 682.921875,
+            "y": 169,
+            "width": 54,
+            "height": 37
+          }
+        },
+        {
+          "number": 4,
+          "bounds": {
+            "x": 745.921875,
+            "y": 169,
+            "width": 54,
+            "height": 37
+          }
+        },
+        {
+          "number": 5,
+          "bounds": {
+            "x": 871.921875,
+            "y": 169,
+            "width": 89,
+            "height": 37
+          }
+        },
+        {
+          "number": 6,
+          "bounds": {
+            "x": 186.390625,
+            "y": 308,
+            "width": 491,
+            "height": 37
+          }
+        }
+      ]
+    },
+    {
+      "file": "collection-guide.png",
+      "url": "http://127.0.0.1:8877/collector.html",
+      "callouts": [
+        {
+          "number": 1,
+          "bounds": {
+            "x": 797.5625,
+            "y": 513,
+            "width": 206,
+            "height": 39
+          }
+        },
+        {
+          "number": 2,
+          "bounds": {
+            "x": 1113,
+            "y": 514,
+            "width": 95,
+            "height": 37
+          }
+        },
+        {
+          "number": 3,
+          "bounds": {
+            "x": 1220,
+            "y": 514,
+            "width": 86,
+            "height": 37
+          }
+        },
+        {
+          "number": 4,
+          "bounds": {
+            "x": 134,
+            "y": 569,
+            "width": 86,
+            "height": 37
+          }
+        },
+        {
+          "number": 5,
+          "bounds": {
+            "x": 232,
+            "y": 569,
+            "width": 217.84375,
+            "height": 37
+          }
+        },
+        {
+          "number": 6,
+          "bounds": {
+            "x": 134,
+            "y": 671,
+            "width": 1172,
+            "height": 879
+          }
+        }
+      ]
+    },
+    {
+      "file": "collection-library.png",
+      "url": "http://127.0.0.1:8877/collector.html",
+      "callouts": [
+        {
+          "number": 1,
+          "bounds": {
+            "x": 1041.703125,
+            "y": 400.0625,
+            "width": 42,
+            "height": 39
+          }
+        },
+        {
+          "number": 2,
+          "bounds": {
+            "x": 1095.703125,
+            "y": 401.0625,
+            "width": 86,
+            "height": 37
+          }
+        },
+        {
+          "number": 3,
+          "bounds": {
+            "x": 1193.703125,
+            "y": 401.0625,
+            "width": 112.296875,
+            "height": 37
+          }
+        },
+        {
+          "number": 4,
+          "bounds": {
+            "x": 1144.03125,
+            "y": 568.84375,
+            "width": 161.96875,
+            "height": 37
+          }
+        }
+      ]
+    },
+    {
+      "file": "admin.png",
+      "url": "http://127.0.0.1:8877/exhibit/admin.html",
+      "callouts": [
+        {
+          "number": 1,
+          "bounds": {
+            "x": 1234,
+            "y": 114.5,
+            "width": 178,
+            "height": 58
+          }
+        },
+        {
+          "number": 2,
+          "bounds": {
+            "x": 44,
+            "y": 508.4375,
+            "width": 182.265625,
+            "height": 24
+          }
+        },
+        {
+          "number": 3,
+          "bounds": {
+            "x": 28,
+            "y": 657.4375,
+            "width": 683,
+            "height": 634
+          }
+        },
+        {
+          "number": 4,
+          "bounds": {
+            "x": 729,
+            "y": 657.4375,
+            "width": 683,
+            "height": 381
+          }
+        }
+      ]
+    },
+    {
+      "file": "shutdown.png",
+      "url": "http://127.0.0.1:8877/exhibit/admin.html",
+      "callouts": [
+        {
+          "number": 1,
+          "bounds": {
+            "x": 509.328125,
+            "y": 816.4375,
+            "width": 286.21875,
+            "height": 68
+          }
+        },
+        {
+          "number": 2,
+          "bounds": {
+            "x": 807.546875,
+            "y": 816.4375,
+            "width": 286.21875,
+            "height": 68
+          }
+        },
+        {
+          "number": 3,
+          "bounds": {
+            "x": 1105.765625,
+            "y": 816.4375,
+            "width": 286.234375,
+            "height": 68
+          }
+        }
+      ]
+    },
+    {
+      "file": "video.png",
+      "url": "http://127.0.0.1:8877/exhibit/video.html",
+      "callouts": [
+        {
+          "number": 1,
+          "bounds": {
+            "x": 30,
+            "y": 922,
+            "width": 64,
+            "height": 52
+          }
+        },
+        {
+          "number": 2,
+          "bounds": {
+            "x": 110,
+            "y": 930,
+            "width": 1008.4375,
+            "height": 36
+          }
+        },
+        {
+          "number": 3,
+          "bounds": {
+            "x": 1268.4375,
+            "y": 922,
+            "width": 141.5625,
+            "height": 52
+          }
+        }
+      ]
+    }
+  ]
+}

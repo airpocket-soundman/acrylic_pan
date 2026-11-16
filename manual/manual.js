@@ -1,0 +1,16 @@
+const menu=document.querySelector('.menu'),toc=document.querySelector('.toc');
+menu.addEventListener('click',()=>{const open=toc.classList.toggle('open');menu.setAttribute('aria-expanded',String(open));});
+toc.addEventListener('click',e=>{if(e.target.closest('a')){toc.classList.remove('open');menu.setAttribute('aria-expanded','false');}});
+document.querySelector('#print').addEventListener('click',()=>window.print());
+const dialog=document.querySelector('#zoom'),zoomImage=dialog.querySelector('img'),zoomCaption=dialog.querySelector('p');
+document.querySelectorAll('.screen button').forEach(button=>button.addEventListener('click',()=>{const image=button.querySelector('img');zoomImage.src=image.src;zoomImage.alt=image.alt;zoomCaption.textContent=button.closest('figure').querySelector('figcaption').textContent;dialog.showModal();}));
+dialog.querySelector('button').addEventListener('click',()=>dialog.close());
+dialog.addEventListener('click',e=>{if(e.target===dialog)dialog.close();});
+const links=[...toc.querySelectorAll('a[href^="#"]')];
+const chapters=[...document.querySelectorAll('section.chapter')];
+let scheduled=false;
+const updateChapter=()=>{scheduled=false;const chapter=[...chapters].reverse().find(s=>s.getBoundingClientRect().top<=160);links.forEach(link=>{if(chapter&&link.hash==='#'+chapter.id)link.setAttribute('aria-current','location');else link.removeAttribute('aria-current');});};
+addEventListener('scroll',()=>{if(!scheduled){scheduled=true;requestAnimationFrame(updateChapter);}},{passive:true});updateChapter();
+const beforePrint=()=>{document.querySelectorAll('details').forEach(d=>{d.dataset.wasOpen=String(d.open);d.open=true;});};
+const afterPrint=()=>{document.querySelectorAll('details').forEach(d=>{d.open=d.dataset.wasOpen==='true';});};
+addEventListener('beforeprint',beforePrint);addEventListener('afterprint',afterPrint);

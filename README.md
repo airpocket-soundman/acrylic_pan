@@ -103,4 +103,6 @@ C:\ProgramData\anaconda3\python.exe -m pc.acrylic_pan_monitor.calibrate --port C
 
 ## ドキュメント
 
+装置の操作・展示運用、追加学習、データ採取、再学習は、[HTML操作マニュアル](https://airpocket-soundman.github.io/acrylic_pan/manual/)を参照してください。ソースは `manual/` にあります。
+
 開発に必要なドキュメントは [docs/README.md](docs/README.md) に目的別にまとめています。
