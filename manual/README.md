@@ -8,6 +8,7 @@ GitHub Pagesの既存設定（main / リポジトリ直下）で配信する静�
 - `style.css`: レスポンシブ表示とA4縦の印刷指定。
 - `manual.js`: 目次、画像拡大、印刷。PDFファイル本体は今後制作する。
 - `assets/*.png`: 実装を実際に起動して撮影したUIと、後付けの番号・枠。
+- `assets/device-wiring.svg`、`assets/debug-network.svg`: 機器配線とデバッグ時のネットワークを示すベクター模式図。
 - `assets/capture-notes.json`: 撮影元コミット、環境、ボタン位置の記録。
 
 ## 写真の差し替え
