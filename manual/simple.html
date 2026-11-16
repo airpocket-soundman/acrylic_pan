@@ -1,0 +1,42 @@
+<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Solistpanの展示担当者向けシンプル版。設置、配線、起動、演奏、終了まで。"><title>Solistpan 展示・演奏シンプルガイド</title><link rel="stylesheet" href="style.css"><link rel="stylesheet" href="simple.css"></head>
+<body id="top"><a class="skip" href="#content">本文へ移動</a>
+<header class="top"><a class="brand" href="#top">Solistpan<small>QUICK OPERATION GUIDE</small></a><div class="tools"><a href="index.html">フル版</a><a class="pdf-download" href="solistpan-simple.pdf" download>PDF版</a><button id="print" type="button">印刷</button><button class="menu" type="button" aria-controls="toc" aria-expanded="false">目次</button></div></header>
+<div class="layout"><aside class="toc" id="toc" aria-label="シンプル版目次"><p>展示・演奏 シンプル版</p><nav><a href="#setting"><span>01</span>装置を設置する</a><a href="#cables"><span>02</span>配線して電源を入れる</a><a href="#playing"><span>03</span>起動して演奏する</a><a href="#assist"><span>04</span>曲とカメラを使う</a><a href="#finish"><span>05</span>終了・片付け</a><a class="minor" href="index.html">フル版マニュアルへ</a></nav><div class="edition">初期設定済みの展示機用<br>2026.11.16 / 写真は追加予定</div></aside>
+<main id="content">
+<section class="chapter simple-sheet" id="setting"><div class="eyebrow">SOLISTPAN / EXHIBITION QUICK GUIDE</div><h1>展示セッティングと演奏<small>シンプル版</small></h1><h2><span class="num">01 / SETTING</span>装置を設置する</h2>
+<p>初期設定済みのラズパイを使う展示担当者向けのガイドです。板・フレーム・ダンパーバー・基板・ラズパイ・モニター・マウス・スピーカー・カメラ・接続ケーブルを用意します。<strong>標準のマレットはTPUマレットです。</strong></p>
+<div class="setup-grid">
+<div class="setup-item"><h3>① アクリル板を取り付ける</h3><p><strong>ボルト4本でブラケットに固定</strong>します。</p><div class="photo"><span class="photo-id">PHOTO P02 · 写真予定</span><strong>板・ブラケット・ボルト4本</strong><p>固定位置が分かる全体写真と接写。</p></div></div>
+<div class="setup-item"><h3>② ダンパーバーを設置する</h3><p>上面がアクリル板と水平になるよう双方の角度を調節します。<strong>板がバーに軽く押し付けられる状態が正常</strong>です。</p><div class="photo"><span class="photo-id">PHOTO P08 · 写真予定</span><strong>ダンパーバーと板の接触部</strong><p>角度と接触状態が見える側面写真。</p></div></div>
+<div class="setup-item"><h3>③ カメラを取り付ける</h3><p><strong>板全体が視野に収まるよう</strong>角度を調節します。</p><div class="photo"><span class="photo-id">PHOTO P05 · 写真予定</span><strong>板全体を映すカメラ</strong><p>取り付け位置と角度が分かる写真。</p></div></div>
+<div class="setup-item"><h3>④ マレットを用意する</h3><p>TPUと糸巻の2種類があります。<strong>通常はTPUマレット</strong>を使います。</p><div class="photo"><span class="photo-id">PHOTO P09 · 写真予定</span><strong>TPU（標準） / 糸巻</strong><p>左にTPU、右に糸巻を並べた比較写真。</p></div></div>
+</div><div class="warning"><p>板の端・固定具・センサを叩かないでください。がたつきやひびがある場合は使用を止めます。配線は電源を入れる前に行います。</p></div></section>
+
+<section class="chapter simple-sheet" id="cables"><h2><span class="num">02 / CONNECTION</span>配線して電源を入れる</h2>
+<figure class="wiring-figure"><img src="assets/device-wiring.svg" width="1000" height="660" alt="センサとSolist-AIを専用ケーブル、ラズパイとSolist-AIをUSB A-Cで接続する模式図。"><figcaption>機器間を配線してから、最後にラズパイへ給電します。</figcaption></figure>
+<div class="table-wrap"><table><thead><tr><th>順序</th><th>接続</th><th>ケーブル・端子</th></tr></thead><tbody><tr><td>1</td><td>ラズパイ ⇔ Solist-AI</td><td>USB A-C（ラズパイ側A / 基板側C）</td></tr><tr><td>2</td><td>Solist-AI ⇔ 加速度センサ</td><td>専用ケーブル</td></tr><tr><td>3</td><td>ラズパイ ⇔ マウス・カメラ</td><td>USB Type-A端子へそれぞれ接続</td></tr><tr><td>4</td><td>ラズパイ ⇔ モバイルモニター</td><td>HDMI micro-mini（ラズパイ側micro）</td></tr><tr><td>5</td><td>電源 → ラズパイ</td><td><strong>最後に電源用Type-Cから入力</strong></td></tr></tbody></table></div>
+<p>モニター・スピーカーも電源と音声接続を確認し、スピーカーは小音量にします。USB A-Cはデータ通信対応品を使用します。</p>
+<div class="note"><p><strong>デモ機のログイン情報</strong>　ユーザー名：<code>solistai</code> ／ パスワード：<code>solistai</code><br>通常の展示ではPC・ネットワーク接続は不要です。</p></div></section>
+
+<section class="chapter simple-sheet" id="playing"><h2><span class="num">03 / START &amp; PLAY</span>起動して演奏する</h2>
+<ol><li>電源投入後、ラズパイの自動ログインと「演奏」画面の全画面表示を待ちます。</li><li>右上が緑の<strong>「センサ接続中」</strong>になったら、画面を一度タッチ／クリックします。</li><li>標準のTPUマレットで板の中心付近を軽く1打。音とエリアの反応を確認します。</li><li>12エリアを順に試し、音量を調整して演奏します。</li></ol>
+<figure class="screen"><button type="button" aria-label="演奏画面を拡大"><img src="assets/play.png" width="1440" height="1000" alt="展示用演奏画面。右上のセンサ接続表示に番号2を付けている。"></button><figcaption>実装を疑似基板で撮影した画面例。②が接続表示です。①の追加学習は通常の演奏では操作しません。</figcaption></figure>
+<div class="grid"><div class="step-card"><h3>音色・音量</h3><p>画面下部で音色と音量を選びます。音量は小さな値から上げます。</p></div><div class="step-card"><h3>自由演奏</h3><p>「演奏補助」で「自由演奏」を選択。画面の4×3グリッドに対応する場所を叩きます。</p></div></div>
+<p class="caption">ログイン画面が出た場合：ユーザー名 <code>solistai</code> ／ パスワード <code>solistai</code>。</p></section>
+
+<section class="chapter simple-sheet" id="assist"><h2><span class="num">04 / SONG &amp; CAMERA</span>曲とカメラを使う</h2>
+<h3>曲を選んで練習する</h3><figure class="screen"><button type="button" aria-label="曲と音の設定を拡大"><img src="assets/music.png" alt="音色、音量、曲、音の長さ、曲の速さ、教示、手本、最初からの各ボタン。"></button><figcaption>下の番号は画面中の番号と対応します。</figcaption></figure>
+<ul class="callouts"><li><span class="badge">1</span><strong>音色</strong>を選び、②<strong>音量</strong>で聴きやすい大きさにします。</li><li><span class="badge">3</span><strong>演奏補助</strong>で曲を選びます。曲を選ぶとエリアの音の割り当てが変わります。</li><li><span class="badge">7</span><strong>手本演奏</strong>で曲を聴きます。もう一度押すと停止します。</li><li><span class="badge">6</span><strong>教示スタート</strong>で案内に合わせて叩きます。⑤<strong>曲の速さ</strong>でゆっくりにもできます。</li><li><span class="badge">8</span><strong>最初から</strong>で先頭へ戻ります。④<strong>音の長さ</strong>は響き方の調整に使います。</li></ul>
+<h3>カメラ映像を表示する（任意）</h3><figure class="screen"><button type="button" aria-label="カメラ操作を拡大"><img src="assets/camera.png" alt="カメラ選択1、開始2、8点フィット3、フィット消去4、停止5。"></button><figcaption>撮影時はカメラ未接続。開始後に「8点フィット」が使えます。</figcaption></figure>
+<ol><li>①カメラを選び、②<strong>「カメラ開始」</strong>を押します。</li><li>枠が板と合わない場合は③<strong>「8点フィット」</strong>。四隅を左上→右上→右下→左下の順にクリックします。</li><li>続いて左上段境界→右上段境界→左下段境界→右下段境界を指定し、枠を合わせます。</li><li>⑤<strong>「停止」</strong>で映像を止めると定型グリッドへ戻ります。カメラなしでも演奏できます。</li></ol>
+<p class="caption">8点フィットの詳細は<a href="index.html#camera">フル版のカメラ設定</a>へ。</p></section>
+
+<section class="chapter simple-sheet" id="finish"><h2><span class="num">05 / FINISH</span>終了・片付け</h2>
+<ol><li>手本演奏などを止め、上部の<strong>「管理」</strong>を開きます。</li><li>③<strong>「ラズパイの電源を切る」</strong>を<strong>3秒間長押し</strong>します。</li><li>終了案内に従い、OS終了とアクセスLEDの点滅停止を確認してから電源を外します。</li><li>周辺機器の電源を切り、ケーブルと板・センサを保護して片付けます。</li></ol>
+<figure class="screen"><button type="button" aria-label="終了用ボタンを拡大"><img src="assets/shutdown.png" alt="管理画面のシステム操作。電源を切る操作は右端の番号3。"></button><figcaption>①はWeb UIだけの再起動、②はラズパイの再起動。片付けるときは③を使います。</figcaption></figure>
+<div class="warning"><p><strong>終了前に電源ケーブルを抜かないでください。</strong>保存データが破損する原因になります。</p></div>
+<h3>演奏できないときの確認</h3><div class="table-wrap"><table><thead><tr><th>症状</th><th>最初に確認すること</th></tr></thead><tbody><tr><td>画面が出ない</td><td>ラズパイの給電、モニターの電源・HDMI入力を確認。</td></tr><tr><td>センサ未接続</td><td>基板の給電、USB A-Cケーブルと両端の接続を確認。</td></tr><tr><td>音が出ない</td><td>画面を一度操作。音量、スピーカーの電源・接続、OS音声出力を確認。</td></tr><tr><td>違う場所が反応する</td><td>板の向き、ダンパーバーとの接触、標準TPUマレットを確認。改善しなければ担当者へ。</td></tr><tr><td>カメラが映らない</td><td>USB接続、選択カメラ、「カメラ開始」を確認。</td></tr></tbody></table></div>
+<div class="note"><p>認識精度の調整が必要な場合は、<a href="index.html#odl">フル版の現場キャリブレーション</a>を担当者が確認します。初期セットアップ・デバッグ・データ採取・再学習は<a href="index.html">フル版マニュアル</a>を参照してください。</p></div>
+<p class="caption">画面画像：Windows / Chrome上の実装。演奏画面は疑似基板、カメラ未接続の表示例です。実機の画面サイズ・接続状態により表示は変わります。外観写真は撮影後に差し替えます。</p></section>
+<footer>Solistpan 展示セッティング・演奏 シンプル版 / 2026.11.16<br><a href="index.html">フル版マニュアルへ</a></footer>
+</main></div><dialog id="zoom" aria-label="操作画面の拡大表示"><button type="button">閉じる</button><img alt=""><p></p></dialog><script src="manual.js"></script></body></html>

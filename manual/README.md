@@ -2,6 +2,10 @@
 
 公開URL: https://airpocket-soundman.github.io/acrylic_pan/manual/
 
+展示・演奏シンプル版: https://airpocket-soundman.github.io/acrylic_pan/manual/simple.html
+
+`simple.html` と `simple.css` は初期設定済みの展示機向けの5項目のガイド。`solistpan-simple.pdf` はA4縦・5ページ。設置・配線・起動と演奏・曲とカメラ・終了に限定し、調整や開発作業はフル版へ案内する。写真枠P02/P08/P05/P09はフル版と同じ対象を示す。
+
 GitHub Pagesの既存設定（main / リポジトリ直下）で配信する静的ページ。外部フォント、CDN、ビルドは不要。HTML内のローカルAPIへのリクエストはなく、説明書から実機操作は行わない。
 
 - `index.html`: 本文。最新配備モデルのみを記載。
@@ -34,3 +38,11 @@ python scripts/export-manual-pdf.py --browser-executable "C:/Program Files/Googl
 ```
 
 `output/pdf/solistpan-manual.pdf` を作成し、公開用の `manual/solistpan-manual.pdf` にもコピーする。リンク付きの目次とページ番号を生成する。画像表示、全ページの改ページ、A4縦の用紙サイズを確認し、本文とPDFを一緒に更新する。写真の追加などでページ数が変わった場合は本READMEのページ数も更新する。
+
+シンプル版は同じ環境で次を実行する。
+
+```powershell
+python scripts/export-simple-manual-pdf.py --browser-executable "C:/Program Files/Google/Chrome/Application/chrome.exe"
+```
+
+`output/pdf/solistpan-simple.pdf` と公開用の `manual/solistpan-simple.pdf` を更新する。
