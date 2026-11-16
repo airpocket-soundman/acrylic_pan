@@ -84,6 +84,7 @@ ssh -L 8765:127.0.0.1:8765 &lt;ユーザー&gt;@&lt;ラズパイのIPアドレ�
 <p>周ごとの表示は、その周に叩いた結果の正解率です。数値は周ごとに変動するため、全体の改善傾向を見せます。独立した評価用データによる精度とは区別してください。</p>
 <h3 id="odl-instrument">60点の精密ODL：楽器として使うための調整</h3>
 <p><strong>初期のセッティングで精度が悪い場合は、60点の精密ODLを繰り返し、楽器として実用的な精度へ高めます。</strong>中心だけでなく各エリアの四隅も含む60点を学習するため、エリア内の広い範囲で演奏できるように調整します。</p>
+<p><strong>十分に精度を回復するには、10〜50周程度が目安です。</strong>精密ODLの1周は60点を各1打なので、合計600〜3,000打に相当します。展示画面は1回の操作で5周学習するため、最初の5周に加えて「追加学習（さらに5周）」を繰り返し、合計10〜50周（5周単位で2〜10回）を目安に調整します。必要な周回数は設置状態により変わるため、エリアの中心とエッジ近くを実際に叩いて確認します。</p>
 <div class="warning"><p><strong>12点の簡易ODLだけでは、楽器として十分な精度は得られません。</strong><br>簡易ODLはエリア中心だけを叩くため、各エリアのエッジ近くを叩いた場合の精度改善には不十分です。中心での正解率が上がっても、そのままエリア全体を正しく認識できるとは限りません。楽器として使うための調整には60点の精密ODLを使用します。</p></div>
 <ol><li>「精密」を選び、「新たに5周を取り直す」で60点 × 5周を学習します。</li><li>「演奏」に戻り、各エリアの中心に加えてエッジ近くも叩き、実際の演奏範囲で認識を確認します。</li><li>まだ精度が十分でなければ、「精密」のまま「追加学習（さらに5周）」を実行します。取り直しではなく、学習済みの状態を引き継いで繰り返します。</li><li>実際に演奏し、狙ったエリアの音が安定して出ることを確認して、使用する重みを保存します。</li></ol>
 <figure class="screen"><button type="button" aria-label="追加学習の方式選択画面を拡大"><img src="assets/odl.png" alt="追加学習画面。高速、精密、新たに5周、さらに5周の位置を示す。"></button><figcaption>図7-1 追加学習の開始前。疑似基板・初期モデルの表示例です。</figcaption></figure>
@@ -97,6 +98,7 @@ ssh -L 8765:127.0.0.1:8765 &lt;ユーザー&gt;@&lt;ラズパイのIPアドレ�
 <p>基板の有効な校正保存枠は1件です。複数の校正を残すときは端末側の保存とJSONを使います。基礎モデルが変わると重みの互換性がなくなる場合があり、CRCによる確認が行われます。</p></section>
 
 <section class="chapter" id="collect"><h2><span class="num">08 / DATA COLLECTION</span>学習用データを採取する</h2><p>基礎モデルを作り直すための振動データを、ガイドに従って収録します。ODLで保存した重みとは別のデータです。採取はラズパイでもWindowsでも行えます。ラズパイでは「管理」→<strong>「学習用データ採取」</strong>で開きます。</p>
+<div class="note"><p><strong>データを再収集して再学習すると、精度の大幅な回復が期待できます。</strong><br>一方、学習用データの採取には全体で3〜4時間、1セッションあたり約30分が目安です。必要なセッション数や採取条件により所要時間は変わります。ここでの時間はデータ採取の目安で、PCでの学習や基板への書き込み時間は含みません。</p></div>
 <h3>8.1 学習用と評価用を先に分ける</h3><p>1セットは、中心12地点の収録と四隅48地点の収録を合わせた60地点です。<strong>ファイル上は中心と四隅の2セッション</strong>になります。始める前に保存先と用途を決め、評価用は学習用と混ぜません。</p>
 <div class="table-wrap"><table><thead><tr><th>用途</th><th>各位置の回数</th><th>中心セッション</th><th>四隅セッション</th><th>1セット</th></tr></thead><tbody><tr><td>学習用</td><td>50打</td><td>12 × 50＝600打</td><td>48 × 50＝2,400打</td><td>3,000打 / 2セッション</td></tr><tr><td>独立評価用</td><td>10打</td><td>12 × 10＝120打</td><td>48 × 10＝480打</td><td>600打 / 2セッション</td></tr></tbody></table></div>
 <div class="note"><p>保存先の例：学習用は <code>data/raw/manual_training</code>、評価用は <code>data/raw/manual_evaluation</code>。これは実行中のサーバーが動く端末上のパスです。ラズパイで採取したデータは、見ているWindows PCではなくラズパイに保存されます。</p></div>
@@ -122,21 +124,33 @@ scp -r &lt;ユーザー&gt;@&lt;ラズパイ&gt;:~/acrylic_pan/data/raw/manual_e
 <details><summary>学習用16セッションのIDを確認する</summary><div class="table-wrap"><table><thead><tr><th>セット</th><th>中心 / 四隅のセッションID</th></tr></thead><tbody>
 <tr><td>T1</td><td><code>20261101_195747_732dc622</code><br><code>20261101_200409_bd8186a8</code></td></tr><tr><td>T2</td><td><code>20261102_185605_ab2d7390</code><br><code>20261102_190132_d56127fe</code></td></tr><tr><td>T3</td><td><code>20261102_205927_3a0bfe2b</code><br><code>20261102_210517_43fe6700</code></td></tr><tr><td>T4</td><td><code>20261103_193903_70647316</code><br><code>20261103_194422_cb514bb0</code></td></tr><tr><td>T5</td><td><code>20261103_201104_5bfa30bd</code><br><code>20261103_201610_061ef5b9</code></td></tr><tr><td>T6</td><td><code>20261104_201234_55f30e5c</code><br><code>20261104_201915_101fc433</code></td></tr><tr><td>T7</td><td><code>20261105_190133_6b691207</code><br><code>20261105_191139_f2d0028d</code></td></tr><tr><td>T8</td><td><code>20261105_194325_3c60eb92</code><br><code>20261105_194942_0523c534</code></td></tr>
 </tbody></table></div></details>
-<h3>9.2 学習環境とデータを準備する</h3><ol><li>開発PCにリポジトリ、Python環境、<code>requirements.txt</code>の依存パッケージを用意します。ファーム更新には別途LEXIDEのベンダープロジェクト、ビルドツール、MCU-Linkが必要です。</li><li>学習用フォルダと独立評価用フォルダを分けます。学習用の「all」は、そのフォルダ内の完了セッションすべてを意味します。評価用を同じフォルダへ置かないでください。</li><li>中心と四隅の対応、板仕様、セッションの完了状態、件数を確認します。60地点すべてを含むデータを使います。</li><li>公式Simulator由来の固定αが <code>data/dummy_model/model.npz</code> に含まれていることを確認します。<code>alpha</code>行列の先頭128×32が使われます。乱数で代用すると同じモデル条件になりません。</li><li>変更前に使用中のファームウェア、生成ヘッダー、PCモデル、校正JSONを保存します。</li></ol>
-<p>最新モデルの元データは <code>data/archives/20261103/T1_train.zip</code>〜<code>T8_train.zip</code>、評価用は <code>E1_evaluation.zip</code>〜<code>E4_evaluation.zip</code>です。<code>manifest.json</code>に用途・件数・SHA-256があります。展開時も元のセッションフォルダ構造を保ちます。</p>
-<h3>9.3 新しい候補モデルを学習する</h3><p>次は、採取したデータで128–32–60の候補を作る汎用コマンドです。リポジトリ直下で実行します。<code>python</code>は依存パッケージを導入済みのPythonに置き換えてください。最初は出力を候補フォルダへ置き、搭載用ファイルを直接上書きしません。</p>
-<pre><code>python -m sim.device_position_probability --sessions data/raw/manual_training --session-ids all --output-dir artifacts/manual_candidate/device_position --header artifacts/manual_candidate/apan_position_probability_model.h</code></pre>
-<p>出力は <code>model.npz</code>、<code>training_report.json</code>、指定したモデルヘッダーです。処理内では反復番号を使う内部評価を行った後、選んだ学習データ全件で最終候補を学習します。内部評価の結果だけで独立評価の代わりにしないでください。</p>
-<div class="note"><p><strong>最新配備モデルを厳密に再生成する場合</strong><br>最新24,000打版は <code>scripts/capacity_comparison.py</code> → <code>scripts/capacity_add_t8.py</code> の実験系列で生成され、160エポック・蒸留比率0.25の設定を使用しています。上の汎用CLIは同じ構造の候補作成手順で、配備バイナリをそのまま再現する保証はありません。厳密な再現には、配備時のデータ、特徴キャッシュ、学習条件をそろえ、<a href="https://github.com/airpocket-soundman/acrylic_pan/blob/b0fb2b1/scripts/capacity_add_t8.py">生成スクリプト</a>と配備記録を照合します。</p></div>
-<h3>9.4 独立データで比較する</h3><pre><code>python -m sim.evaluate_device_model --model artifacts/manual_candidate/device_position/model.npz --sessions data/raw/manual_evaluation --session-ids all &gt; artifacts/manual_candidate/independent_evaluation.json</code></pre>
-<p>現在使用中のモデルにも<strong>同じ評価セッション</strong>を入力し、60位置Top-1、12エリア精度、平均距離誤差、25 mm以内率、地点別の失敗傾向を比較します。学習レポートの <code>session_ids</code> と評価用IDに重複がないことを確認します。悪化した候補は配備せず、収録条件・誤ラベル・データ偏りを見直します。</p>
-<h3>9.5 モデルとODL初期行列を反映する</h3><p>採用後に、候補モデルに対応するODL初期行列を生成します。学習時と同じセッションを指定します。</p><pre><code>python -m sim.position_odl_calibration_prior --sessions data/raw/manual_training --session-ids all --model artifacts/manual_candidate/device_position/model.npz --prior-header artifacts/manual_candidate/apan_calibration_prior.h</code></pre>
-<ol><li>採用した <code>apan_position_probability_model.h</code> と <code>apan_calibration_prior.h</code> を、両方とも <code>firmware/AcrylicPanCollector/generated/</code> へ反映します。モデルと初期行列を別世代で混ぜません。</li><li>Windowsの開発環境でクリーンビルドします。下のパスは実際のベンダープロジェクトへ置き換えます。</li></ol>
-<pre><code>.\scripts\build-firmware.ps1 -SourceProject &lt;LEXIDEのベンダープロジェクト&gt; -Clean
-.\scripts\flash-firmware.ps1 -FirmwareHex &lt;ビルドで生成されたHEX&gt; -Execute</code></pre>
-<p>書き込み前にWebサーバーなどのポート使用を止め、対象基板とMCU-Linkの接続を確認します。ビルド結果のリンクマップに <code>ApanCollectorAppInitialize</code> と <code>apan_position_beta</code> が入り、βとCRCが意図した候補に一致することを確認します。</p>
-<h3>9.6 更新後の確認と復旧</h3><ul class="checklist"><li>書き込み・照合が成功し、基板を再起動できる。</li><li>USB接続、演奏、12エリア反応、音声が動作する。</li><li>新しい基礎モデルでODLの開始・中止・保存ができる。</li><li>電源を入れ直しても基礎モデルと有効な校正が意図どおり使われる。</li><li>モデル、データID、評価JSON、ヘッダー、CRC、Gitコミット、HEX/ELFをまとめて保存した。</li></ul>
-<p>問題があれば保存した動作確認済みのHEXを書き戻します。ソースを戻すだけでは基板は戻りません。モデルのCRCが変わると既存校正が無効になるため、復旧・更新後は校正状態も確認します。</p></section>
+<h3>9.2 精度が十分に回復しない場合</h3>
+<p>精密ODLを繰り返しても十分な精度が得られない場合は、実際の設置・支持状態と使用するマレットで学習データを再収集し、PCで基礎モデルを再学習します。<strong>データを再収集して再学習すれば、精度は大幅に回復します。</strong>ただし、データ採取には3〜4時間程度、1セッションあたり約30分かかることを見込んで準備してください。</p>
+<p>所要時間は収録範囲とセッション数によって変わります。今回の再学習に必要なデータを決めてから採取を始めます。</p>
+<h3>9.3 リポジトリをクローンする</h3>
+<p>学習・評価・モデル出力・ファームウェア書き込みまでの実装と資料は、次のリポジトリにあります。</p>
+<p><strong><a href="https://github.com/airpocket-soundman/acrylic_pan">https://github.com/airpocket-soundman/acrylic_pan</a></strong></p>
+<p>開発用PCの作業用フォルダでクローンします。</p>
+<pre><code>git clone https://github.com/airpocket-soundman/acrylic_pan.git
+cd acrylic_pan</code></pre>
+<h3>9.4 LLMに学習から書き込みまで確認させる</h3>
+<p><strong>クローンしたリポジトリを読めるLLM・コーディングエージェントに、再学習方法を確認させてください。</strong>リポジトリ内の資料とスクリプトを確認すれば、データの準備から学習、評価、基板への書き込みまでの手順が分かります。次の依頼文を使えます。</p>
+<pre><code>このリポジトリを確認して、Solistpanの最新構成で、
+学習データの再収集・モデルの再学習・評価・Solist-AI基板への
+書き込みまでの手順を、現在の実装に合わせて教えてください。
+
+README、docs、scripts、sim、firmwareを読み、次を確認してください。
+1. 使う学習データと独立評価データ、保存先、セッションID
+2. 必要なPython環境、公式Simulator由来のα、学習条件
+3. 学習・評価・モデルとODL初期行列の生成手順
+4. LEXIDEプロジェクト、ビルドツール、MCU-Linkなどの書き込み環境
+5. クリーンビルド、書き込み・照合、実機の接続・演奏確認
+6. 変更前のモデル・ファーム・校正のバックアップと復旧方法
+
+使用するPCの環境と接続基板を確認したうえで、
+実行するコマンドと出力先を具体的に示してください。</code></pre>
+<p>LLMには、今回採取したデータの場所、使用PCのOS、接続する基板と書き込み器も伝えます。学習用と評価用を混ぜず、必要な機器・ツール・生成ファイルを確認したうえで作業します。</p>
+<p>書き込み後は、12エリアの中心とエッジ近くでの演奏、ODL、再起動後の状態を実機で確認してください。ソースコードを更新しただけでは、基板のモデルは更新されません。</p></section>
 
 <section class="chapter" id="exhibit"><h2><span class="num">10 / EXHIBITION</span>展示で使う</h2><h3>開場前の点検</h3><ul class="checklist"><li>配線が抜けかけていない。板・フレーム・センサに緩みがない。</li><li>電源投入から演奏画面まで自動で立ち上がる。</li><li>12エリアで発音と表示を確認し、適切な音量になっている。</li><li>カメラを使う場合は映像とフィットが合っている。</li><li>管理画面の必須項目に赤がない。黄色は内容を読み、使用する機能に問題がない。</li><li>ネットワークなしでも、演奏・音声・必要な動画が使える。</li></ul>
 <h3>デモ動画を見せる</h3><p>上部の「デモ動画」で再生画面へ移動します。動画を出るときは「演奏」へ戻ります。動画はラズパイ上の <code>web/assets/pv/</code> のMP4を使います。別フォルダはサーバーの <code>--video-dir</code> で指定できます。</p>
