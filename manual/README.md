@@ -7,7 +7,7 @@ GitHub Pagesの既存設定（main / リポジトリ直下）で配信する静�
 - `index.html`: 本文。最新配備モデルのみを記載。
 - `style.css`: レスポンシブ表示とA4縦の印刷指定。
 - `manual.js`: 目次、画像拡大、印刷。
-- `solistpan-manual.pdf`: A4縦・32ページのPDF版。HTMLヘッダーの「PDF版」からダウンロード可能。
+- `solistpan-manual.pdf`: A4縦・33ページのPDF版。HTMLヘッダーの「PDF版」からダウンロード可能。
 - `pdf.css`: ダウンロード用PDFの追加印刷レイアウト。
 - `assets/*.png`: 実装を実際に起動して撮影したUIと、後付けの番号・枠。
 - `assets/device-wiring.svg`、`assets/debug-network.svg`: 機器配線とデバッグ時のネットワークを示すベクター模式図。

@@ -48,4 +48,5 @@
   #retrain details th,#retrain details td{padding:2mm 3mm}
   #exhibit .screen img{max-height:115mm}
   .pdf-prompt{break-inside:avoid}
+  .pdf-mallets{break-before:page;break-inside:avoid}
 }

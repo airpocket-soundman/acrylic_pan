@@ -42,6 +42,15 @@ def main():
           });
           toc.append(cover.querySelector('.note'),cover.querySelector('.caption'));
           cover.after(toc);
+          const malletHeading=document.querySelector('#mallets');
+          if(malletHeading){
+            const malletGroup=document.createElement('div');malletGroup.className='pdf-mallets';
+            const malletText=malletHeading.nextElementSibling;
+            const malletPhoto=malletText.nextElementSibling;
+            const malletNote=malletPhoto.nextElementSibling;
+            malletGroup.append(malletHeading,malletText,malletPhoto,malletNote);
+            document.querySelector('#about').append(malletGroup);
+          }
           const transfer=document.querySelector('#collect pre');
           const transferNote=document.createElement('p');
           transferNote.textContent='ラズパイからPCへの転送コマンドは、付録A「A.4 収録データをPCへコピーする」を参照してください。';
